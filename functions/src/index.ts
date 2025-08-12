@@ -1,4 +1,5 @@
 import { onCall } from "firebase-functions/v2/https";
+import { initializeApp } from "firebase-admin/app";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import Stripe from "stripe";
@@ -7,13 +8,13 @@ import { logger } from "firebase-functions";
 admin.initializeApp();
 
 const stripe = new Stripe(
-  "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",
+  process.env.STRIPE_SECRET_KEY || "",
   {
     apiVersion: "2025-06-30.basil",
   }
 );
 
-export const cancelSubscription = onCall(async (request) => {
+export const cancelSubscription = onCall(async (request: functions.https.CallableRequest) => {
   try {
     const { subscriptionId, userId } = request.data;
 
@@ -50,7 +51,7 @@ export const cancelSubscription = onCall(async (request) => {
   }
 });
 
-export const upgradeSubscription = onCall(async (request) => {
+export const upgradeSubscription = onCall(async (request: functions.https.CallableRequest) => {
   try {
     const { subscriptionId, newPriceId, userId } = request.data;
 
@@ -105,7 +106,7 @@ export const upgradeSubscription = onCall(async (request) => {
   }
 });
 
-export const getPlanById = onCall(async (request) => {
+export const getPlanById = onCall(async (request: functions.https.CallableRequest) => {
   const { priceId } = request.data;
 
   if (!priceId || typeof priceId !== "string") {
@@ -141,7 +142,7 @@ export const getPlanById = onCall(async (request) => {
   }
 });
 
-export const mintCustomToken = onCall(async (request) => {
+export const mintCustomToken = onCall(async (request: functions.https.CallableRequest) => {
   // 1️⃣ Log inicial
   logger.log('mintCustomToken called with data:', request.data);
 

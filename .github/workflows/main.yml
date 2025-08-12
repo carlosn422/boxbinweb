@@ -53,6 +53,7 @@ jobs:
           DROPLET_USER: root
           DROPLET_PASS: ${{ secrets.DROPLET_PASSWORD }}
           IMAGE: registry.digitalocean.com/dockerimages/app:box-bin-web
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
         run: |
           sshpass -p "$DROPLET_PASS" ssh -o StrictHostKeyChecking=no $DROPLET_USER@$DROPLET_IP << 'EOF'
             set -e
