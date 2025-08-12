@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "../../components/ui/checkbox";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Grid, List, Search } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Input } from "../../components/ui/input";
@@ -18,6 +18,7 @@ import {
   writeBatch,
   doc,
 } from "firebase/firestore";
+import { Badge } from "@/components/ui/badge";
 
 type LabelType = {
   dateCreated: string;
@@ -182,24 +183,27 @@ export const SmartLabelsPage = () => {
     }
   };
 
-  return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+return (
+  <div className="container mx-auto p-6 max-w-7xl">
+    {/* Header Section */}
+    <div className="mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Smart Labels</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 mb-2">
+            Smart Labels
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400">
             Manage and organize your QR code labels
           </p>
         </div>
+        
         {selectedLabels.length > 0 && (
-          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <div className="text-sm text-blue-700">
+          <div className="flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-950/50 rounded-lg border border-blue-200 dark:border-blue-800/50">
+            <div className="text-sm text-blue-700 dark:text-blue-300">
               <span className="font-medium">{selectedLabels.length}</span> label
               {selectedLabels.length !== 1 ? "s" : ""} selected
             </div>
             <Button
-              variant="default"
               onClick={() => {
                 navigate("/smart-labels/templates", {
                   state: {
@@ -207,45 +211,44 @@ export const SmartLabelsPage = () => {
                   },
                 });
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="h-9 text-sm"
             >
               Generate Template
             </Button>
           </div>
         )}
       </div>
+    </div>
 
-      {/* Filters Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Filters & Search
-        </h2>
-
+    {/* Filters Section */}
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="text-lg">Filters & Search</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
         {/* Search Section */}
-        <div className="space-y-4 mb-6">
+        <div className="space-y-4">
           <div className="space-y-3">
             <Label
               htmlFor="search"
-              className="text-sm font-medium text-gray-700"
+              className="text-sm font-medium text-slate-700 dark:text-slate-300"
             >
               Search by QR Code IDs
             </Label>
 
             {/* Search Tags */}
             {searchTags.length > 0 && (
-              <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-lg border">
+              <div className="flex flex-wrap gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
                 {searchTags.map((tag, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-md text-sm shadow-sm"
+                    className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-md text-sm shadow-sm"
                   >
-                    <span className="text-gray-700">{tag}</span>
+                    <span className="text-slate-700 dark:text-slate-300">{tag}</span>
                     <button
                       type="button"
                       onClick={() => {
-                        const newTags = searchTags.filter(
-                          (_, i) => i !== index
-                        );
+                        const newTags = searchTags.filter((_, i) => i !== index);
                         setSearchTags(newTags);
 
                         if (newTags.length === 0) {
@@ -262,7 +265,7 @@ export const SmartLabelsPage = () => {
                           );
                         }
                       }}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
+                      className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 transition-colors"
                     >
                       ×
                     </button>
@@ -274,7 +277,7 @@ export const SmartLabelsPage = () => {
                     setSearchTags([]);
                     setLabels(allLabels);
                   }}
-                  className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                  className="px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-md transition-colors"
                 >
                   Clear all
                 </button>
@@ -283,14 +286,12 @@ export const SmartLabelsPage = () => {
 
             {/* Search Input */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
                 id="search"
                 placeholder="Enter QR Code IDs (comma separated)"
                 value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                }}
+                onChange={(e) => setSearchTerm(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
                     e.preventDefault();
@@ -314,7 +315,7 @@ export const SmartLabelsPage = () => {
                     }
                   }
                 }}
-                className="pl-10 h-11 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                className="pl-10 h-10"
               />
             </div>
           </div>
@@ -322,7 +323,7 @@ export const SmartLabelsPage = () => {
           {/* Date Filters */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">
+              <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 Start Date
               </Label>
               <DatePicker
@@ -331,13 +332,13 @@ export const SmartLabelsPage = () => {
                 selectsStart
                 startDate={startDate || undefined}
                 endDate={endDate || undefined}
-                className="w-full h-11 border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full h-10 border border-slate-300 dark:border-slate-600 rounded-md px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-blue-500 focus:ring-blue-500"
                 placeholderText="Select start date"
                 maxDate={new Date()}
               />
             </div>
             <div className="space-y-2">
-              <Label className="text-sm font-medium text-gray-700">
+              <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">
                 End Date
               </Label>
               <DatePicker
@@ -346,7 +347,7 @@ export const SmartLabelsPage = () => {
                 selectsEnd
                 startDate={startDate || undefined}
                 endDate={endDate || undefined}
-                className="w-full h-11 border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:ring-blue-500"
+                className="w-full h-10 border border-slate-300 dark:border-slate-600 rounded-md px-3 py-2 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 focus:border-blue-500 focus:ring-blue-500"
                 placeholderText="Select end date"
                 minDate={startDate || undefined}
                 maxDate={new Date()}
@@ -359,224 +360,219 @@ export const SmartLabelsPage = () => {
                   setStartDate(null);
                   setEndDate(null);
                 }}
-                className="h-11 border-gray-300 text-gray-600 hover:bg-gray-50"
+                className="h-10"
               >
                 Clear Dates
               </Button>
             )}
           </div>
         </div>
-      </div>
+      </CardContent>
+    </Card>
 
-      {/* Actions Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-            className="gap-2 border-gray-300"
-          >
-            {viewMode === "grid" ? (
-              <>
-                <List className="h-4 w-4" />
-                List View
-              </>
-            ) : (
-              <>
-                <Grid className="h-4 w-4" />
-                Grid View
-              </>
-            )}
-          </Button>
-
-          {labels.length > 0 && (
-            <div className="text-sm text-gray-600">
-              Showing <span className="font-medium">{labels.length}</span> label
-              {labels.length !== 1 ? "s" : ""}
-            </div>
-          )}
-        </div>
-
+    {/* Actions Bar */}
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex items-center gap-4">
         <Button
-          onClick={() => setShowQuantityModal(true)}
-          disabled={isLoading}
-          className="bg-green-600 hover:bg-green-700 gap-2"
+          variant="outline"
+          size="sm"
+          onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
+          className="gap-2"
         >
-          {isLoading ? (
+          {viewMode === "grid" ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-              Creating...
+              <List className="h-4 w-4" />
+              List View
             </>
           ) : (
-            "Create Label"
+            <>
+              <Grid className="h-4 w-4" />
+              Grid View
+            </>
           )}
         </Button>
+
+        {labels.length > 0 && (
+          <div className="text-sm text-slate-600 dark:text-slate-400">
+            Showing <span className="font-medium text-slate-900 dark:text-slate-100">{labels.length}</span> label
+            {labels.length !== 1 ? "s" : ""}
+          </div>
+        )}
       </div>
 
-      {/* Content Area */}
-      {labels.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
-          <div className="text-gray-400 mb-2">
-            <Search className="h-12 w-12 mx-auto" />
+      <Button
+        onClick={() => setShowQuantityModal(true)}
+        disabled={isLoading}
+        className="gap-2 h-10"
+      >
+        {isLoading ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+            Creating...
+          </>
+        ) : (
+          "Create Label"
+        )}
+      </Button>
+    </div>
+
+    {/* Content Area */}
+    {labels.length === 0 ? (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-12">
+          <div className="text-slate-400 dark:text-slate-500 mb-4">
+            <Search className="h-12 w-12" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-1">
+          <h3 className="text-lg font-medium text-slate-900 dark:text-slate-100 mb-2">
             No labels found
           </h3>
-          <p className="text-gray-600">
+          <p className="text-slate-600 dark:text-slate-400 text-center">
             Try adjusting your search filters or create a new label.
           </p>
-        </div>
-      ) : (
-        <>
-          {/* List View */}
-          {viewMode === "list" && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-              <div className="divide-y divide-gray-200">
+        </CardContent>
+      </Card>
+    ) : (
+      <>
+        {/* List View */}
+        {viewMode === "list" && (
+          <Card>
+            <CardContent className="p-0">
+              <div className="divide-y divide-slate-200 dark:divide-slate-700">
                 {labels.map((label) => (
                   <div
                     key={label.guid}
-                    className="p-4 hover:bg-gray-50 transition-colors flex items-center space-x-4"
+                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors flex items-center space-x-4"
                   >
                     <Checkbox
                       checked={selectedLabels.includes(label.guid)}
                       onCheckedChange={() => handleLabelSelect(label.guid)}
-                      className="border-gray-300"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-medium text-slate-900 dark:text-slate-100">
                             QR Code: {label.qrcodeId}
                           </div>
-                          {/* <div className="text-sm text-gray-600 mt-1">
-                            Field: {label.field}
-                          </div> */}
                         </div>
                         <div className="text-right">
-                          <div className="text-xs text-gray-500 mb-2">
-                            Created:{" "}
-                            {new Date(label.dateCreated).toLocaleString()}
+                          <div className="text-xs text-slate-500 dark:text-slate-400 mb-2">
+                            Created: {new Date(label.dateCreated).toLocaleString()}
                           </div>
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          <Badge
+                            variant={label.isUsed ? "destructive" : "secondary"}
+                            className={
                               label.isUsed
-                                ? "bg-red-100 text-red-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
+                                ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800"
+                                : "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-300 dark:border-green-800"
+                            }
                           >
                             {label.isUsed ? "Used" : "Available"}
-                          </span>
+                          </Badge>
                         </div>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            </CardContent>
+          </Card>
+        )}
 
-          {/* Grid View */}
-          {viewMode === "grid" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {labels.map((label) => (
-                <Card
-                  key={label.guid}
-                  className="hover:shadow-lg transition-all duration-200 border-gray-200"
-                >
-                  <CardContent className="p-5">
-                    <div className="flex items-start space-x-3">
-                      <Checkbox
-                        checked={selectedLabels.includes(label.guid)}
-                        onCheckedChange={() => handleLabelSelect(label.guid)}
-                        className="mt-1 border-gray-300"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-gray-900 truncate">
+        {/* Grid View */}
+        {viewMode === "grid" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {labels.map((label) => (
+              <Card
+                key={label.guid}
+                className="hover:shadow-md transition-shadow duration-200"
+              >
+                <CardContent className="p-4">
+                  <div className="flex items-start space-x-3">
+                    <Checkbox
+                      checked={selectedLabels.includes(label.guid)}
+                      onCheckedChange={() => handleLabelSelect(label.guid)}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 min-w-0 space-y-3">
+                      <div>
+                        <div className="font-medium text-slate-900 dark:text-slate-100 truncate">
                           QR Code: {label.qrcodeId}
                         </div>
-                        {/* <div className="text-sm text-gray-600 mt-1 truncate">
-                          Field: {label.field}
-                        </div> */}
-                        <div className="text-xs text-gray-500 mt-3">
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                           {new Date(label.dateCreated).toLocaleDateString()}
                         </div>
-                        <div className="mt-3">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                              label.isUsed
-                                ? "bg-red-100 text-red-800"
-                                : "bg-green-100 text-green-800"
-                            }`}
-                          >
-                            {label.isUsed ? "Used" : "Available"}
-                          </span>
-                        </div>
                       </div>
+                      <Badge
+                        variant={label.isUsed ? "destructive" : "secondary"}
+                        className={
+                          label.isUsed
+                            ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800"
+                            : "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/50 dark:text-green-300 dark:border-green-800"
+                        }
+                      >
+                        {label.isUsed ? "Used" : "Available"}
+                      </Badge>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </>
+    )}
 
-      {/* Modal */}
-      {showQuantityModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-1">
-                Create New Labels
-              </h2>
-              <p className="text-gray-600 text-sm mb-6">
-                Specify how many labels you want to create
-              </p>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Number of labels to create:
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:ring-blue-500"
-                    placeholder="Enter quantity"
-                  />
-                </div>
+    {/* Modal */}
+    {showQuantityModal && (
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-xl">Create New Labels</CardTitle>
+            <CardDescription>
+              Specify how many labels you want to create
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">
+                  Number of labels to create:
+                </Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="100"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                  placeholder="Enter quantity"
+                  className="h-10"
+                />
               </div>
             </div>
+          </CardContent>
 
-            <div className="flex justify-end space-x-3 px-6 py-4 bg-gray-50 rounded-b-xl">
-              <Button
-                variant="outline"
-                onClick={() => setShowQuantityModal(false)}
-                className="border-gray-300"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  setShowQuantityModal(false);
-                  handleCreateLabel({
-                    field: `New Label ${
-                      quantity > 1 ? "(x" + quantity + ")" : ""
-                    }`,
-                  });
-                }}
-                className="bg-green-600 hover:bg-green-700"
-              >
-                Create {quantity > 1 ? `${quantity} Labels` : "Label"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+          <CardFooter className="flex justify-end space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowQuantityModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                setShowQuantityModal(false);
+                handleCreateLabel({
+                  field: `New Label ${quantity > 1 ? "(x" + quantity + ")" : ""}`,
+                });
+              }}
+            >
+              Create {quantity > 1 ? `${quantity} Labels` : "Label"}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    )}
+  </div>
+);
 };

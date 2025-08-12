@@ -12,11 +12,10 @@ import {
   Calendar,
   X,
   Loader2,
-  Check,
   AlertCircle,
   RefreshCw,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import {
   addDoc,
@@ -482,64 +481,40 @@ export const LocationsManager = () => {
   const totalPages = Math.ceil(totalLocations / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Floating alert */}
-      {/*showAlert.show && (
-        <Alert
-          className={`fixed top-4 right-4 z-50 max-w-md shadow-lg border-l-4 ${
-            showAlert.type === "error"
-              ? "border-l-red-500 bg-red-50 border-red-200"
-              : "border-l-green-500 bg-green-50 border-green-200"
-          } animate-in slide-in-from-right-full duration-300`}
-        >
-          <div className="flex items-center">
-            {showAlert.type === "error" ? (
-              <AlertCircle className="h-4 w-4 text-red-600 mr-2" />
-            ) : (
-              <Check className="h-4 w-4 text-green-600 mr-2" />
-            )}
-            <AlertDescription
-              className={
-                showAlert.type === "error" ? "text-red-800" : "text-green-800"
-              }
-            >
-              {t(`locations.alert.${showAlert.type}`, {
-                message: showAlert.message,
-              })}
-            </AlertDescription>
-          </div>
-        </Alert>
-      )*/}
-
-      {/* Impersonation Header */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+     
       {userImpersonated && (
-        <div className="bg-gray-50 border-b border-gray-200">
-          <div className="container mx-auto px-6 py-2 max-w-7xl flex items-center justify-end space-x-4">
-            <span className="text-sm text-gray-500">
+        <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-200/50 backdrop-blur-sm">
+          <div className="container mx-auto px-6 py-3 max-w-7xl flex items-center justify-end space-x-4">
+            <span className="text-sm text-orange-700 font-medium">
               {t("dashboard.by")}{" "}
-              <strong>{userImpersonated?.ownerUsername}</strong>
+              <strong className="text-orange-800">{userImpersonated?.ownerUsername}</strong>
             </span>
             <button
               onClick={clearImpersonation}
-              className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200 transition-colors duration-200"
+              className="px-4 py-1.5 bg-gradient-to-r from-red-100 to-red-200 text-red-700 rounded-full text-sm font-medium hover:from-red-200 hover:to-red-300 transition-all duration-200 shadow-sm border border-red-200"
             >
               {t("dashboard.stopImpersonation")}
             </button>
           </div>
         </div>
       )}
-      <div className="container mx-auto px-4 py-8">
+      
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
-          <div className="flex items-center gap-4 mb-4 sm:mb-0">
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <Building className="h-8 w-8 text-blue-600" />
+          <div className="flex items-center gap-5 mb-4 sm:mb-0">
+            <div className="relative group">
+              <div className="absolute inset-0 bg-blue-400 rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity"></div>
+              <div className="relative p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl">
+                <Building className="h-8 w-8 text-white" />
+              </div>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
                 {t("locations.title")}
               </h1>
-              <p className="text-gray-600 mt-1">{t("locations.subtitle")}</p>
+              <p className="text-gray-600 mt-2 text-lg font-medium">{t("locations.subtitle")}</p>
             </div>
           </div>
 
@@ -549,13 +524,17 @@ export const LocationsManager = () => {
               size="sm"
               onClick={handleRefresh}
               disabled={pageLoading}
+              className="border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all duration-200"
             >
               <RefreshCw
                 className={`h-4 w-4 mr-2 ${pageLoading ? "animate-spin" : ""}`}
               />
               {t("locations.refresh")}
             </Button>
-            <Badge variant="outline" className="px-3 py-1">
+            <Badge 
+              variant="outline" 
+              className="px-3 py-1.5 bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 font-medium"
+            >
               {totalLocations} {t("locations.count")}
             </Badge>
             {totalLocations <= Number(subscription?.metadata?.locations) && (
@@ -564,7 +543,7 @@ export const LocationsManager = () => {
                   resetForm();
                   setIsModalVisible(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-700 shadow-lg"
+                className="bg-gradient-to-r from-blue-600 via-blue-600 to-blue-700 hover:from-blue-700 hover:via-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {t("locations.new")}
@@ -574,94 +553,98 @@ export const LocationsManager = () => {
         </div>
 
         {/* Filters and search */}
-        <Card className="mb-6 shadow-sm border-0 bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder={t("locations.searchPlaceholder")}
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  className="pl-10 pr-10 h-11 border-gray-200 focus:border-blue-500 focus:ring-blue-500"
-                />
-                {searchText && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-1 h-7 w-7"
-                    onClick={() => setSearchText("")}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-              <div className="flex gap-3">
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="name">
-                      {t("locations.sort.name")}
-                    </SelectItem>
-                    <SelectItem value="createdAt">
-                      {t("locations.sort.date")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select value={sortOrder} onValueChange={setSortOrder}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="asc">
-                      {t("locations.sort.asc")}
-                    </SelectItem>
-                    <SelectItem value="desc">
-                      {t("locations.sort.desc")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={itemsPerPage.toString()}
-                  onValueChange={(v) => setItemsPerPage(parseInt(v))}
+        <Card className="mb-6 shadow-sm border-0 bg-white">
+          <CardContent className="p-0">
+            <div className="flex items-center bg-gray-50 rounded-t-lg p-3 border-b">
+              <Search className="h-4 w-4 text-gray-500 mr-2" />
+              <Input
+                placeholder={t("locations.searchPlaceholder")}
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="border-0 bg-transparent focus:ring-0 h-8 text-sm flex-1"
+              />
+              {searchText && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-gray-200 rounded"
+                  onClick={() => setSearchText("")}
                 >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="6">6</SelectItem>
-                    <SelectItem value="12">12</SelectItem>
-                    <SelectItem value="24">24</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            <div className="p-4 flex gap-3">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-40 h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">
+                    {t("locations.sort.name")}
+                  </SelectItem>
+                  <SelectItem value="createdAt">
+                    {t("locations.sort.date")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={sortOrder} onValueChange={setSortOrder}>
+                <SelectTrigger className="w-32 h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="asc">
+                    {t("locations.sort.asc")}
+                  </SelectItem>
+                  <SelectItem value="desc">
+                    {t("locations.sort.desc")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select
+                value={itemsPerPage.toString()}
+                onValueChange={(v) => setItemsPerPage(parseInt(v))}
+              >
+                <SelectTrigger className="w-20 h-9 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="6">6</SelectItem>
+                  <SelectItem value="12">12</SelectItem>
+                  <SelectItem value="24">24</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
 
         {/* Loading state */}
         {pageLoading && (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <div className="flex items-center justify-center py-24">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-10 w-10 animate-spin text-blue-600 mx-auto" />
+              <p className="text-gray-500 text-sm">{t("common.loading")}</p>
+            </div>
           </div>
         )}
 
         {/* Content */}
         {!pageLoading && filteredLocations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-32 h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full flex items-center justify-center mb-6">
-              <Building className="w-16 h-16 text-blue-600" />
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className="relative mb-8">
+              <div className="w-32 h-32 bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 rounded-3xl flex items-center justify-center shadow-lg">
+                <Building className="w-16 h-16 text-blue-600" />
+              </div>
+              <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full shadow-md"></div>
             </div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+            <h2 className="text-2xl font-semibold text-gray-900 mb-3">
               {searchText.trim()
                 ? t("locations.emptySearch")
                 : t("locations.empty")}
             </h2>
-            <p className="text-gray-600 mb-6 text-center max-w-md">
+            <p className="text-gray-600 mb-8 text-center max-w-md leading-relaxed">
               {searchText.trim()
                 ? t("locations.hintSearch")
                 : t("locations.hintEmpty")}
@@ -672,7 +655,7 @@ export const LocationsManager = () => {
                   resetForm();
                   setIsModalVisible(true);
                 }}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 {t("locations.createFirst")}
@@ -682,33 +665,63 @@ export const LocationsManager = () => {
         ) : (
           <>
             {/* Locations grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <div className="space-y-4 mb-8">
               {filteredLocations.map((location: any) => (
                 <Card
                   key={location.id}
-                  className={`group cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border-0 shadow-sm bg-white/80 backdrop-blur-sm ${
+                  className={`group cursor-pointer transition-all duration-200 hover:shadow-md border ${
                     selectedLocation?.id === location.id
-                      ? "ring-2 ring-blue-500 shadow-blue-100"
-                      : "hover:shadow-gray-200"
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 hover:border-gray-300"
                   }`}
                   onClick={() => handleLocationSelect(location)}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                          <MapPin className="h-5 w-5 text-blue-600" />
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          selectedLocation?.id === location.id ? 'bg-blue-100' : 'bg-gray-100'
+                        }`}>
+                          <MapPin className={`h-5 w-5 ${
+                            selectedLocation?.id === location.id ? 'text-blue-600' : 'text-gray-600'
+                          }`} />
                         </div>
-                        <div>
-                          <CardTitle className="text-lg font-semibold text-gray-900 group-hover:text-blue-700 transition-colors">
-                            {location.name}
-                          </CardTitle>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Calendar className="h-3 w-3 text-gray-400" />
-                            <span className="text-xs text-gray-500">
-                              {formatDate(location.createdAt)}
-                            </span>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 mb-1">
+                            <h3 className="text-lg font-semibold text-gray-900 truncate">
+                              {location.name}
+                            </h3>
+                            <Badge 
+                              variant="secondary" 
+                              className="text-xs px-2 py-0.5"
+                            >
+                              {t("locations.badge")}
+                            </Badge>
+                            {selectedLocation?.id === location.id && (
+                              <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5">
+                                {t("locations.selected")}
+                              </Badge>
+                            )}
                           </div>
+                          
+                          <div className="flex items-center gap-4 text-sm text-gray-600">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>{formatDate(location.createdAt)}</span>
+                            </div>
+                            {location.address && (
+                              <span className="truncate flex-1">
+                                {location.address}
+                              </span>
+                            )}
+                          </div>
+                          
+                          {location.description && (
+                            <p className="text-sm text-gray-700 mt-2 line-clamp-2">
+                              {location.description}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -717,7 +730,7 @@ export const LocationsManager = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-8 w-8 p-0"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <MoreVertical className="h-4 w-4" />
@@ -738,39 +751,13 @@ export const LocationsManager = () => {
                               e.stopPropagation();
                               confirmDeleteLocation(location.id);
                             }}
-                            className="text-red-600 hover:text-red-700"
+                            className="text-red-600"
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             {t("actions.delete")}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    </div>
-                  </CardHeader>
-
-                  <CardContent className="pt-0">
-                    {location.address && (
-                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                        {location.address}
-                      </p>
-                    )}
-                    {location.description && (
-                      <p className="text-sm text-gray-700 mb-3 line-clamp-2">
-                        {location.description}
-                      </p>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <Badge variant="secondary" className="px-2 py-1 text-xs">
-                        {t("locations.badge")}
-                      </Badge>
-                      {selectedLocation?.id === location.id && (
-                        <div className="flex items-center gap-1">
-                          <Check className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm text-blue-600 font-medium">
-                            {t("locations.selected")}
-                          </span>
-                        </div>
-                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -779,25 +766,26 @@ export const LocationsManager = () => {
 
             {/* Pagination */}
             {!searchText && totalPages > 1 && (
-              <div className="flex items-center justify-between">
-                <div className="text-sm text-gray-600">
+              <div className="flex items-center justify-between bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-gray-100">
+                <div className="text-sm text-gray-600 font-medium">
                   {t("locations.pagination.pageInfo", {
                     current: currentPage,
                     total: totalPages,
                     count: totalLocations,
                   })}
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={!hasPrevPage || pageLoading}
+                    className="border-gray-200 hover:border-blue-300 hover:bg-blue-50"
                   >
                     <ChevronLeft className="h-4 w-4" />
                     {t("pagination.previous")}
                   </Button>
-                  <span className="text-sm text-gray-600 px-3">
+                  <span className="text-sm text-gray-600 px-4 py-2 bg-gray-50 rounded-lg font-medium">
                     {currentPage} / {totalPages}
                   </span>
                   <Button
@@ -805,6 +793,7 @@ export const LocationsManager = () => {
                     size="sm"
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={!hasNextPage || pageLoading}
+                    className="border-gray-200 hover:border-blue-300 hover:bg-blue-50"
                   >
                     {t("pagination.next")}
                     <ChevronRight className="h-4 w-4 ml-1" />
@@ -818,29 +807,29 @@ export const LocationsManager = () => {
 
       {/* Modal for adding location */}
       <Dialog open={isModalVisible} onOpenChange={setIsModalVisible}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">
+        <DialogContent className="sm:max-w-[500px] bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-semibold text-gray-900">
               {t("locations.modal.newTitle")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">
-                {t("form.name")} *
+              <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+                {t("form.name")} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="name"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
                 placeholder={t("form.namePlaceholder")}
-                className="h-11"
+                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address" className="text-sm font-medium">
+              <Label htmlFor="address" className="text-sm font-medium text-gray-700">
                 {t("form.address")}{" "}
-                <span className="text-gray-500 font-normal">
+                <span className="text-gray-400 font-normal text-xs">
                   ({t("form.optional")})
                 </span>
               </Label>
@@ -849,13 +838,13 @@ export const LocationsManager = () => {
                 value={itemAddress}
                 onChange={(e) => setItemAddress(e.target.value)}
                 placeholder={t("form.addressPlaceholder")}
-                className="h-11"
+                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium">
+              <Label htmlFor="description" className="text-sm font-medium text-gray-700">
                 {t("form.description")}{" "}
-                <span className="text-gray-500 font-normal">
+                <span className="text-gray-400 font-normal text-xs">
                   ({t("form.optional")})
                 </span>
               </Label>
@@ -865,14 +854,14 @@ export const LocationsManager = () => {
                 onChange={(e) => setItemDescription(e.target.value)}
                 placeholder={t("form.descriptionPlaceholder")}
                 rows={4}
-                className="resize-none"
+                className="resize-none border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
               />
             </div>
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-6">
               <Button
                 variant="outline"
                 onClick={() => setIsModalVisible(false)}
-                className="flex-1"
+                className="flex-1 border-gray-200 hover:bg-gray-50"
                 disabled={operationLoading}
               >
                 {t("actions.cancel")}
@@ -880,7 +869,7 @@ export const LocationsManager = () => {
               <Button
                 onClick={handleSubmit}
                 disabled={!itemName.trim() || operationLoading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 {operationLoading ? (
                   <>
@@ -901,29 +890,29 @@ export const LocationsManager = () => {
 
       {/* Edit Location Modal */}
       <Dialog open={isEditModalVisible} onOpenChange={setIsEditModalVisible}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">
+        <DialogContent className="sm:max-w-[500px] bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-semibold text-gray-900">
               {t("locations.modal.editTitle")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label htmlFor="edit-name" className="text-sm font-medium">
-                {t("form.name")} *
+              <Label htmlFor="edit-name" className="text-sm font-medium text-gray-700">
+                {t("form.name")} <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="edit-name"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
                 placeholder={t("form.namePlaceholder")}
-                className="h-11"
+                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-address" className="text-sm font-medium">
+              <Label htmlFor="edit-address" className="text-sm font-medium text-gray-700">
                 {t("form.address")}{" "}
-                <span className="text-gray-500 font-normal">
+                <span className="text-gray-400 font-normal text-xs">
                   ({t("form.optional")})
                 </span>
               </Label>
@@ -932,13 +921,13 @@ export const LocationsManager = () => {
                 value={itemAddress}
                 onChange={(e) => setItemAddress(e.target.value)}
                 placeholder={t("form.addressPlaceholder")}
-                className="h-11"
+                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-description" className="text-sm font-medium">
+              <Label htmlFor="edit-description" className="text-sm font-medium text-gray-700">
                 {t("form.description")}{" "}
-                <span className="text-gray-500 font-normal">
+                <span className="text-gray-400 font-normal text-xs">
                   ({t("form.optional")})
                 </span>
               </Label>
@@ -948,14 +937,14 @@ export const LocationsManager = () => {
                 onChange={(e) => setItemDescription(e.target.value)}
                 placeholder={t("form.descriptionPlaceholder")}
                 rows={4}
-                className="resize-none"
+                className="resize-none border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
               />
             </div>
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-6">
               <Button
                 variant="outline"
                 onClick={() => setIsEditModalVisible(false)}
-                className="flex-1"
+                className="flex-1 border-gray-200 hover:bg-gray-50"
                 disabled={operationLoading}
               >
                 {t("actions.cancel")}
@@ -963,7 +952,7 @@ export const LocationsManager = () => {
               <Button
                 onClick={handleUpdateSubmit}
                 disabled={!itemName.trim() || operationLoading}
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300"
               >
                 {operationLoading ? (
                   <>

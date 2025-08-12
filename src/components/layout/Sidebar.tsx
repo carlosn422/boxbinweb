@@ -85,37 +85,48 @@ export function Sidebar({ className }: SidebarProps) {
   return (
     <div
       className={cn(
-        "relative flex h-full flex-col bg-gradient-to-b from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out",
-        collapsed ? "w-16" : "w-72",
+        "relative flex h-full flex-col bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 transition-all duration-300",
+        collapsed ? "w-16" : "w-64",
         className
       )}
     >
       {/* Header */}
-      <div className="relative flex h-16 items-center justify-between px-4 border-b border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
+      <div className="flex h-16 items-center justify-between px-4 border-b border-slate-200 dark:border-slate-800">
         {!collapsed && (
           <div className="flex items-center space-x-3">
-            <img src={LogoIcon} alt="Logo" className="w-8 h-8 rounded-lg shadow-sm" />
+            <img 
+              src={LogoIcon} 
+              alt="Logo" 
+              className="w-8 h-8 rounded-md object-cover" 
+            />
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100 leading-tight">
                 {t("sidebar.dashboard")}
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400">v2.0</p>
             </div>
           </div>
         )}
+        {collapsed && (
+          <img 
+            src={LogoIcon} 
+            alt="Logo" 
+            className="w-8 h-8 rounded-md object-cover mx-auto" 
+          />
+        )}
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setCollapsed(!collapsed)}
-          className="h-8 w-8 p-0 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg"
+          className="h-8 w-8 p-0 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800"
         >
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </Button>
       </div>
 
       {/* Navigation */}
-      <ScrollArea className="flex-1 px-3 py-6">
-        <nav className="space-y-1">
+      <ScrollArea className="flex-1 py-4">
+        <nav className="px-3 space-y-1">
           {sidebarItems.map((item) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.href;
@@ -124,23 +135,23 @@ export function Sidebar({ className }: SidebarProps) {
                 <Button
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start h-11 rounded-xl transition-all duration-200 overflow-hidden",
-                    collapsed ? "px-3" : "px-4",
+                    "w-full h-10 rounded-md font-medium text-sm transition-colors duration-200",
+                    collapsed ? "px-2 justify-center" : "px-3 justify-start",
                     isActive
-                      ? "bg-blue-500/10 text-blue-600 shadow-sm border border-blue-200 dark:border-blue-800"
-                      : "text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60"
+                      ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+                      : "text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800"
                   )}
                   onClick={() => navigate(item.href)}
                 >
-                  {isActive && (
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-r-full" />
-                  )}
-                  <Icon className={cn("h-5 w-5", !collapsed && "mr-3", isActive && "text-blue-600 dark:text-blue-400")} />
+                  <Icon className={cn("h-4 w-4 flex-shrink-0", !collapsed && "mr-3")} />
                   {!collapsed && (
-                    <div className="flex items-center justify-between w-full">
-                      <span className="font-medium">{item.title}</span>
+                    <div className="flex items-center justify-between w-full min-w-0">
+                      <span className="truncate">{item.title}</span>
                       {item.badge && (
-                        <Badge variant="secondary" className="ml-2 h-5 text-xs">
+                        <Badge 
+                          variant="secondary" 
+                          className="ml-2 h-5 text-xs font-medium bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800"
+                        >
                           {item.badge}
                         </Badge>
                       )}
@@ -148,10 +159,10 @@ export function Sidebar({ className }: SidebarProps) {
                   )}
                 </Button>
                 {collapsed && (
-                  <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-3 py-1 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                  <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
                     {item.title}
                     {item.badge && (
-                      <span className="ml-2 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded">
+                      <span className="ml-2 px-1.5 py-0.5 bg-blue-600 dark:bg-blue-500 text-white text-xs rounded">
                         {item.badge}
                       </span>
                     )}
@@ -161,44 +172,63 @@ export function Sidebar({ className }: SidebarProps) {
             );
           })}
         </nav>
-        <Separator className="my-6 bg-slate-200 dark:bg-slate-700" />
-        <LanguageSelector collapsed={collapsed} />
+        
+        <Separator className="mx-3 my-4 bg-slate-200 dark:bg-slate-800" />
+        
+        <div className="px-3">
+          <LanguageSelector collapsed={collapsed} />
+        </div>
       </ScrollArea>
 
       {/* Footer */}
-      <Separator className="bg-slate-200 dark:bg-slate-700" />
-      <div className="p-4 space-y-3 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
-        {!collapsed && currentUser && (
-          <div className="flex items-center space-x-3 p-3 rounded-xl bg-white/60 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-              <User className="h-5 w-5 text-white" />
+      <div className="border-t border-slate-200 dark:border-slate-800 p-4">
+        {currentUser && (
+          <div className={cn(
+            "flex items-center mb-3",
+            collapsed ? "justify-center" : "space-x-3 p-3 rounded-md bg-slate-50 dark:bg-slate-900"
+          )}>
+            <div className="relative group">
+              <div className="w-8 h-8 bg-slate-900 dark:bg-slate-100 rounded-full flex items-center justify-center">
+                <User className="h-4 w-4 text-white dark:text-slate-900" />
+              </div>
+              {collapsed && (
+                <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
+                  <div className="font-medium">{currentUser.displayName || t("sidebar.user")}</div>
+                  <div className="text-xs opacity-75">{currentUser.email}</div>
+                </div>
+              )}
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
-                {currentUser.displayName || t("sidebar.user")}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {currentUser.email}
-              </p>
-            </div>
+            {!collapsed && (
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
+                  {currentUser.displayName || t("sidebar.user")}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {currentUser.email}
+                </p>
+              </div>
+            )}
           </div>
         )}
-        <Button
-          variant="ghost"
-          className={cn(
-            "w-full justify-start h-11 rounded-xl text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20",
-            collapsed && "px-3"
-          )}
-          onClick={handleLogout}
-        >
-          <LogOut className={cn("h-5 w-5", !collapsed && "mr-3")} />
-          {!collapsed && <span className="font-medium">{t("sidebar.logout")}</span>}
+        
+        <div className="relative group">
+          <Button
+            variant="ghost"
+            className={cn(
+              "w-full h-10 rounded-md text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 transition-colors duration-200",
+              collapsed ? "px-2 justify-center" : "px-3 justify-start"
+            )}
+            onClick={handleLogout}
+          >
+            <LogOut className={cn("h-4 w-4", !collapsed && "mr-3")} />
+            {!collapsed && <span>{t("sidebar.logout")}</span>}
+          </Button>
           {collapsed && (
-            <div className="absolute left-full top-1/2 -translate-y-1/2 ml-2 px-3 py-1 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+            <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-sm rounded-md opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-50">
               {t("sidebar.logout")}
             </div>
           )}
-        </Button>
+        </div>
       </div>
     </div>
   );
