@@ -12,6 +12,9 @@ import {
   X,
   Minus,
   Loader2,
+  Upload,
+  Video,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -60,6 +63,42 @@ import {
 } from "firebase/storage";
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
+import { getAuth } from "firebase/auth";
+
+const moveFileInFirebase = async (signedUrl: string, newFolder: string) => {
+  const storage = getStorage();
+
+  // 1. Sacar el path interno del signed URL
+  // URL: .../video_processing/.../file.jpg?GoogleAccessId=...
+  const urlWithoutParams = signedUrl.split("?")[0]; // quita los query params
+  const pathMatch = urlWithoutParams.match(/storage\.app\/([^?]+)/);
+  if (!pathMatch) throw new Error("No se pudo extraer el path del URL");
+
+  const encodedPath = pathMatch[1];
+  const decodedPath = decodeURIComponent(encodedPath);
+
+  // 2. Descargar archivo original como blob
+  const response = await fetch(signedUrl);
+  const blob = await response.blob();
+
+  // 3. Crear nueva ruta
+  const fileName = decodedPath.split("/").pop();
+  const newPath = `${newFolder}/${fileName}`;
+  const newRef = ref(storage, newPath);
+
+  // 4. Subir a la nueva ubicación
+  await uploadBytes(newRef, blob);
+
+  // 5. Borrar original
+  const oldRef = ref(storage, decodedPath);
+  await deleteObject(oldRef);
+
+  // 6. Obtener nuevo URL
+  const newUrl = await getDownloadURL(newRef);
+
+  return newUrl;
+};
+
 
 export const uploadImage = async (file: File): Promise<string> => {
   const storage = getStorage();
@@ -143,7 +182,7 @@ const BinDetailsScreen: React.FC = () => {
 
   // States
   const [bin, setBin] = useState<BinDetails | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<any>([]);
   const [loading, setLoading] = useState(true);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -160,7 +199,7 @@ const BinDetailsScreen: React.FC = () => {
   // Form states
   const [itemName, setItemName] = useState("");
   const [itemDescription, setItemDescription] = useState("");
-  const [itemCuantity, setItemCuantity] = useState<number>(0);
+  const [itemCuantity, setItemCuantity] = useState<number>(1);
   const [itemValue, setItemValue] = useState<any>("");
   const [itemTags, setItemTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
@@ -173,7 +212,6 @@ const BinDetailsScreen: React.FC = () => {
   const [binAddress, setBinAddress] = useState("");
 
   const [error, setError] = useState("");
-
 
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isBulkUploading, setIsBulkUploading] = useState(false);
@@ -230,7 +268,7 @@ const BinDetailsScreen: React.FC = () => {
       }
     }
 
-    setItems((prev) => [...prev, ...newItems]);
+    setItems((prev: any) => [...prev, ...newItems]);
     setIsBulkUploading(false);
     setIsBulkUploadOpen(false);
     //alert(`Bulk upload complete: ${newItems.length} items created.`);
@@ -367,8 +405,8 @@ const BinDetailsScreen: React.FC = () => {
       await updateDoc(itemRef, updateData);
 
       // Actualizar estado local
-      setItems((prev) =>
-        prev.map((item) =>
+      setItems((prev: any) =>
+        prev.map((item: any) =>
           item.id === currentItem.id ? { ...item, ...updateData } : item
         )
       );
@@ -543,23 +581,23 @@ const BinDetailsScreen: React.FC = () => {
 
   const deleteItem = async (itemId: string, imageUrl: string | undefined) => {
     try {
-      await deleteDoc(doc(db, 'items', itemId));
-  
+      await deleteDoc(doc(db, "items", itemId));
+
       if (imageUrl) {
         const path = extractStoragePath(imageUrl);
-        
+
         if (path) {
-            const storage = getStorage();
-            const storageRef = ref(storage, path);
+          const storage = getStorage();
+          const storageRef = ref(storage, path);
           await deleteObject(storageRef);
-          console.log('Archivo eliminado');
+          console.log("Archivo eliminado");
         } else {
-          console.warn('No se pudo extraer un path válido de la URL');
+          console.warn("No se pudo extraer un path válido de la URL");
         }
       }
-  
+
       // Update the local state
-      setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+      setItems((prevItems: any) => prevItems.filter((item: any) => item.id !== itemId));
       //toast.success( 'Item deleted successfully');
       setModalState({
         isOpen: true,
@@ -567,9 +605,9 @@ const BinDetailsScreen: React.FC = () => {
         message: "Item deleted successfully",
       });
     } catch (error) {
-      console.error('Error deleting item:', error);
-     //toast.error( 'Failed to delete item');
-     setModalState({
+      console.error("Error deleting item:", error);
+      //toast.error( 'Failed to delete item');
+      setModalState({
         isOpen: true,
         type: "error",
         message: "Failed to delete item",
@@ -583,6 +621,172 @@ const BinDetailsScreen: React.FC = () => {
   useEffect(() => {
     setIsUploading(false);
   }, []);
+
+  // Add these state variables with your other useState declarations
+  const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState<any>(null);
+  const [videoPreview, setVideoPreview] = useState<any>(null);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [detectedItems, setDetectedItems] = useState([]);
+  const [showResults, setShowResults] = useState(false);
+
+  // Add these functions
+  const handleVideoUpload = (event: any) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("video/")) {
+      alert("Please select a valid video file");
+      return;
+    }
+
+    // Create video element to check duration
+    const video = document.createElement("video");
+    video.preload = "metadata";
+
+    video.onloadedmetadata = () => {
+      window.URL.revokeObjectURL(video.src);
+      const duration = video.duration;
+
+      // Check duration (5 seconds to 2 minutes)
+      if (duration < 5) {
+        alert("Video must be at least 5 seconds long");
+        return;
+      }
+
+      if (duration > 120) {
+        alert("Video must be less than 2 minutes long");
+        return;
+      }
+
+      // If validation passes, set the video
+      setSelectedVideo(file);
+      setVideoPreview(URL.createObjectURL(file));
+    };
+
+    video.src = URL.createObjectURL(file);
+  };
+
+  const handleVideoSubmit = async () => {
+    if (!selectedVideo) return;
+
+    setIsUploading(true);
+    setVideoUploadProgress(0);
+
+    try {
+      // 1. Get Firebase token
+      const auth = getAuth();
+      const token = await auth.currentUser?.getIdToken();
+
+      // 2. Prepare FormData
+      const formData = new FormData();
+      formData.append("videoFile", selectedVideo);
+
+      // 3. Use XMLHttpRequest to track progress
+      const xhr = new XMLHttpRequest();
+
+      xhr.open(
+        "POST",
+        "https://boxbinapi-iv6wi.ondigitalocean.app/api/process-video",
+        true
+      );
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+
+      // Real progress event
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setVideoUploadProgress(percent);
+        }
+      };
+
+      // When finished
+      xhr.onload = () => {
+        setIsUploading(false);
+
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const data = JSON.parse(xhr.responseText);
+            console.log("Backend response:", data);
+
+            if (data?.data?.items && data?.data?.items.length > 0) {
+              const items = data?.data?.items;
+              setDetectedItems(items);
+              setShowResults(true);
+              toast.success(`Successfully detected ${items.length} items!`);
+            } else {
+              toast.error("No items were detected in the video");
+            }
+          } catch (err) {
+            console.error("Error parsing response:", err);
+            toast.error("Error processing server response");
+          }
+        } else {
+          console.error("Error:", xhr.responseText);
+          toast.error("Failed to process video");
+        }
+      };
+
+      // Network error event
+      xhr.onerror = () => {
+        setIsUploading(false);
+        toast.error("Network error while uploading video");
+      };
+
+      // 4. Send FormData
+      xhr.send(formData);
+    } catch (error) {
+      setIsUploading(false);
+      console.error("Error uploading video:", error);
+      toast.error("Error uploading video");
+    }
+  };
+
+  const resetVideoForm = () => {
+    setSelectedVideo(null);
+    if (videoPreview) {
+      URL.revokeObjectURL(videoPreview);
+      setVideoPreview(null);
+    }
+    setVideoUploadProgress(0);
+    setDetectedItems([]);
+    setShowResults(false);
+  };
+
+  // Manejo de ítems detectados con subida a Firestore
+const handleAddDetectedItem = async (item: any) => {
+  try {
+    // Mover imagen al folder "items"
+    const newImageUrl = await moveFileInFirebase(item.imageUrl, "items");
+
+    // Crear datos para Firestore
+    const newItemData = {
+      name: item.label,
+      description: item.description || "",
+      quantity: 1,
+      value: 0,
+      tags: item.tags || [],
+      confidence: item.confidence,
+      timestamp: item.timestamp_seconds,
+      createdAt: new Date().toISOString(),
+      binId: id,
+      userId: "", // si necesitas asignar el usuario actual aquí
+      imageUrl: newImageUrl,
+    };
+
+    // Guardar en Firestore
+    const docRef = await addDoc(collection(db, "items"), newItemData);
+
+    // Actualizar estado local si lo usas
+    setItems((prev: any) => [...prev, { id: docRef.id, ...newItemData }]);
+
+    toast.success(`Added "${item.label}" to container`);
+  } catch (error) {
+    console.error("Error adding detected item:", error);
+    toast.error("Failed to add item to container");
+  }
+};
 
   if (loading) {
     return (
@@ -600,8 +804,12 @@ const BinDetailsScreen: React.FC = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <Package className="h-16 w-16 text-gray-400 mx-auto" />
-          <h2 className="text-xl font-semibold text-gray-900">Container not found</h2>
-          <p className="text-gray-600">The requested container could not be found.</p>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Container not found
+          </h2>
+          <p className="text-gray-600">
+            The requested container could not be found.
+          </p>
           <Button onClick={() => navigate("/")} variant="outline">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Go Back
@@ -917,8 +1125,9 @@ const BinDetailsScreen: React.FC = () => {
                     Delete Container
                   </AlertDialogTitle>
                   <AlertDialogDescription className="text-slate-600">
-                    Are you sure you want to delete this container? This action cannot
-                    be undone and will also delete all items in this container.
+                    Are you sure you want to delete this container? This action
+                    cannot be undone and will also delete all items in this
+                    container.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -933,62 +1142,295 @@ const BinDetailsScreen: React.FC = () => {
             </AlertDialog>
 
             {/* Bulk Upload Dialog */}
-      <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
-        <DialogTrigger asChild>
-          <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-200">
-            <Plus className="h-4 w-4 mr-2" />
-            Bulk Upload
-          </Button>
-        </DialogTrigger>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
-          <DialogHeader className="pb-6">
-            <DialogTitle className="text-2xl font-bold text-slate-900">
-              Bulk Upload Items
-            </DialogTitle>
-          </DialogHeader>
+            <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+              <DialogTrigger asChild>
+                <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-200">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Bulk Upload
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
+                <DialogHeader className="pb-6">
+                  <DialogTitle className="text-2xl font-bold text-slate-900">
+                    Bulk Upload Items
+                  </DialogTitle>
+                </DialogHeader>
 
-          <div className="space-y-6">
-            <label className="block text-sm font-medium text-slate-700">
-              Select images (multiple)
+                <div className="space-y-6">
+                  <label className="block text-sm font-medium text-slate-700">
+                    Select images (multiple)
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    disabled={isBulkUploading}
+                    onChange={(e) => handleBulkUpload(e.target.files)}
+                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                  />
+
+                  {isBulkUploading && (
+                    <div>
+                      <div className="w-full bg-gray-200 rounded-full h-4">
+                        <div
+                          className="bg-green-600 h-4 rounded-full transition-all"
+                          style={{
+                            width: `${
+                              (bulkProgress.done / bulkProgress.total) * 100
+                            }%`,
+                          }}
+                        />
+                      </div>
+                      <p className="mt-2 text-center text-sm text-gray-700">
+                        Uploading {bulkProgress.done} of {bulkProgress.total}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end space-x-3 pt-6">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsBulkUploadOpen(false)}
+                      className="rounded-xl border-slate-300 hover:bg-slate-50"
+                      disabled={isBulkUploading}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* NEW: Video AI Button */}
+  <Dialog  open={isVideoUploadOpen} onOpenChange={setIsVideoUploadOpen}>
+    <DialogTrigger asChild>
+      <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200">
+        <Video className="h-4 w-4 mr-2" />
+        Video AI
+      </Button>
+    </DialogTrigger>
+    <DialogContent className="!max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
+      <DialogHeader className="pb-6">
+        <DialogTitle className="text-2xl font-bold text-slate-900">
+          {showResults ? `AI Detected Items (${detectedItems.length})` : 'Upload Video for AI Analysis'}
+        </DialogTitle>
+      </DialogHeader>
+
+      {!showResults ? (
+        <div className="space-y-6">
+          {/* Video Upload */}
+          <div className="space-y-3">
+            <label className="text-sm font-medium text-slate-700">
+              Video File (5s - 2min)
             </label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              disabled={isBulkUploading}
-              onChange={(e) => handleBulkUpload(e.target.files)}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-            />
+            <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200">
+              {selectedVideo ? (
+                <div className="space-y-4">
+                  <video
+                    src={videoPreview}
+                    controls
+                    className="max-w-full h-48 rounded-xl mx-auto shadow-sm"
+                  />
+                  <div className="text-sm text-slate-600">
+                    {selectedVideo.name}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={resetVideoForm}
+                    className="rounded-xl"
+                    disabled={isUploading}
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Remove Video
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <Upload className="h-8 w-8 text-slate-400 mx-auto" />
+                  <div>
+                    <label className="cursor-pointer">
+                      <span className="text-sm text-purple-600 hover:text-purple-500 font-medium">
+                        Click to upload a video
+                      </span>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="video/*"
+                        onChange={handleVideoUpload}
+                        disabled={isUploading}
+                      />
+                    </label>
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Supported formats: MP4, MOV, AVI, WebM<br/>
+                    Duration: 5 seconds to 2 minutes
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
 
-            {isBulkUploading && (
-              <div>
-                <div className="w-full bg-gray-200 rounded-full h-4">
-                  <div
-                    className="bg-green-600 h-4 rounded-full transition-all"
-                    style={{
-                      width: `${(bulkProgress.done / bulkProgress.total) * 100}%`,
+          {/* Upload Progress */}
+          {isUploading && (
+            <div className="space-y-3">
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div
+                  className="bg-purple-600 h-3 rounded-full transition-all duration-300"
+                  style={{ width: `${videoUploadProgress}%` }}
+                />
+              </div>
+              <p className="text-center text-sm text-slate-600">
+                {videoUploadProgress < 100 ? `Uploading... ${Math.round(videoUploadProgress)}%` : 'Processing complete!'}
+              </p>
+            </div>
+          )}
+
+          {/* Action Buttons */}
+          <div className="flex justify-end space-x-3 pt-6">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsVideoUploadOpen(false);
+                if (!isUploading) resetVideoForm();
+              }}
+              className="rounded-xl border-slate-300 hover:bg-slate-50"
+              disabled={isUploading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleVideoSubmit}
+              disabled={!selectedVideo || isUploading}
+              className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+            >
+              {isUploading ? 'Processing...' : 'Analyze Video'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* Results View */
+        <div className="space-y-6">
+          {/* Results Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto">
+            {detectedItems.map((item: any) => (
+              <div
+                key={item.id}
+                className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+              >
+                {/* Item Image */}
+                <div className="relative">
+                  <img
+                    src={item.image_url}
+                    alt={item.label}
+                    className="w-full h-48 object-cover"
+                    onError={(e: any) => {
+                      e.target.style.display = 'none';
+                      e.target.nextElementSibling.style.display = 'flex';
                     }}
                   />
-                </div>
-                <p className="mt-2 text-center text-sm text-gray-700">
-                  Uploading {bulkProgress.done} of {bulkProgress.total}
-                </p>
-              </div>
-            )}
+                  <div className="hidden w-full h-48 bg-slate-100 items-center justify-center">
+                    <span className="text-slate-400">Image not available</span>
+                  </div>
+                  
+                  {/* Confidence Badge */}
+                  <div className="absolute top-3 right-3">
+                    <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
+                      {Math.round(item.confidence * 100)}% confident
+                    </span>
+                  </div>
 
-            <div className="flex justify-end space-x-3 pt-6">
+                  {/* Timestamp Badge */}
+                  <div className="absolute top-3 left-3">
+                    <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {item.timestamp_seconds}s
+                    </span>
+                  </div>
+                </div>
+
+                {/* Item Details */}
+                <div className="p-4 space-y-3">
+                  <div>
+                    <h3 className="font-semibold text-slate-900 text-lg">
+                      {item.label}
+                    </h3>
+                    <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+                      {item.description}
+                    </p>
+                  </div>
+
+                  {/* Tags */}
+                  {item.tags && item.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {item.tags.slice(0, 3).map((tag: any, tagIndex: number) => (
+                        <span
+                          key={tagIndex}
+                          className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {item.tags.length > 3 && (
+                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
+                          +{item.tags.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add Button */}
+                  <Button
+                    onClick={() => handleAddDetectedItem(item)}
+                    className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                    size="sm"
+                  >
+                    Add to Container
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Results Actions */}
+          <div className="flex justify-between items-center pt-6 border-t border-slate-200">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowResults(false);
+                resetVideoForm();
+              }}
+              className="rounded-xl border-slate-300 hover:bg-slate-50"
+            >
+              Upload New Video
+            </Button>
+            
+            <div className="flex space-x-3">
               <Button
                 variant="outline"
-                onClick={() => setIsBulkUploadOpen(false)}
-                className="rounded-xl border-slate-300 hover:bg-slate-50"
-                disabled={isBulkUploading}
+                onClick={() => {
+                  // Add all items at once
+                  detectedItems.forEach(item => handleAddDetectedItem(item));
+                }}
+                className="rounded-xl border-blue-300 text-blue-600 hover:bg-blue-50"
               >
-                Cancel
+                Add All Items
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsVideoUploadOpen(false);
+                  resetVideoForm();
+                }}
+                className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+              >
+                Done
               </Button>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
+    </DialogContent>
+  </Dialog>
           </div>
 
           {/* Items Section */}
@@ -1022,7 +1464,7 @@ const BinDetailsScreen: React.FC = () => {
               </Card>
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {items.map((item) => (
+                {items.map((item: any) => (
                   <Card
                     key={item.id}
                     className="overflow-hidden hover:shadow-xl transition-all duration-300 rounded-2xl border-0 bg-white/70 backdrop-blur-sm group"
@@ -1105,7 +1547,12 @@ const BinDetailsScreen: React.FC = () => {
                                 <AlertDialogCancel className="rounded-xl border-slate-300 hover:bg-slate-50">
                                   Cancel
                                 </AlertDialogCancel>
-                                <AlertDialogAction onClick={() => { deleteItem(item.id, item.imageUrl) }} className="bg-red-600 hover:bg-red-700 rounded-xl">
+                                <AlertDialogAction
+                                  onClick={() => {
+                                    deleteItem(item.id, item.imageUrl);
+                                  }}
+                                  className="bg-red-600 hover:bg-red-700 rounded-xl"
+                                >
                                   Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
@@ -1120,7 +1567,7 @@ const BinDetailsScreen: React.FC = () => {
 
                       {item.tags.length > 0 && (
                         <div className="flex flex-wrap gap-2">
-                          {item.tags.map((tag, index) => (
+                          {item.tags.map((tag: any, index: number) => (
                             <Badge
                               key={index}
                               variant="outline"
@@ -1321,7 +1768,7 @@ const BinDetailsScreen: React.FC = () => {
                 <Input
                   id="itemQuantity"
                   type="number"
-                  min={0}
+                  min={1}
                   value={itemCuantity}
                   onChange={(e) => setItemCuantity(Number(e.target.value))}
                   className="w-20 text-center rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
@@ -1483,8 +1930,7 @@ const BinDetailsScreen: React.FC = () => {
                 {!selectedLocation && <span className="text-red-500">*</span>}
               </Label>
               {!selectedLocation ? (
-                <>
-                </>
+                <></>
               ) : (
                 <div className="flex items-center space-x-3">
                   <div className="inline-flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-full border border-blue-200">
