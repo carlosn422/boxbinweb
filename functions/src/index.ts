@@ -1,5 +1,4 @@
 import { onCall } from "firebase-functions/v2/https";
-import { initializeApp } from "firebase-admin/app";
 import * as admin from "firebase-admin";
 import * as functions from "firebase-functions";
 import Stripe from "stripe";
@@ -233,3 +232,123 @@ export const mintCustomToken = onCall(async (request: functions.https.CallableRe
   }
 }
 );
+
+export const validateCoupon = onCall(async (request) => {
+    try {
+      const { couponCode, planId, userId } = request.data;
+  
+      // Validate required parameters
+      if (!couponCode || typeof couponCode !== 'string') {
+        throw new functions.https.HttpsError(
+          "invalid-argument",
+          "Coupon code is required"
+        );
+      }
+  
+      logger.info(`Validating coupon: ${couponCode} for plan: ${planId}`);
+  
+      // Validate the coupon in Stripe
+      const coupon = await stripe.coupons.retrieve(couponCode.toUpperCase());
+  
+      // Check if the coupon is valid
+      if (!coupon.valid) {
+        return {
+          valid: false,
+          error: 'The coupon is not valid or has expired'
+        };
+      }
+  
+      // Check expiration by date
+      if (coupon.redeem_by && coupon.redeem_by * 1000 < Date.now()) {
+        return {
+          valid: false,
+          error: 'The coupon has expired'
+        };
+      }
+  
+      // Check if max redemptions have been reached
+      if (coupon.max_redemptions && coupon.times_redeemed >= coupon.max_redemptions) {
+        return {
+          valid: false,
+          error: 'The coupon has reached its redemption limit'
+        };
+      }
+  
+      // Check plan-specific restrictions (if defined in metadata)
+      if (coupon.metadata && coupon.metadata.restricted_plans && planId) {
+        const allowedPlans = coupon.metadata.restricted_plans.split(',');
+        if (!allowedPlans.includes(planId)) {
+          return {
+            valid: false,
+            error: 'This coupon is not valid for the selected plan'
+          };
+        }
+      }
+  
+      // Check if the user has already used this coupon (optional)
+      if (userId && coupon.metadata && coupon.metadata.one_per_customer === 'true') {
+        const subsRef = admin.firestore().collection("subscriptions");
+        const existingUse = await subsRef
+          .where("userId", "==", userId)
+          .where("couponUsed.id", "==", coupon.id)
+          .get();
+  
+        if (!existingUse.empty) {
+          return {
+            valid: false,
+            error: 'You have already used this coupon before'
+          };
+        }
+      }
+  
+      // Check minimum amount (if defined in metadata)
+      if (coupon.metadata && coupon.metadata.minimum_amount && planId) {
+        // Here you could fetch the plan price and verify the minimum amount
+        // const price = await stripe.prices.retrieve(planId);
+        // if (price.unit_amount && price.unit_amount < parseInt(coupon.metadata.minimum_amount)) {
+        //   return {
+        //     valid: false,
+        //     error: `This coupon requires a minimum amount of $${parseInt(coupon.metadata.minimum_amount) / 100}`
+        //   };
+        // }
+      }
+  
+      logger.info(`Coupon validated successfully: ${couponCode}`);
+  
+      return {
+        valid: true,
+        coupon: {
+          id: coupon.id,
+          percent_off: coupon.percent_off,
+          amount_off: coupon.amount_off,
+          currency: coupon.currency,
+          name: coupon.name,
+          duration: coupon.duration,
+          duration_in_months: coupon.duration_in_months,
+          metadata: coupon.metadata,
+        }
+      };
+  
+    } catch (error: any) {
+      logger.error('Error validating coupon:', error);
+  
+      // Handle Stripe-specific errors
+      if (error.type === 'StripeInvalidRequestError') {
+        return {
+          valid: false,
+          error: 'Invalid coupon code'
+        };
+      }
+  
+      if (error.code === 'resource_missing') {
+        return {
+          valid: false,
+          error: 'Coupon code does not exist'
+        };
+      }
+  
+      // For other errors, throw HttpsError
+      throw new functions.https.HttpsError("internal", "Internal server error");
+    }
+  });
+  
