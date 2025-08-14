@@ -64,41 +64,7 @@ import {
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import { getAuth } from "firebase/auth";
-
-const moveFileInFirebase = async (signedUrl: string, newFolder: string) => {
-  const storage = getStorage();
-
-  // 1. Sacar el path interno del signed URL
-  // URL: .../video_processing/.../file.jpg?GoogleAccessId=...
-  const urlWithoutParams = signedUrl.split("?")[0]; // quita los query params
-  const pathMatch = urlWithoutParams.match(/storage\.app\/([^?]+)/);
-  if (!pathMatch) throw new Error("No se pudo extraer el path del URL");
-
-  const encodedPath = pathMatch[1];
-  const decodedPath = decodeURIComponent(encodedPath);
-
-  // 2. Descargar archivo original como blob
-  const response = await fetch(signedUrl);
-  const blob = await response.blob();
-
-  // 3. Crear nueva ruta
-  const fileName = decodedPath.split("/").pop();
-  const newPath = `${newFolder}/${fileName}`;
-  const newRef = ref(storage, newPath);
-
-  // 4. Subir a la nueva ubicación
-  await uploadBytes(newRef, blob);
-
-  // 5. Borrar original
-  const oldRef = ref(storage, decodedPath);
-  await deleteObject(oldRef);
-
-  // 6. Obtener nuevo URL
-  const newUrl = await getDownloadURL(newRef);
-
-  return newUrl;
-};
-
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 export const uploadImage = async (file: File): Promise<string> => {
   const storage = getStorage();
@@ -757,9 +723,16 @@ const BinDetailsScreen: React.FC = () => {
   // Manejo de ítems detectados con subida a Firestore
 const handleAddDetectedItem = async (item: any) => {
   try {
-    // Mover imagen al folder "items"
-    const newImageUrl = await moveFileInFirebase(item.imageUrl, "items");
+    // 1. Obtener path relativo desde signed URL
+    //const path = getStoragePathFromUrl(item.image_url);
 
+    // 2. Mover imagen a nueva carpeta
+    //const newImageUrl = await moveFileInFirebase(path, "items");
+    const functions = getFunctions();
+    const newImageUrl = await httpsCallable(functions, "moveImageToFinal")({
+      imageUrl: item?.image_url,
+      newFolder: "items"
+    });
     // Crear datos para Firestore
     const newItemData = {
       name: item.label,
