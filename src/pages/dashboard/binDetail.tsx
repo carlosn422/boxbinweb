@@ -650,7 +650,7 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
       const formData = new FormData();
       formData.append("videoFile", selectedVideo);
       // Use fetch for upload
-      const response = await fetch("http://localhost:3000/api/v1/gemini-video/process-video", {
+      const response = await fetch("https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video", {
         method: "POST",
         body: formData,
       });
@@ -688,7 +688,7 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
     if (isPolling && processingId) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`http://localhost:3000/api/v1/gemini-video/process-video/status/${processingId}`);
+          const res = await fetch(`https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`);
           const statusData = await res.json();
           if (statusData.success && statusData.data?.status === "completed") {
             setDetectedItems(statusData.data.result.items || []);
