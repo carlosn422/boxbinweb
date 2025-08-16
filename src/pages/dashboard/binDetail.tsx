@@ -592,7 +592,7 @@ const BinDetailsScreen: React.FC = () => {
   const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
 const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
 const [videoPreview, setVideoPreview] = useState<string | null>(null);
-const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+
 const [detectedItems, setDetectedItems] = useState<any[]>([]);
 const [showResults, setShowResults] = useState<boolean>(false);
 const [processingId, setProcessingId] = useState<string | null>(null);
@@ -640,7 +640,7 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
   const handleVideoSubmit = async () => {
     if (!selectedVideo) return;
     setIsUploading(true);
-    setVideoUploadProgress(0);
+    
     setDetectedItems([]);
     setShowResults(false);
     setProcessingId(null);
@@ -682,7 +682,7 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
       URL.revokeObjectURL(videoPreview);
       setVideoPreview(null);
     }
-    setVideoUploadProgress(0);
+    
     setDetectedItems([]);
     setShowResults(false);
     setProcessingId(null);
