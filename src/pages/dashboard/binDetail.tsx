@@ -148,7 +148,7 @@ const BinDetailsScreen: React.FC = () => {
 
   // States
   const [bin, setBin] = useState<BinDetails | null>(null);
-  const [items, setItems] = useState<any>([]);
+  const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddItemOpen, setIsAddItemOpen] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -295,7 +295,7 @@ const BinDetailsScreen: React.FC = () => {
     setItemTags(itemTags.filter((tag) => tag !== tagToRemove));
   };
 
-  const handleEditItem = (item: any) => {
+  const handleEditItem = (item: Item) => {
     console.log(currentItem);
     console.log(item);
     setCurrentItem(item);
@@ -581,7 +581,7 @@ const BinDetailsScreen: React.FC = () => {
     }
   };
 
-  const [selectedLocation, setSelectedLocation] = useState<any>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{ name: string; coordinates: { lat: number; lng: number } } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -590,14 +590,17 @@ const BinDetailsScreen: React.FC = () => {
 
   // Add these state variables with your other useState declarations
   const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-  const [videoPreview, setVideoPreview] = useState<any>(null);
-  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
-  const [detectedItems, setDetectedItems] = useState([]);
-  const [showResults, setShowResults] = useState(false);
+const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+const [videoPreview, setVideoPreview] = useState<string | null>(null);
+const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+const [detectedItems, setDetectedItems] = useState<any[]>([]);
+const [showResults, setShowResults] = useState<boolean>(false);
+const [processingId, setProcessingId] = useState<string | null>(null);
+const [isPolling, setIsPolling] = useState<boolean>(false);
+const [pollingError, setPollingError] = useState<string | null>(null);
 
   // Add these functions
-  const handleVideoUpload = (event: any) => {
+  const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -636,78 +639,35 @@ const BinDetailsScreen: React.FC = () => {
 
   const handleVideoSubmit = async () => {
     if (!selectedVideo) return;
-
     setIsUploading(true);
     setVideoUploadProgress(0);
-
+    setDetectedItems([]);
+    setShowResults(false);
+    setProcessingId(null);
+    setPollingError(null);
     try {
-      // 1. Get Firebase token
-      const auth = getAuth();
-      const token = await auth.currentUser?.getIdToken();
-
-      // 2. Prepare FormData
+      // Prepare FormData
       const formData = new FormData();
       formData.append("videoFile", selectedVideo);
-
-      // 3. Use XMLHttpRequest to track progress
-      const xhr = new XMLHttpRequest();
-
-      xhr.open(
-        "POST",
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/process-video",
-        true
-      );
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-
-      // Real progress event
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const percent = Math.round((event.loaded / event.total) * 100);
-          setVideoUploadProgress(percent);
-        }
-      };
-
-      // When finished
-      xhr.onload = () => {
+      // Use fetch for upload
+      const response = await fetch("http://localhost:3000/api/v1/gemini-video/process-video", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+      if (data.success && data.processingId) {
+        setProcessingId(data.processingId);
+        setIsPolling(true);
+        toast.success("Video processing started!");
+      } else {
         setIsUploading(false);
-
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            console.log("Backend response:", data);
-
-            if (data?.data?.items && data?.data?.items.length > 0) {
-              const items = data?.data?.items;
-              setDetectedItems(items);
-              setShowResults(true);
-              toast.success(`Successfully detected ${items.length} items!`);
-            } else {
-              toast.error("No items were detected in the video");
-            }
-          } catch (err) {
-            console.error("Error parsing response:", err);
-            toast.error("Error processing server response");
-          }
-        } else {
-          console.error("Error:", xhr.responseText);
-          toast.error("Failed to process video");
-        }
-      };
-
-      // Network error event
-      xhr.onerror = () => {
-        setIsUploading(false);
-        toast.error("Network error while uploading video");
-      };
-
-      // 4. Send FormData
-      xhr.send(formData);
-    } catch (error) {
+        toast.error("Failed to start video processing");
+      }
+    } catch (err) {
       setIsUploading(false);
-      console.error("Error uploading video:", error);
       toast.error("Error uploading video");
     }
-  };
+};
 
   const resetVideoForm = () => {
     setSelectedVideo(null);
@@ -718,9 +678,41 @@ const BinDetailsScreen: React.FC = () => {
     setVideoUploadProgress(0);
     setDetectedItems([]);
     setShowResults(false);
+    setProcessingId(null);
+    setIsPolling(false);
+    setPollingError(null);
   };
 
-  // Manejo de ítems detectados con subida a Firestore
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPolling && processingId) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`http://localhost:3000/api/v1/gemini-video/process-video/status/${processingId}`);
+          const statusData = await res.json();
+          if (statusData.success && statusData.data?.status === "completed") {
+            setDetectedItems(statusData.data.result.items || []);
+            setShowResults(true);
+            setIsUploading(false);
+            setIsPolling(false);
+            toast.success("Video processing completed!");
+          } else if (statusData.data?.status === "failed") {
+            setPollingError("Video processing failed");
+            setIsUploading(false);
+            setIsPolling(false);
+            toast.error("Video processing failed");
+          }
+        } catch (err) {
+          setPollingError("Error polling video status");
+        }
+      }, 5000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+}, [isPolling, processingId]);
+
+// Manejo de ítems detectados con subida a Firestore
 const handleAddDetectedItem = async (item: any) => {
   try {
     // 1. Obtener path relativo desde signed URL
