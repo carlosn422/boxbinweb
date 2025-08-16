@@ -3,7 +3,7 @@ name: Deploy React/Vite Docker
 on:
   push:
     branches:
-      - task/trialSubscription
+      - task/AI-Processing
 
 jobs:
   build-and-deploy:
