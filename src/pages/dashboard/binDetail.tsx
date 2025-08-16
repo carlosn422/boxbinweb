@@ -1253,18 +1253,11 @@ const handleAddDetectedItem = async (item: any) => {
 
           {/* Upload Progress */}
           {isUploading && (
-            <div className="space-y-3">
-              <div className="w-full bg-gray-200 rounded-full h-3">
-                <div
-                  className="bg-purple-600 h-3 rounded-full transition-all duration-300"
-                  style={{ width: `${videoUploadProgress}%` }}
-                />
-              </div>
-              <p className="text-center text-sm text-slate-600">
-                {videoUploadProgress < 100 ? `Uploading... ${Math.round(videoUploadProgress)}%` : 'Processing complete!'}
-              </p>
-            </div>
-          )}
+  <div className="flex flex-col items-center justify-center py-4">
+    <Loader2 className="w-6 h-6 text-purple-600 animate-spin mb-2" />
+    <p className="text-center text-sm text-slate-600">Uploading video...</p>
+  </div>
+)}
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-3 pt-6">
