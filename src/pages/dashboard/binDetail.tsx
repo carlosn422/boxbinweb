@@ -650,9 +650,16 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
       const formData = new FormData();
       formData.append("videoFile", selectedVideo);
       // Use fetch for upload
+      let token = "";
+      if (currentUser) {
+        token = await currentUser.getIdToken();
+      }
       const response = await fetch("https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video", {
         method: "POST",
         body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
       });
       const data = await response.json();
       if (data.success && data.processingId) {
@@ -688,7 +695,15 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
     if (isPolling && processingId) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch(`https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`);
+          let token = "";
+          if (currentUser) {
+            token = await currentUser.getIdToken();
+          }
+          const res = await fetch(`https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`, {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
           const statusData = await res.json();
           if (statusData.success && statusData.data?.status === "completed") {
             setDetectedItems(statusData.data.result.items || []);
