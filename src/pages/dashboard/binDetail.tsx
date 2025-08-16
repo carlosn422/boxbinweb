@@ -63,7 +63,7 @@ import {
 } from "firebase/storage";
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
-import { getAuth } from "firebase/auth";
+
 import { getFunctions, httpsCallable } from "firebase/functions";
 
 export const uploadImage = async (file: File): Promise<string> => {
@@ -405,7 +405,7 @@ const BinDetailsScreen: React.FC = () => {
       setBinAddress(bin.address);
       setIsEditBinOpen(true);
       console.log(bin);
-      setSelectedLocation(bin.location);
+      setSelectedLocation(bin.location ?? null);
     }
   };
 
@@ -597,11 +597,11 @@ const [detectedItems, setDetectedItems] = useState<any[]>([]);
 const [showResults, setShowResults] = useState<boolean>(false);
 const [processingId, setProcessingId] = useState<string | null>(null);
 const [isPolling, setIsPolling] = useState<boolean>(false);
-const [pollingError, setPollingError] = useState<string | null>(null);
+// Removed unused pollingError state
 
   // Add these functions
   const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files[0];
+    const file = event.target.files?.[0];
     if (!file) return;
 
     // Validate file type
@@ -644,7 +644,7 @@ const [pollingError, setPollingError] = useState<string | null>(null);
     setDetectedItems([]);
     setShowResults(false);
     setProcessingId(null);
-    setPollingError(null);
+
     try {
       // Prepare FormData
       const formData = new FormData();
@@ -680,7 +680,7 @@ const [pollingError, setPollingError] = useState<string | null>(null);
     setShowResults(false);
     setProcessingId(null);
     setIsPolling(false);
-    setPollingError(null);
+
   };
 
   useEffect(() => {
@@ -697,13 +697,13 @@ const [pollingError, setPollingError] = useState<string | null>(null);
             setIsPolling(false);
             toast.success("Video processing completed!");
           } else if (statusData.data?.status === "failed") {
-            setPollingError("Video processing failed");
+
             setIsUploading(false);
             setIsPolling(false);
             toast.error("Video processing failed");
           }
         } catch (err) {
-          setPollingError("Error polling video status");
+
         }
       }, 5000);
     }
@@ -1192,7 +1192,7 @@ const handleAddDetectedItem = async (item: any) => {
               {selectedVideo ? (
                 <div className="space-y-4">
                   <video
-                    src={videoPreview}
+                    src={videoPreview ?? undefined}
                     controls
                     className="max-w-full h-48 rounded-xl mx-auto shadow-sm"
                   />
