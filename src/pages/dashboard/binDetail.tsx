@@ -549,21 +549,27 @@ const BinDetailsScreen: React.FC = () => {
     try {
       await deleteDoc(doc(db, "items", itemId));
 
-      if (imageUrl) {
-        const path = extractStoragePath(imageUrl);
+      try {
+        if (imageUrl) {
+          const path = extractStoragePath(imageUrl);
 
-        if (path) {
-          const storage = getStorage();
-          const storageRef = ref(storage, path);
-          await deleteObject(storageRef);
-          console.log("Archivo eliminado");
-        } else {
-          console.warn("No se pudo extraer un path válido de la URL");
+          if (path) {
+            const storage = getStorage();
+            const storageRef = ref(storage, path);
+            await deleteObject(storageRef);
+            console.log("Archivo eliminado");
+          } else {
+            console.warn("No se pudo extraer un path válido de la URL");
+          }
         }
+      } catch (error) {
+        console.log(error);
       }
 
       // Update the local state
-      setItems((prevItems: any) => prevItems.filter((item: any) => item.id !== itemId));
+      setItems((prevItems: any) =>
+        prevItems.filter((item: any) => item.id !== itemId)
+      );
       //toast.success( 'Item deleted successfully');
       setModalState({
         isOpen: true,
@@ -581,7 +587,10 @@ const BinDetailsScreen: React.FC = () => {
     }
   };
 
-  const [selectedLocation, setSelectedLocation] = useState<{ name: string; coordinates: { lat: number; lng: number } } | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    name: string;
+    coordinates: { lat: number; lng: number };
+  } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
@@ -590,16 +599,14 @@ const BinDetailsScreen: React.FC = () => {
 
   // Add these state variables with your other useState declarations
   const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
-const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
-const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
 
-const [detectedItems, setDetectedItems] = useState<any[]>([]);
-const [showResults, setShowResults] = useState<boolean>(false);
-const [processingId, setProcessingId] = useState<string | null>(null);
-const [isPolling, setIsPolling] = useState<boolean>(false);
-// Removed unused pollingError state
+  const [detectedItems, setDetectedItems] = useState<any[]>([]);
+  const [showResults, setShowResults] = useState<boolean>(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState<boolean>(false);
 
-  // Add these functions
   const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -640,7 +647,7 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
   const handleVideoSubmit = async () => {
     if (!selectedVideo) return;
     setIsUploading(true);
-    
+
     setDetectedItems([]);
     setShowResults(false);
     setProcessingId(null);
@@ -654,13 +661,16 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
       if (currentUser) {
         token = await currentUser.getIdToken();
       }
-      const response = await fetch("https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video", {
-        method: "POST",
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await fetch(
+        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
+        {
+          method: "POST",
+          body: formData,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      });
+      );
       const data = await response.json();
       if (data.success && data.processingId) {
         setProcessingId(data.processingId);
@@ -674,7 +684,7 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
       setIsUploading(false);
       toast.error("Error uploading video");
     }
-};
+  };
 
   const resetVideoForm = () => {
     setSelectedVideo(null);
@@ -682,12 +692,11 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
       URL.revokeObjectURL(videoPreview);
       setVideoPreview(null);
     }
-    
+
     setDetectedItems([]);
     setShowResults(false);
     setProcessingId(null);
     setIsPolling(false);
-
   };
 
   useEffect(() => {
@@ -699,11 +708,14 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
           if (currentUser) {
             token = await currentUser.getIdToken();
           }
-          const res = await fetch(`https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`, {
-            headers: {
-              Authorization: `Bearer ${token}`
+          const res = await fetch(
+            `https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`,
+            {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
             }
-          });
+          );
           const statusData = await res.json();
           if (statusData.success && statusData.data?.status === "completed") {
             setDetectedItems(statusData.data.result.items || []);
@@ -712,61 +724,65 @@ const [isPolling, setIsPolling] = useState<boolean>(false);
             setIsPolling(false);
             toast.success("Video processing completed!");
           } else if (statusData.data?.status === "failed") {
-
             setIsUploading(false);
             setIsPolling(false);
             toast.error("Video processing failed");
           }
-        } catch (err) {
-
-        }
+        } catch (err) {}
       }, 5000);
     }
     return () => {
       if (interval) clearInterval(interval);
     };
-}, [isPolling, processingId]);
+  }, [isPolling, processingId]);
 
-// Manejo de ítems detectados con subida a Firestore
-const handleAddDetectedItem = async (item: any) => {
-  try {
-    // 1. Obtener path relativo desde signed URL
-    //const path = getStoragePathFromUrl(item.image_url);
+  // Manejo de ítems detectados con subida a Firestore
+  const handleAddDetectedItem = async (item: any) => {
+    try {
+      // 1. Obtener path relativo desde signed URL
+      //const path = getStoragePathFromUrl(item.image_url);
 
-    // 2. Mover imagen a nueva carpeta
-    //const newImageUrl = await moveFileInFirebase(path, "items");
-    const functions = getFunctions();
-    const newImageUrl = await httpsCallable(functions, "moveImageToFinal")({
-      imageUrl: item?.image_url,
-      newFolder: "items"
-    });
-    // Crear datos para Firestore
-    const newItemData = {
-      name: item.label,
-      description: item.description || "",
-      quantity: 1,
-      value: 0,
-      tags: item.tags || [],
-      confidence: item.confidence,
-      timestamp: item.timestamp_seconds,
-      createdAt: new Date().toISOString(),
-      binId: id,
-      userId: "", // si necesitas asignar el usuario actual aquí
-      imageUrl: newImageUrl,
-    };
+      // 2. Mover imagen a nueva carpeta
+      //const newImageUrl = await moveFileInFirebase(path, "items");
+      const functions = getFunctions();
+      const newImageUrl: any = await httpsCallable(
+        functions,
+        "moveImageToFinal"
+      )({
+        imageUrl: item?.image_url,
+        newFolder: "items",
+      });
 
-    // Guardar en Firestore
-    const docRef = await addDoc(collection(db, "items"), newItemData);
+      console.log(newImageUrl, " nueva");
+      // Crear datos para Firestore
+      const newItemData = {
+        name: item.label,
+        description: item.description || "",
+        quantity: 1,
+        value: 0,
+        tags: item.tags || [],
+        confidence: item.confidence,
+        timestamp: item.timestamp_seconds,
+        createdAt: new Date().toISOString(),
+        binId: id,
+        userId: "", // si necesitas asignar el usuario actual aquí
+        imageUrl: newImageUrl?.data.newUrl,
+      };
 
-    // Actualizar estado local si lo usas
-    setItems((prev: any) => [...prev, { id: docRef.id, ...newItemData }]);
+      console.log(newItemData, " jn");
 
-    toast.success(`Added "${item.label}" to container`);
-  } catch (error) {
-    console.error("Error adding detected item:", error);
-    toast.error("Failed to add item to container");
-  }
-};
+      // Guardar en Firestore
+      const docRef = await addDoc(collection(db, "items"), newItemData);
+
+      // Actualizar estado local si lo usas
+      setItems((prev: any) => [...prev, { id: docRef.id, ...newItemData }]);
+
+      toast.success(`Added "${item.label}" to container`);
+    } catch (error) {
+      console.error("Error adding detected item:", error);
+      toast.error("Failed to add item to container");
+    }
+  };
 
   if (loading) {
     return (
@@ -1182,228 +1198,243 @@ const handleAddDetectedItem = async (item: any) => {
             </Dialog>
 
             {/* NEW: Video AI Button */}
-  <Dialog  open={isVideoUploadOpen} onOpenChange={setIsVideoUploadOpen}>
-    <DialogTrigger asChild>
-      <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200">
-        <Video className="h-4 w-4 mr-2" />
-        Video AI
-      </Button>
-    </DialogTrigger>
-    <DialogContent className="!max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
-      <DialogHeader className="pb-6">
-        <DialogTitle className="text-2xl font-bold text-slate-900">
-          {showResults ? `AI Detected Items (${detectedItems.length})` : 'Upload Video for AI Analysis'}
-        </DialogTitle>
-      </DialogHeader>
-
-      {!showResults ? (
-        <div className="space-y-6">
-          {/* Video Upload */}
-          <div className="space-y-3">
-            <label className="text-sm font-medium text-slate-700">
-              Video File (5s - 2min)
-            </label>
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200">
-              {selectedVideo ? (
-                <div className="space-y-4">
-                  <video
-                    src={videoPreview ?? undefined}
-                    controls
-                    className="max-w-full h-48 rounded-xl mx-auto shadow-sm"
-                  />
-                  <div className="text-sm text-slate-600">
-                    {selectedVideo.name}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetVideoForm}
-                    className="rounded-xl"
-                    disabled={isUploading}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Remove Video
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  <Upload className="h-8 w-8 text-slate-400 mx-auto" />
-                  <div>
-                    <label className="cursor-pointer">
-                      <span className="text-sm text-purple-600 hover:text-purple-500 font-medium">
-                        Click to upload a video
-                      </span>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="video/*"
-                        onChange={handleVideoUpload}
-                        disabled={isUploading}
-                      />
-                    </label>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Supported formats: MP4, MOV, AVI, WebM<br/>
-                    Duration: 5 seconds to 2 minutes
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Upload Progress */}
-          {isUploading && (
-  <div className="flex flex-col items-center justify-center py-4">
-    <Loader2 className="w-6 h-6 text-purple-600 animate-spin mb-2" />
-    <p className="text-center text-sm text-slate-600">Uploading video...</p>
-  </div>
-)}
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 pt-6">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsVideoUploadOpen(false);
-                if (!isUploading) resetVideoForm();
-              }}
-              className="rounded-xl border-slate-300 hover:bg-slate-50"
-              disabled={isUploading}
+            <Dialog
+              open={isVideoUploadOpen}
+              onOpenChange={setIsVideoUploadOpen}
             >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleVideoSubmit}
-              disabled={!selectedVideo || isUploading}
-              className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-            >
-              {isUploading ? 'Processing...' : 'Analyze Video'}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        /* Results View */
-        <div className="space-y-6">
-          {/* Results Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto">
-            {detectedItems.map((item: any) => (
-              <div
-                key={item.id}
-                className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
-              >
-                {/* Item Image */}
-                <div className="relative">
-                  <img
-                    src={item.image_url}
-                    alt={item.label}
-                    className="w-full h-48 object-cover"
-                    onError={(e: any) => {
-                      e.target.style.display = 'none';
-                      e.target.nextElementSibling.style.display = 'flex';
-                    }}
-                  />
-                  <div className="hidden w-full h-48 bg-slate-100 items-center justify-center">
-                    <span className="text-slate-400">Image not available</span>
-                  </div>
-                  
-                  {/* Confidence Badge */}
-                  <div className="absolute top-3 right-3">
-                    <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                      {Math.round(item.confidence * 100)}% confident
-                    </span>
-                  </div>
+              <DialogTrigger asChild>
+                <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200">
+                  <Video className="h-4 w-4 mr-2" />
+                  Video AI
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="!max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
+                <DialogHeader className="pb-6">
+                  <DialogTitle className="text-2xl font-bold text-slate-900">
+                    {showResults
+                      ? `AI Detected Items (${detectedItems.length})`
+                      : "Upload Video for AI Analysis"}
+                  </DialogTitle>
+                </DialogHeader>
 
-                  {/* Timestamp Badge */}
-                  <div className="absolute top-3 left-3">
-                    <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full flex items-center">
-                      <Clock className="h-3 w-3 mr-1" />
-                      {item.timestamp_seconds}s
-                    </span>
-                  </div>
-                </div>
-
-                {/* Item Details */}
-                <div className="p-4 space-y-3">
-                  <div>
-                    <h3 className="font-semibold text-slate-900 text-lg">
-                      {item.label}
-                    </h3>
-                    <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                      {item.description}
-                    </p>
-                  </div>
-
-                  {/* Tags */}
-                  {item.tags && item.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {item.tags.slice(0, 3).map((tag: any, tagIndex: number) => (
-                        <span
-                          key={tagIndex}
-                          className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                      {item.tags.length > 3 && (
-                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
-                          +{item.tags.length - 3} more
-                        </span>
-                      )}
+                {!showResults ? (
+                  <div className="space-y-6">
+                    {/* Video Upload */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium text-slate-700">
+                        Video File (5s - 2min)
+                      </label>
+                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200">
+                        {selectedVideo ? (
+                          <div className="space-y-4">
+                            <video
+                              src={videoPreview ?? undefined}
+                              controls
+                              className="max-w-full h-48 rounded-xl mx-auto shadow-sm"
+                            />
+                            <div className="text-sm text-slate-600">
+                              {selectedVideo.name}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={resetVideoForm}
+                              className="rounded-xl"
+                              disabled={isUploading}
+                            >
+                              <X className="h-4 w-4 mr-1" />
+                              Remove Video
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <Upload className="h-8 w-8 text-slate-400 mx-auto" />
+                            <div>
+                              <label className="cursor-pointer">
+                                <span className="text-sm text-purple-600 hover:text-purple-500 font-medium">
+                                  Click to upload a video
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="video/*"
+                                  onChange={handleVideoUpload}
+                                  disabled={isUploading}
+                                />
+                              </label>
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              Supported formats: MP4, MOV, AVI, WebM
+                              <br />
+                              Duration: 5 seconds to 2 minutes
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
 
-                  {/* Add Button */}
-                  <Button
-                    onClick={() => handleAddDetectedItem(item)}
-                    className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                    size="sm"
-                  >
-                    Add to Container
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
+                    {/* Upload Progress */}
+                    {isUploading && (
+                      <div className="flex flex-col items-center justify-center py-4">
+                        <Loader2 className="w-6 h-6 text-purple-600 animate-spin mb-2" />
+                        <p className="text-center text-sm text-slate-600">
+                          Uploading video...
+                        </p>
+                      </div>
+                    )}
 
-          {/* Results Actions */}
-          <div className="flex justify-between items-center pt-6 border-t border-slate-200">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowResults(false);
-                resetVideoForm();
-              }}
-              className="rounded-xl border-slate-300 hover:bg-slate-50"
-            >
-              Upload New Video
-            </Button>
-            
-            <div className="flex space-x-3">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  // Add all items at once
-                  detectedItems.forEach(item => handleAddDetectedItem(item));
-                }}
-                className="rounded-xl border-blue-300 text-blue-600 hover:bg-blue-50"
-              >
-                Add All Items
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsVideoUploadOpen(false);
-                  resetVideoForm();
-                }}
-                className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-              >
-                Done
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </DialogContent>
-  </Dialog>
+                    {/* Action Buttons */}
+                    <div className="flex justify-end space-x-3 pt-6">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsVideoUploadOpen(false);
+                          if (!isUploading) resetVideoForm();
+                        }}
+                        className="rounded-xl border-slate-300 hover:bg-slate-50"
+                        disabled={isUploading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleVideoSubmit}
+                        disabled={!selectedVideo || isUploading}
+                        className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                      >
+                        {isUploading ? "Processing..." : "Analyze Video"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Results View */
+                  <div className="space-y-6">
+                    {/* Results Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto">
+                      {detectedItems.map((item: any) => (
+                        <div
+                          key={item.id}
+                          className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+                        >
+                          {/* Item Image */}
+                          <div className="relative">
+                            <img
+                              src={item.image_url}
+                              alt={item.label}
+                              className="w-full h-48 object-cover"
+                              onError={(e: any) => {
+                                e.target.style.display = "none";
+                                e.target.nextElementSibling.style.display =
+                                  "flex";
+                              }}
+                            />
+                            <div className="hidden w-full h-48 bg-slate-100 items-center justify-center">
+                              <span className="text-slate-400">
+                                Image not available
+                              </span>
+                            </div>
+
+                            {/* Confidence Badge */}
+                            <div className="absolute top-3 right-3">
+                              <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
+                                {Math.round(item.confidence * 100)}% confident
+                              </span>
+                            </div>
+
+                            {/* Timestamp Badge */}
+                            <div className="absolute top-3 left-3">
+                              <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full flex items-center">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {item.timestamp_seconds}s
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Item Details */}
+                          <div className="p-4 space-y-3">
+                            <div>
+                              <h3 className="font-semibold text-slate-900 text-lg">
+                                {item.label}
+                              </h3>
+                              <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+                                {item.description}
+                              </p>
+                            </div>
+
+                            {/* Tags */}
+                            {item.tags && item.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {item.tags
+                                  .slice(0, 3)
+                                  .map((tag: any, tagIndex: number) => (
+                                    <span
+                                      key={tagIndex}
+                                      className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                {item.tags.length > 3 && (
+                                  <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
+                                    +{item.tags.length - 3} more
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Add Button */}
+                            <Button
+                              onClick={() => handleAddDetectedItem(item)}
+                              className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                              size="sm"
+                            >
+                              Add to Container
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Results Actions */}
+                    <div className="flex justify-between items-center pt-6 border-t border-slate-200">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setShowResults(false);
+                          resetVideoForm();
+                        }}
+                        className="rounded-xl border-slate-300 hover:bg-slate-50"
+                      >
+                        Upload New Video
+                      </Button>
+
+                      <div className="flex space-x-3">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            
+                            detectedItems.forEach((item) =>
+                              handleAddDetectedItem(item)
+                            );
+                          }}
+                          className="rounded-xl border-blue-300 text-blue-600 hover:bg-blue-50"
+                        >
+                          Add All Items
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setIsVideoUploadOpen(false);
+                            resetVideoForm();
+                          }}
+                          className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                        >
+                          Done
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </div>
 
           {/* Items Section */}
