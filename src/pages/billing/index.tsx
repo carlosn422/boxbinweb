@@ -88,8 +88,13 @@ export default function BillingPage() {
 
       console.log(stripePlans);
 
+      const filteredPlans = stripePlans.filter(plan => {
+        const keys = plan.metadata ? Object.keys(plan.metadata) : [];
+        return keys.includes("tokens") && keys.length > 1;
+      });
+
       // Invertir el orden de los planes
-      setPlans(stripePlans.reverse());
+      setPlans(filteredPlans.reverse());
     } catch (error) {
       console.error("Error fetching plans:", error);
       setError(`Failed to load plans. Please try again later.`);

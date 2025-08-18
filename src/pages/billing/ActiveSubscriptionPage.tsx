@@ -146,8 +146,13 @@ export default function ActiveSubscriptionPage() {
 
       console.log(superiorPlans);
 
+        const filteredPlans = superiorPlans.filter(plan => {
+        const keys = plan.metadata ? Object.keys(plan.metadata) : [];
+        return keys.includes("tokens") && keys.length > 1;
+      });
+
       // Ordenar de menor a mayor precio
-      const sortedPlans = superiorPlans.sort(
+      const sortedPlans = filteredPlans.sort(
         (a, b) => a.unit_amount - b.unit_amount
       );
 
