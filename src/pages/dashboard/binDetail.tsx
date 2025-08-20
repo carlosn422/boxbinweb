@@ -673,8 +673,8 @@ const BinDetailsScreen: React.FC = () => {
 
     try {
       const estimateResponse = await fetch(
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
+        //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
+        "http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
         {
           method: "POST",
           body: formData,
@@ -710,8 +710,8 @@ const BinDetailsScreen: React.FC = () => {
     }
 
     const processResponse = await fetch(
-      "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
-      //"http://localhost:3000/api/v1/gemini-video/process-video",
+      //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
+      "http://localhost:3000/api/v1/gemini-video/process-video",
       {
         method: "POST",
         body: formData,
@@ -814,8 +814,11 @@ const BinDetailsScreen: React.FC = () => {
       // Guardar en Firestore
       const docRef = await addDoc(collection(db, "items"), newItemData);
 
-      // Actualizar estado local si lo usas
+      // Actualizar estado local del contenedor
       setItems((prev: any) => [...prev, { id: docRef.id, ...newItemData }]);
+
+      // Quitar el ítem del arreglo principal
+      setDetectedItems((prev: any[]) => prev.filter((d) => d.id !== item.id));
 
       toast.success(`Added "${item.label}" to container`);
     } catch (error) {
