@@ -40,9 +40,12 @@ import { STRIPE_PUBLISHABLE_KEY } from "../config/stripe";
 export const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 import { STRIPE_SECRET_KEY } from "../config/stripe";
 
-const stripeClient = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: "2025-06-30.basil" as const,
-});
+const stripeClient = new Stripe(
+  STRIPE_SECRET_KEY,
+  {
+    apiVersion: "2025-06-30.basil" as const,
+  }
+);
 
 export const getStripePlans = async (): Promise<Plan[]> => {
   try {

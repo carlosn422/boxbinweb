@@ -673,8 +673,8 @@ const BinDetailsScreen: React.FC = () => {
 
     try {
       const estimateResponse = await fetch(
-        //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        'http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens',
+        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
+        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
         {
           method: "POST",
           body: formData,
@@ -1360,9 +1360,7 @@ const BinDetailsScreen: React.FC = () => {
                         <p>My tokens: {estimateData?.available_tokens}</p>
                         <p>Tokens required: {estimateData.MY_TOTAL_TOKENS}</p>
                         <p>
-                          Tokens left:{" "}
-                          {estimateData?.available_tokens ??
-                            0 - estimateData.MY_TOTAL_TOKENS}
+                          Tokens left: {estimateData?.tokens_remaining_after}
                         </p>
                         <div className="flex justify-center space-x-3 pt-4">
                           <Button
