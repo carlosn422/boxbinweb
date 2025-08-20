@@ -17,6 +17,7 @@ import { TemplatesView } from '@/pages/smart-labels/components/TemplatesView';
 import LoginByToken from '@/pages/auth/login-by-token';
 import ExportInventory from '@/pages/dashboard/ExportInventory';
 import NotFoundPage from './NotFoundPage';
+import TokensPurchasePage from '@/pages/billing/TokensPage';
 
 // Componente para proteger rutas
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -187,6 +188,14 @@ const router = createBrowserRouter([
         element: (
             <ProtectedRoute>
                 <ActiveSubscriptionPage />
+            </ProtectedRoute>
+        ),
+    },
+    {
+        path: '/tokensai',
+        element: (
+            <ProtectedRoute>
+                <TokensPurchasePage />
             </ProtectedRoute>
         ),
     },

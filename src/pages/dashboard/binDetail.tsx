@@ -66,6 +66,19 @@ import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 
 import { getFunctions, httpsCallable } from "firebase/functions";
 
+interface TokenEstimate {
+  success: boolean;
+  MY_TOTAL_TOKENS: number;
+  MY_TOTAL_COST: number;
+  user_tokens: number;
+  tokens_needed?: number;
+  message?: string;
+
+  available_tokens?: number;
+  tokens_remaining_after?: number;
+  required_tokens?: number;
+}
+
 export const uploadImage = async (file: File): Promise<string> => {
   const storage = getStorage();
   const storageRef = ref(storage, `items/${Date.now()}-${file.name}`);
@@ -644,25 +657,24 @@ const BinDetailsScreen: React.FC = () => {
     video.src = URL.createObjectURL(file);
   };
 
+  const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
+
   const handleVideoSubmit = async () => {
     if (!selectedVideo) return;
     setIsUploading(true);
 
-    setDetectedItems([]);
-    setShowResults(false);
-    setProcessingId(null);
+    const formData = new FormData();
+    formData.append("videoFile", selectedVideo);
+
+    let token = "";
+    if (currentUser) {
+      token = await currentUser.getIdToken();
+    }
 
     try {
-      // Prepare FormData
-      const formData = new FormData();
-      formData.append("videoFile", selectedVideo);
-      // Use fetch for upload
-      let token = "";
-      if (currentUser) {
-        token = await currentUser.getIdToken();
-      }
-      const response = await fetch(
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
+      const estimateResponse = await fetch(
+        //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
+        'http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens',
         {
           method: "POST",
           body: formData,
@@ -671,18 +683,51 @@ const BinDetailsScreen: React.FC = () => {
           },
         }
       );
-      const data = await response.json();
-      if (data.success && data.processingId) {
-        setProcessingId(data.processingId);
-        setIsPolling(true);
-        toast.success("Video processing started!");
-      } else {
-        setIsUploading(false);
-        toast.error("Failed to start video processing");
-      }
-    } catch (err) {
+
+      const estimateJson = await estimateResponse.json();
+      console.log(estimateJson, " njnj");
+      setEstimateData(estimateJson);
       setIsUploading(false);
-      toast.error("Error uploading video");
+    } catch (err) {
+      console.error("Error:", err);
+      setIsUploading(false);
+    }
+  };
+
+  const confirmProcess = async () => {
+    if (!estimateData?.success) {
+      return;
+    }
+
+    const formData = new FormData();
+    if (selectedVideo) {
+      formData.append("videoFile", selectedVideo);
+    }
+
+    let token = "";
+    if (currentUser) {
+      token = await currentUser.getIdToken();
+    }
+
+    const processResponse = await fetch(
+      "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
+      //"http://localhost:3000/api/v1/gemini-video/process-video",
+      {
+        method: "POST",
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const processData = await processResponse.json();
+    if (processData.success && processData.processingId) {
+      setProcessingId(processData.processingId);
+      setIsPolling(true);
+      toast.success("🎥 Video processing started!");
+    } else {
+      toast.error("Failed to start video processing");
     }
   };
 
@@ -739,11 +784,6 @@ const BinDetailsScreen: React.FC = () => {
   // Manejo de ítems detectados con subida a Firestore
   const handleAddDetectedItem = async (item: any) => {
     try {
-      // 1. Obtener path relativo desde signed URL
-      //const path = getStoragePathFromUrl(item.image_url);
-
-      // 2. Mover imagen a nueva carpeta
-      //const newImageUrl = await moveFileInFirebase(path, "items");
       const functions = getFunctions();
       const newImageUrl: any = await httpsCallable(
         functions,
@@ -1200,7 +1240,10 @@ const BinDetailsScreen: React.FC = () => {
             {/* NEW: Video AI Button */}
             <Dialog
               open={isVideoUploadOpen}
-              onOpenChange={setIsVideoUploadOpen}
+              onOpenChange={(open) => {
+                setShowResults(false);
+                setIsVideoUploadOpen(open);
+              }}
             >
               <DialogTrigger asChild>
                 <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200">
@@ -1217,7 +1260,8 @@ const BinDetailsScreen: React.FC = () => {
                   </DialogTitle>
                 </DialogHeader>
 
-                {!showResults ? (
+                {/* --- TOKEN CHECK / UPLOAD FLOW --- */}
+                {!showResults && !estimateData ? (
                   <div className="space-y-6">
                     {/* Video Upload */}
                     <div className="space-y-3">
@@ -1297,13 +1341,86 @@ const BinDetailsScreen: React.FC = () => {
                         Cancel
                       </Button>
                       <Button
-                        onClick={handleVideoSubmit}
+                        onClick={handleVideoSubmit} // <-- llama primero a estimate
                         disabled={!selectedVideo || isUploading}
                         className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
                       >
                         {isUploading ? "Processing..." : "Analyze Video"}
                       </Button>
                     </div>
+                  </div>
+                ) : !showResults && estimateData ? (
+                  <div className="space-y-6">
+                    {/* --- CASE 1: Enough tokens --- */}
+                    {estimateData.success ? (
+                      <div className="text-center space-y-4">
+                        <h2 className="text-xl font-bold text-green-600">
+                          ✅ You have enough tokens
+                        </h2>
+                        <p>My tokens: {estimateData?.available_tokens}</p>
+                        <p>Tokens required: {estimateData.MY_TOTAL_TOKENS}</p>
+                        <p>
+                          Tokens left:{" "}
+                          {estimateData?.available_tokens ??
+                            0 - estimateData.MY_TOTAL_TOKENS}
+                        </p>
+                        <div className="flex justify-center space-x-3 pt-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setEstimateData(null)}
+                            className="rounded-xl border-slate-300"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={confirmProcess}
+                            className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                          >
+                            Confirm and Process
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (estimateData?.available_tokens ?? 0) > 0 ? (
+                      /* --- CASE 2: Not enough tokens --- */
+                      <div className="text-center space-y-4">
+                        <h2 className="text-xl font-bold text-yellow-600">
+                          ⚠️ Not enough tokens
+                        </h2>
+                        <p>My tokens: {estimateData?.available_tokens}</p>
+                        <p>Tokens required: {estimateData?.required_tokens}</p>
+                        <p>
+                          Tokens missing:{" "}
+                          {(estimateData?.required_tokens ?? 0) -
+                            (estimateData?.available_tokens ?? 0)}
+                        </p>
+                        <Button
+                          className="mt-4 bg-red-500 text-white px-4 py-2 rounded-xl"
+                          onClick={() => {
+                            setEstimateData(null);
+                            window.open("/tokensai", "_blank");
+                          }}
+                        >
+                          Buy Tokens
+                        </Button>
+                      </div>
+                    ) : (
+                      /* --- CASE 3: No tokens --- */
+                      <div className="text-center space-y-4">
+                        <h2 className="text-xl font-bold text-red-600">
+                          ❌ No tokens
+                        </h2>
+                        <p>You don’t have tokens available.</p>
+                        <Button
+                          className="mt-4 bg-red-500 text-white px-4 py-2 rounded-xl"
+                          onClick={() => {
+                            setEstimateData(null);
+                            // redirigir a compra
+                          }}
+                        >
+                          Buy Tokens
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   /* Results View */
@@ -1411,7 +1528,6 @@ const BinDetailsScreen: React.FC = () => {
                         <Button
                           variant="outline"
                           onClick={() => {
-                            
                             detectedItems.forEach((item) =>
                               handleAddDetectedItem(item)
                             );
