@@ -673,8 +673,8 @@ const BinDetailsScreen: React.FC = () => {
 
     try {
       const estimateResponse = await fetch(
-        //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        "http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
+        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
+        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
         {
           method: "POST",
           body: formData,
