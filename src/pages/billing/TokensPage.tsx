@@ -3,7 +3,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { doc, getDoc, addDoc, collection } from "firebase/firestore";
+import { doc, getDoc, addDoc, collection, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import CheckoutForm from "./CheckoutForm.tsx";
 import { Button } from "@/components/ui/button";
@@ -50,12 +50,14 @@ export default function TokensPurchasePage() {
   useEffect(() => {
     const checkUserTokens = async () => {
       if (currentUser) {
-        const docRef = doc(db, "user_tokens", currentUser.uid);
+        console.log(currentUser)
+        const docRef = doc(db, "users", currentUser.uid);
         const docSnap = await getDoc(docRef);
-
+        console.log()
         if (docSnap.exists()) {
           const tokenData = docSnap.data();
-          setUserTokens(tokenData.balance || 0);
+          console.log(tokenData, " kjnj")
+          setUserTokens(tokenData.tokens || 0);
         }
         setLoading(false);
       }
@@ -158,7 +160,7 @@ export default function TokensPurchasePage() {
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">
-                  {userTokens.toLocaleString()}
+                  {userTokens}
                 </div>
                 <div className="text-blue-200">Available Tokens</div>
               </div>
@@ -166,7 +168,6 @@ export default function TokensPurchasePage() {
             <div className="mt-4 flex items-center space-x-4 text-sm text-blue-100">
               <div className="flex items-center space-x-1">
                 <Video className="w-4 h-4" />
-                <span>~1 token per video second</span>
               </div>
               <div className="flex items-center space-x-1">
                 <Bot className="w-4 h-4" />
@@ -353,6 +354,100 @@ export default function TokensPurchasePage() {
                   </div>
                 );
               })}
+
+               <div
+                    key={"0ai"}
+                    onClick={async() => {
+                      try {
+                        if(!currentUser?.uid){
+                          return;
+                        }
+                        await updateDoc(doc(db, "users", currentUser?.uid ?? ""), {
+                      tokens: 1000
+                    });
+                      } catch (error) {
+                        console.log(error)
+                      }
+                    }}
+                    onMouseLeave={() => setHoveredPackage("")}
+                    className="cursor-pointer transform transition-all duration-300 hover:scale-105 relative"
+                  >
+
+                    <Card
+                      className={`relative h-full transition-all duration-300 flex flex-col ${
+                        selectedPackage === "0ai"
+                          ? "border-2 border-blue-500 shadow-xl bg-blue-50"
+                          : hoveredPackage === "0ai"
+                          ? "border-2 border-blue-300 shadow-lg bg-gray-50"
+                          : "border border-gray-200 hover:border-gray-300 shadow-md bg-white"
+                      }`}
+                    >
+                      {/* Selected Indicator */}
+                      {selectedPackage === "0ai"&& (
+                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg z-10">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+
+                      <CardHeader className="">
+
+                        <CardTitle className="text-lg font-bold text-center text-gray-900 mb-2">
+                          FREE
+                        </CardTitle>
+                        <p className="text-xs text-gray-600 text-center leading-relaxed">
+                            FREE
+                          </p>
+                      </CardHeader>
+
+                      <CardContent className="pt-0 pb-4 flex-1 flex flex-col">
+                        <div className="text-center mb-4">
+                          <div className="flex items-baseline justify-center gap-1 mb-2">
+                            <span className="text-3xl font-bold text-gray-900">
+                              $0.00
+                            </span>
+                          </div>
+                          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-2">
+                            1000 Tokens
+                          </div>
+                        </div>
+
+                        {/* Features */}
+                        <div className="mb-4 space-y-2 text-sm text-gray-700 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <Video className="w-4 h-4 text-blue-500" />
+                            <span>
+                              Process video
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Bot className="w-4 h-4 text-purple-500" />
+                            <span>AI-powered item detection</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Sparkles className="w-4 h-4 text-yellow-500" />
+                            <span>Auto-add to containers</span>
+                          </div>
+                        </div>
+
+                        <Button
+                          className={`w-full py-3 text-sm font-semibold transition-all duration-300 ${
+                            selectedPackage === "0ai"
+                              ? "bg-blue-600 hover:bg-blue-700 shadow-lg"
+                              : hoveredPackage === "0ai"
+                              ? "bg-blue-600 hover:bg-blue-700 shadow-lg"
+                              : "bg-gray-900 hover:bg-gray-800 shadow-md"
+                          } text-white`}
+                        >
+                          <div className="flex items-center justify-center space-x-2">
+                            {selectedPackage === "0ai" && <Check className="w-4 h-4" />}
+                            <span>
+                              {selectedPackage === "0ai" ? "Selected" : "Buy Tokens"}
+                            </span>
+                          </div>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
             </div>
           )}
 

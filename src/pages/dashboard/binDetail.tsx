@@ -673,8 +673,8 @@ const BinDetailsScreen: React.FC = () => {
 
     try {
       const estimateResponse = await fetch(
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
+        //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
+        "http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
         {
           method: "POST",
           body: formData,
@@ -1258,7 +1258,7 @@ const BinDetailsScreen: React.FC = () => {
                   Video AI
                 </Button>
               </DialogTrigger>
-              <DialogContent className="!max-w-5xl max-h-[90vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
+              <DialogContent className="!max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
                 <DialogHeader className="pb-6">
                   <DialogTitle className="text-2xl font-bold text-slate-900">
                     {showResults
@@ -1358,73 +1358,179 @@ const BinDetailsScreen: React.FC = () => {
                   </div>
                 ) : !showResults && estimateData ? (
                   <div className="space-y-6">
-                    {/* --- CASE 1: Enough tokens --- */}
                     {estimateData.success ? (
-                      <div className="text-center space-y-4">
-                        <h2 className="text-xl font-bold text-green-600">
-                          ✅ You have enough tokens
-                        </h2>
-                        <p>My tokens: {estimateData?.available_tokens}</p>
-                        <p>Tokens required: {estimateData.MY_TOTAL_TOKENS}</p>
-                        <p>
-                          Tokens left: {estimateData?.tokens_remaining_after}
-                        </p>
-                        <div className="flex justify-center space-x-3 pt-4">
-                          <Button
-                            variant="outline"
-                            onClick={() => setEstimateData(null)}
-                            className="rounded-xl border-slate-300"
-                          >
-                            Cancel
-                          </Button>
-                          <Button
-                            onClick={confirmProcess}
-                            className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-                          >
-                            Confirm and Process
-                          </Button>
+                      <div>
+                        <div className="w-full bg-white shadow-md rounded-2xl p-4 md:p-5 flex flex-col md:flex-row items-center gap-4">
+                          <div className="flex-shrink-0 w-full md:w-28 flex items-center justify-center">
+                            <div className="relative w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center ring-1 ring-emerald-100">
+                              <span className="absolute -top-2 -right-2 bg-emerald-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-sm">
+                                ✅
+                              </span>
+                              <div className="text-center">
+                                <div className="text-xs text-slate-400">
+                                  Tokens
+                                </div>
+                                <div className="mt-1 text-lg font-semibold text-slate-900">
+                                  {estimateData?.available_tokens}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex-1 w-full text-center md:text-left">
+                            <h2 className="text-lg font-semibold text-slate-900">
+                              You have enough tokens
+                            </h2>
+
+                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-slate-600">
+                              <div className="flex flex-col items-center sm:items-start">
+                                <div className="text-xs text-slate-500">
+                                  Tokens required
+                                </div>
+                                <div className="font-medium text-slate-800">
+                                  {estimateData.MY_TOTAL_TOKENS}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-center sm:items-start">
+                                <div className="text-xs text-slate-500">
+                                  Tokens left
+                                </div>
+                                <div className="font-medium text-slate-800">
+                                  {estimateData?.tokens_remaining_after}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* subtle progress line */}
+                            <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
+                              <div
+                                className="h-2 rounded-full bg-emerald-500 transition-width"
+                                style={{
+                                  width: `${Math.min(
+                                    100,
+                                    Math.round(
+                                      ((estimateData?.available_tokens ?? 0) /
+                                        (estimateData.MY_TOTAL_TOKENS || 1)) *
+                                        100
+                                    )
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex w-full  mt-4 flex-col items-end gap-2">
+                          <div className="flex w-full gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              onClick={() => setEstimateData(null)}
+                              className="flex-1 rounded-xl border-slate-300"
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={confirmProcess}
+                              className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
+                            >
+                              Confirm and Process
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ) : (estimateData?.available_tokens ?? 0) > 0 ? (
-                      /* --- CASE 2: Not enough tokens --- */
-                      <div className="text-center space-y-4">
-                        <h2 className="text-xl font-bold text-yellow-600">
-                          ⚠️ Not enough tokens
-                        </h2>
-                        <p>My tokens: {estimateData?.available_tokens}</p>
-                        <p>Tokens required: {estimateData?.required_tokens}</p>
-                        <p>
-                          Tokens missing:{" "}
-                          {(estimateData?.required_tokens ?? 0) -
-                            (estimateData?.available_tokens ?? 0)}
-                        </p>
-                        <Button
-                          className="mt-4 bg-red-500 text-white px-4 py-2 rounded-xl"
-                          onClick={() => {
-                            setEstimateData(null);
-                            window.open("/tokensai", "_blank");
-                          }}
-                        >
-                          Buy Tokens
-                        </Button>
+                      <div className="w-full bg-yellow-50/70 border border-yellow-100 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row items-center gap-4">
+                        <div className="flex-shrink-0 w-full md:w-20 flex items-center justify-center">
+                          <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center ring-1 ring-yellow-200">
+                            <div className="text-amber-700 font-semibold">
+                              ⚠️
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 text-center md:text-left">
+                          <h2 className="text-lg font-semibold text-amber-800">
+                            Not enough tokens
+                          </h2>
+                          <div className="mt-2 text-sm text-slate-600 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                              <div className="text-xs text-slate-500">
+                                My tokens
+                              </div>
+                              <div className="font-medium text-slate-800">
+                                {estimateData?.available_tokens}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500">
+                                Tokens required
+                              </div>
+                              <div className="font-medium text-slate-800">
+                                {estimateData?.required_tokens}
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-xs text-slate-500">
+                                Tokens missing
+                              </div>
+                              <div className="font-semibold text-rose-600">
+                                {(estimateData?.required_tokens ?? 0) -
+                                  (estimateData?.available_tokens ?? 0)}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 text-xs text-slate-500">
+                            Top-up to continue immediately.
+                          </div>
+                        </div>
+
+                        <div className="flex-shrink-0 w-full md:w-44 flex items-center md:items-end">
+                          <Button
+                            className="w-full bg-red-500 text-white px-4 py-2 rounded-xl"
+                            onClick={() => {
+                              setEstimateData(null);
+                              window.open("/tokensai", "_blank");
+                            }}
+                          >
+                            Buy Tokens
+                          </Button>
+                        </div>
                       </div>
                     ) : (
                       /* --- CASE 3: No tokens --- */
-                      <div className="text-center space-y-4">
-                        <h2 className="text-xl font-bold text-red-600">
-                          ❌ No tokens
-                        </h2>
-                        <p>You don’t have tokens available.</p>
-                        <Button
-                          className="mt-4 bg-red-500 text-white px-4 py-2 rounded-xl"
-                          onClick={() => {
-                            setEstimateData(null);
-                             setEstimateData(null);
-                            window.open("/tokensai", "_blank");
-                          }}
-                        >
-                          Buy Tokens
-                        </Button>
+                      <div className="w-full bg-red-50/70 border border-red-100 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row items-center gap-4">
+                        <div className="flex-shrink-0 w-full md:w-20 flex items-center justify-center">
+                          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center ring-1 ring-red-200">
+                            <div className="text-red-600 font-semibold">❌</div>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 text-center md:text-left">
+                          <h2 className="text-lg font-semibold text-red-700">
+                            No tokens
+                          </h2>
+                          <p className="mt-2 text-sm text-slate-600">
+                            You don’t have tokens available.
+                          </p>
+                          <div className="mt-3 text-xs text-slate-500">
+                            Purchase tokens to start processing jobs.
+                          </div>
+                        </div>
+
+                        <div className="flex-shrink-0 w-full md:w-44 flex items-center md:items-end">
+                          <Button
+                            className="w-full bg-red-500 text-white px-4 py-2 rounded-xl"
+                            onClick={() => {
+                              setEstimateData(null);
+                              setEstimateData(null);
+                              window.open("/tokensai", "_blank");
+                            }}
+                          >
+                            Buy Tokens
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
