@@ -673,8 +673,8 @@ const BinDetailsScreen: React.FC = () => {
 
     try {
       const estimateResponse = await fetch(
-        //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        "http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
+        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
+        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
         {
           method: "POST",
           body: formData,
@@ -708,10 +708,13 @@ const BinDetailsScreen: React.FC = () => {
     if (currentUser) {
       token = await currentUser.getIdToken();
     }
+    setIsUploading(true);
+    setShowResults(false);
+    setEstimateData(null);
 
     const processResponse = await fetch(
-      //"https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
-      "http://localhost:3000/api/v1/gemini-video/process-video",
+      "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
+      //"http://localhost:3000/api/v1/gemini-video/process-video",
       {
         method: "POST",
         body: formData,
@@ -1246,6 +1249,7 @@ const BinDetailsScreen: React.FC = () => {
               onOpenChange={(open) => {
                 setShowResults(false);
                 setIsVideoUploadOpen(open);
+                setSelectedVideo(null);
               }}
             >
               <DialogTrigger asChild>
@@ -1415,7 +1419,8 @@ const BinDetailsScreen: React.FC = () => {
                           className="mt-4 bg-red-500 text-white px-4 py-2 rounded-xl"
                           onClick={() => {
                             setEstimateData(null);
-                            // redirigir a compra
+                             setEstimateData(null);
+                            window.open("/tokensai", "_blank");
                           }}
                         >
                           Buy Tokens
