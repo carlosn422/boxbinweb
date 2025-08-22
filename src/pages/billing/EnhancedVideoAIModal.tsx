@@ -1042,16 +1042,6 @@ const EnhancedVideoAIModal = ({
               ? "Token Verification"
               : "Upload Video for AI Analysis"}
           </DialogTitle>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowTokenPurchase(true)}
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg"
-          >
-            <Coins className="w-4 h-4 mr-1" />
-            Buy Tokens
-          </Button>
         </DialogHeader>
 
         {renderMainContent()}
