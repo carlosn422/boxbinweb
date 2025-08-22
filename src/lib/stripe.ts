@@ -41,7 +41,7 @@ export const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 import { STRIPE_SECRET_KEY } from "../config/stripe";
 
 const stripeClient = new Stripe(
-  STRIPE_SECRET_KEY,
+   STRIPE_SECRET_KEY,
   {
     apiVersion: "2025-06-30.basil" as const,
   }
@@ -361,3 +361,20 @@ export const upgradeSubscription = async ({
   const result = await fn({ subscriptionId, newPriceId, userId });
   return result.data;
 };
+
+export async function createStripePaymentIntent(
+  amount: number,
+  currency: string = "usd",
+  email?: string,
+  name?: string
+): Promise<{ clientSecret: string }> {
+  const paymentIntent = await stripeClient.paymentIntents.create({
+    amount,
+    currency,
+    receipt_email: email,
+    description: `One-time purchase by ${name || email || "Unknown"}`,
+    automatic_payment_methods: { enabled: true },
+  });
+
+  return { clientSecret: paymentIntent.client_secret! };
+}

@@ -5,7 +5,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { doc, getDoc, addDoc, collection, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import CheckoutForm from "./CheckoutForm.tsx";
 import { Button } from "@/components/ui/button";
 import { getStripePlans } from "../../lib/stripe";
 import { STRIPE_PUBLISHABLE_KEY } from "../../config/stripe";
@@ -25,6 +24,7 @@ const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 const planIcons = [Coins, Zap, Star, Crown];
 
 import { useTranslation } from "react-i18next";
+import TokenCheckoutForm from "./TokenCheckoutForm.tsx";
 
 export default function TokensPurchasePage() {
   const { t } = useTranslation();
@@ -220,137 +220,6 @@ export default function TokensPurchasePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-              {tokenPackages.map((pkg, index) => {
-                const IconComponent = planIcons[index % planIcons.length];
-                const isSelected = selectedPackage === pkg.id;
-                const isHovered = hoveredPackage === pkg.id;
-                const isPopular =
-                  index === Math.floor(tokenPackages.length / 2);
-                const tokenAmount = parseInt(pkg.metadata?.tokens || "0");
-                const pricePerToken = pkg.unit_amount / tokenAmount;
-
-                return (
-                  <div
-                    key={pkg.id}
-                    onClick={() => setSelectedPackage(pkg.id)}
-                    onMouseEnter={() => setHoveredPackage(pkg.id)}
-                    onMouseLeave={() => setHoveredPackage("")}
-                    className="cursor-pointer transform transition-all duration-300 hover:scale-105 relative"
-                  >
-                    {/* Popular Badge */}
-                    {isPopular && (
-                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-[140px]">
-                        <div className="bg-blue-600 text-white px-3 py-1 rounded-full font-bold shadow-lg w-full">
-                          <div className="flex items-center justify-center space-x-1 w-full">
-                            <Crown className="w-[0.9em] h-[0.9em]" />
-                            <span className="text-[0.9em] whitespace-nowrap">
-                              Best Value
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <Card
-                      className={`relative h-full transition-all duration-300 flex flex-col ${
-                        isSelected
-                          ? "border-2 border-blue-500 shadow-xl bg-blue-50"
-                          : isHovered
-                          ? "border-2 border-blue-300 shadow-lg bg-gray-50"
-                          : "border border-gray-200 hover:border-gray-300 shadow-md bg-white"
-                      }`}
-                    >
-                      {/* Selected Indicator */}
-                      {isSelected && (
-                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg z-10">
-                          <Check className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-
-                      <CardHeader className="">
-                        <div
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 transition-all duration-300 ${
-                            isSelected
-                              ? "bg-blue-600 shadow-lg"
-                              : isHovered
-                              ? "bg-blue-500 shadow-lg"
-                              : "bg-gray-600"
-                          }`}
-                        >
-                          <IconComponent className="w-6 h-6 text-white" />
-                        </div>
-
-                        <CardTitle className="text-lg font-bold text-center text-gray-900 mb-2">
-                          {pkg.product.name}
-                        </CardTitle>
-                        {pkg.product.description && (
-                          <p className="text-xs text-gray-600 text-center leading-relaxed">
-                            {pkg.product.description}
-                          </p>
-                        )}
-                      </CardHeader>
-
-                      <CardContent className="pt-0 pb-4 flex-1 flex flex-col">
-                        <div className="text-center mb-4">
-                          <div className="flex items-baseline justify-center gap-1 mb-2">
-                            <span className="text-3xl font-bold text-gray-900">
-                              ${(pkg.unit_amount / 100).toFixed(2)}
-                            </span>
-                          </div>
-                          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-2">
-                            {tokenAmount.toLocaleString()} Tokens
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            ${(pricePerToken / 100).toFixed(4)} per token
-                          </p>
-                        </div>
-
-                        {/* Features */}
-                        <div className="mb-4 space-y-2 text-sm text-gray-700 flex-1">
-                          <div className="flex items-center space-x-2">
-                            <Video className="w-4 h-4 text-blue-500" />
-                            <span>Process video</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Bot className="w-4 h-4 text-purple-500" />
-                            <span>AI-powered item detection</span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Sparkles className="w-4 h-4 text-yellow-500" />
-                            <span>Auto-add to containers</span>
-                          </div>
-                          {pkg.metadata?.bonus && (
-                            <div className="flex items-center space-x-2">
-                              <Crown className="w-4 h-4 text-orange-500" />
-                              <span className="text-orange-600 font-semibold">
-                                +{pkg.metadata.bonus}% Bonus Tokens
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        <Button
-                          className={`w-full py-3 text-sm font-semibold transition-all duration-300 ${
-                            isSelected
-                              ? "bg-blue-600 hover:bg-blue-700 shadow-lg"
-                              : isHovered
-                              ? "bg-blue-600 hover:bg-blue-700 shadow-lg"
-                              : "bg-gray-900 hover:bg-gray-800 shadow-md"
-                          } text-white`}
-                        >
-                          <div className="flex items-center justify-center space-x-2">
-                            {isSelected && <Check className="w-4 h-4" />}
-                            <span>
-                              {isSelected ? "Selected" : "Buy Tokens"}
-                            </span>
-                          </div>
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  </div>
-                );
-              })}
-
               <div
                 key={"0ai"}
                 onClick={async () => {
@@ -358,10 +227,14 @@ export default function TokensPurchasePage() {
                     if (!currentUser?.uid) {
                       return;
                     }
+                    setIsLoading(true);
                     await updateDoc(doc(db, "users", currentUser?.uid ?? ""), {
                       tokens: 1000,
                     });
+                    setIsLoading(false);
+                    window.location.reload();
                   } catch (error) {
+                    setIsLoading(false);
                     console.log(error);
                   }
                 }}
@@ -444,6 +317,136 @@ export default function TokensPurchasePage() {
                   </CardContent>
                 </Card>
               </div>
+              {tokenPackages.map((pkg, index) => {
+                const IconComponent = planIcons[index % planIcons.length];
+                const isSelected = selectedPackage === pkg.id;
+                const isHovered = hoveredPackage === pkg.id;
+                const isPopular =
+                  index === Math.floor(tokenPackages.length / 2);
+                const tokenAmount = parseInt(pkg.metadata?.tokens || "0");
+                const pricePerToken = pkg.unit_amount / tokenAmount;
+
+                return (
+                  <div
+                    key={pkg.id}
+                    onClick={() => setSelectedPackage(pkg.id)}
+                    onMouseEnter={() => setHoveredPackage(pkg.id)}
+                    onMouseLeave={() => setHoveredPackage("")}
+                    className="cursor-pointer transform transition-all duration-300 hover:scale-105 relative"
+                  >
+                    {/* Popular Badge */}
+                    {isPopular && (
+                      <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10 w-full max-w-[140px]">
+                        <div className="bg-blue-600 text-white px-3 py-1 rounded-full font-bold shadow-lg w-full">
+                          <div className="flex items-center justify-center space-x-1 w-full">
+                            <Crown className="w-[0.9em] h-[0.9em]" />
+                            <span className="text-[0.9em] whitespace-nowrap">
+                              Best Value
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <Card
+                      className={`relative h-full transition-all duration-300 flex flex-col ${
+                        isSelected
+                          ? "border-2 border-blue-500 shadow-xl bg-blue-50"
+                          : isHovered
+                          ? "border-2 border-blue-300 shadow-lg bg-gray-50"
+                          : "border border-gray-200 hover:border-gray-300 shadow-md bg-white"
+                      }`}
+                    >
+                      {/* Selected Indicator */}
+                      {isSelected && (
+                        <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg z-10">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+
+                      <CardHeader className="">
+                        <div
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-3 transition-all duration-300 ${
+                            isSelected
+                              ? "bg-blue-600 shadow-lg"
+                              : isHovered
+                              ? "bg-blue-500 shadow-lg"
+                              : "bg-gray-600"
+                          }`}
+                        >
+                          <IconComponent className="w-6 h-6 text-white" />
+                        </div>
+
+                        <CardTitle className="text-lg font-bold text-center text-gray-900 mb-2">
+                          {pkg.product.name}
+                        </CardTitle>
+                        {pkg.product.description && (
+                          <p className="text-xs text-gray-600 text-center leading-relaxed">
+                            {pkg.product.description}
+                          </p>
+                        )}
+                      </CardHeader>
+
+                      <CardContent className="pt-0 pb-4 flex-1 flex flex-col">
+                        <div className="text-center mb-4">
+                          <div className="flex items-baseline justify-center gap-1 mb-2">
+                            <span className="text-3xl font-bold text-gray-900">
+                              ${(pkg.unit_amount / 100).toFixed(2)}
+                            </span>
+                          </div>
+                          <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-bold mb-2">
+                            {tokenAmount} Tokens
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            ${(pricePerToken / 100).toFixed(4)} per token
+                          </p>
+                        </div>
+
+                        {/* Features */}
+                        <div className="mb-4 space-y-2 text-sm text-gray-700 flex-1">
+                          <div className="flex items-center space-x-2">
+                            <Video className="w-4 h-4 text-blue-500" />
+                            <span>Process video</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Bot className="w-4 h-4 text-purple-500" />
+                            <span>AI-powered item detection</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Sparkles className="w-4 h-4 text-yellow-500" />
+                            <span>Auto-add to containers</span>
+                          </div>
+                          {pkg.metadata?.bonus && (
+                            <div className="flex items-center space-x-2">
+                              <Crown className="w-4 h-4 text-orange-500" />
+                              <span className="text-orange-600 font-semibold">
+                                +{pkg.metadata.bonus}% Bonus Tokens
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        <Button
+                          className={`w-full py-3 text-sm font-semibold transition-all duration-300 ${
+                            isSelected
+                              ? "bg-blue-600 hover:bg-blue-700 shadow-lg"
+                              : isHovered
+                              ? "bg-blue-600 hover:bg-blue-700 shadow-lg"
+                              : "bg-gray-900 hover:bg-gray-800 shadow-md"
+                          } text-white`}
+                        >
+                          <div className="flex items-center justify-center space-x-2">
+                            {isSelected && <Check className="w-4 h-4" />}
+                            <span>
+                              {isSelected ? "Selected" : "Buy Tokens"}
+                            </span>
+                          </div>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -508,13 +511,13 @@ export default function TokensPurchasePage() {
                   </div>
                 ) : (
                   <Elements stripe={stripePromise}>
-                    <CheckoutForm
-                      userId={currentUser?.uid}
-                      planId={selectedPackage}
-                      currency="usd"
-                      originalPrice={
-                        tokenPackages.find((p) => p.id === selectedPackage)
-                          ?.unit_amount || 0
+                    <TokenCheckoutForm 
+                      userId={currentUser?.uid ?? ""} 
+                      tokens={parseInt(
+                        tokenPackages.find((p) => p.id === selectedPackage)?.metadata?.tokens || "0"
+                      )}
+                      price={
+                        tokenPackages.find((p) => p.id === selectedPackage)?.unit_amount || 0
                       }
                     />
                   </Elements>

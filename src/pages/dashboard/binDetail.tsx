@@ -12,9 +12,6 @@ import {
   X,
   Minus,
   Loader2,
-  Upload,
-  Video,
-  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -63,10 +60,9 @@ import {
 } from "firebase/storage";
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
+import EnhancedVideoAIModal from "../billing/EnhancedVideoAIModal";
 
-import { getFunctions, httpsCallable } from "firebase/functions";
-
-interface TokenEstimate {
+export interface TokenEstimate {
   success: boolean;
   MY_TOTAL_TOKENS: number;
   MY_TOTAL_COST: number;
@@ -612,15 +608,15 @@ const BinDetailsScreen: React.FC = () => {
 
   // Add these state variables with your other useState declarations
   const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
-  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  //const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  //const [videoPreview, setVideoPreview] = useState<string | null>(null);
 
-  const [detectedItems, setDetectedItems] = useState<any[]>([]);
-  const [showResults, setShowResults] = useState<boolean>(false);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState<boolean>(false);
+  //const [detectedItems, setDetectedItems] = useState<any[]>([]);
+  //const [showResults, setShowResults] = useState<boolean>(false);
+  //const [processingId, setProcessingId] = useState<string | null>(null);
+  //const [isPolling, setIsPolling] = useState<boolean>(false);
 
-  const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  /*const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -655,11 +651,11 @@ const BinDetailsScreen: React.FC = () => {
     };
 
     video.src = URL.createObjectURL(file);
-  };
+  };*/
 
-  const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
+  //const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
 
-  const handleVideoSubmit = async () => {
+  /*const handleVideoSubmit = async () => {
     if (!selectedVideo) return;
     setIsUploading(true);
 
@@ -745,9 +741,9 @@ const BinDetailsScreen: React.FC = () => {
     setShowResults(false);
     setProcessingId(null);
     setIsPolling(false);
-  };
+  };*/
 
-  useEffect(() => {
+  /*useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPolling && processingId) {
       interval = setInterval(async () => {
@@ -828,7 +824,7 @@ const BinDetailsScreen: React.FC = () => {
       console.error("Error adding detected item:", error);
       toast.error("Failed to add item to container");
     }
-  };
+  };*/
 
   if (loading) {
     return (
@@ -1243,7 +1239,14 @@ const BinDetailsScreen: React.FC = () => {
               </DialogContent>
             </Dialog>
 
-            {/* NEW: Video AI Button */}
+            <EnhancedVideoAIModal
+              setIsVideoUploadOpen={setIsVideoUploadOpen}
+              isVideoUploadOpen={isVideoUploadOpen}
+              itemId={id}
+              setItems={setItems}
+            />
+
+            {/* NEW: Video AI Button 
             <Dialog
               open={isVideoUploadOpen}
               onOpenChange={(open) => {
@@ -1267,10 +1270,8 @@ const BinDetailsScreen: React.FC = () => {
                   </DialogTitle>
                 </DialogHeader>
 
-                {/* --- TOKEN CHECK / UPLOAD FLOW --- */}
                 {!showResults && !estimateData ? (
                   <div className="space-y-6">
-                    {/* Video Upload */}
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-slate-700">
                         Video File (5s - 2min)
@@ -1324,7 +1325,6 @@ const BinDetailsScreen: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Upload Progress */}
                     {isUploading && (
                       <div className="flex flex-col items-center justify-center py-4">
                         <Loader2 className="w-6 h-6 text-purple-600 animate-spin mb-2" />
@@ -1334,7 +1334,6 @@ const BinDetailsScreen: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Action Buttons */}
                     <div className="flex justify-end space-x-3 pt-6">
                       <Button
                         variant="outline"
@@ -1402,7 +1401,6 @@ const BinDetailsScreen: React.FC = () => {
                               </div>
                             </div>
 
-                            {/* subtle progress line */}
                             <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
                               <div
                                 className="h-2 rounded-full bg-emerald-500 transition-width"
@@ -1499,7 +1497,6 @@ const BinDetailsScreen: React.FC = () => {
                         </div>
                       </div>
                     ) : (
-                      /* --- CASE 3: No tokens --- */
                       <div className="w-full bg-red-50/70 border border-red-100 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row items-center gap-4">
                         <div className="flex-shrink-0 w-full md:w-20 flex items-center justify-center">
                           <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center ring-1 ring-red-200">
@@ -1535,16 +1532,13 @@ const BinDetailsScreen: React.FC = () => {
                     )}
                   </div>
                 ) : (
-                  /* Results View */
                   <div className="space-y-6">
-                    {/* Results Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto">
                       {detectedItems.map((item: any) => (
                         <div
                           key={item.id}
                           className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
                         >
-                          {/* Item Image */}
                           <div className="relative">
                             <img
                               src={item.image_url}
@@ -1562,14 +1556,12 @@ const BinDetailsScreen: React.FC = () => {
                               </span>
                             </div>
 
-                            {/* Confidence Badge */}
                             <div className="absolute top-3 right-3">
                               <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
                                 {Math.round(item.confidence * 100)}% confident
                               </span>
                             </div>
 
-                            {/* Timestamp Badge */}
                             <div className="absolute top-3 left-3">
                               <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full flex items-center">
                                 <Clock className="h-3 w-3 mr-1" />
@@ -1578,7 +1570,6 @@ const BinDetailsScreen: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Item Details */}
                           <div className="p-4 space-y-3">
                             <div>
                               <h3 className="font-semibold text-slate-900 text-lg">
@@ -1589,7 +1580,6 @@ const BinDetailsScreen: React.FC = () => {
                               </p>
                             </div>
 
-                            {/* Tags */}
                             {item.tags && item.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1">
                                 {item.tags
@@ -1610,7 +1600,6 @@ const BinDetailsScreen: React.FC = () => {
                               </div>
                             )}
 
-                            {/* Add Button */}
                             <Button
                               onClick={() => handleAddDetectedItem(item)}
                               className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
@@ -1623,7 +1612,6 @@ const BinDetailsScreen: React.FC = () => {
                       ))}
                     </div>
 
-                    {/* Results Actions */}
                     <div className="flex justify-between items-center pt-6 border-t border-slate-200">
                       <Button
                         variant="outline"
@@ -1662,7 +1650,7 @@ const BinDetailsScreen: React.FC = () => {
                   </div>
                 )}
               </DialogContent>
-            </Dialog>
+            </Dialog>*/}
           </div>
 
           {/* Items Section */}
