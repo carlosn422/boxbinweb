@@ -32,23 +32,21 @@ export const moveImageToFinal = onCall(
         );
       }
 
-      // 1. Quitar query params
-      const withoutParams = imageUrl.split("?")[0];
-      console.log("URL sin query params:", withoutParams);
+      // 1. Extraer el path dentro del bucket directamente desde la URL
+      const url = new URL(imageUrl);
+      const pathname = decodeURIComponent(url.pathname); // decodifica caracteres especiales
+      console.log("URL pathname decodificado:", pathname);
 
-      // 2. Extraer path real dentro del bucket
+      // 2. Buscar el subpath dentro de file_processing o video_processing
       let oldPath: string | null = null;
-
-      const fileIndex = withoutParams.indexOf("/file_processing/");
-      const videoIndex = withoutParams.indexOf("/video_processing/");
+      const fileIndex = pathname.indexOf("/file_processing/");
+      const videoIndex = pathname.indexOf("/video_processing/");
 
       if (fileIndex !== -1) {
-        oldPath = withoutParams.substring(fileIndex + 1);
+        oldPath = pathname.substring(fileIndex + 1);
       } else if (videoIndex !== -1) {
-        oldPath = withoutParams.substring(videoIndex + 1);
+        oldPath = pathname.substring(videoIndex + 1);
       }
-
-      console.log("Old path extraído:", oldPath);
 
       if (!oldPath) {
         throw new functions.https.HttpsError(
@@ -57,17 +55,15 @@ export const moveImageToFinal = onCall(
         );
       }
 
+      console.log("Old path extraído:", oldPath);
+
       // 3. Definir nuevo path
       const fileName = oldPath.split("/").pop();
       const newPath = `${newFolder}/${fileName}`;
       console.log("Nuevo path:", newPath);
 
+      // 4. Obtener bucket correctamente
       const bucket = storage.bucket();
-
-
-      // 4. Obtener bucket explícitamente
-      //const bucketName = "binventory-ea555.appspot.com"; // <-- asegurar bucket correcto
-      //const bucket = storage.bucket(bucketName);
       console.log("Usando bucket:", bucket.name);
 
       // 5. Copiar y borrar (mover)
@@ -78,10 +74,10 @@ export const moveImageToFinal = onCall(
       await bucket.file(oldPath).delete();
       console.log(`Archivo original eliminado: ${oldPath}`);
 
-      // 6. Generar signed URL
+      // 6. Generar signed URL seguro
       const [signedUrl] = await bucket.file(newPath).getSignedUrl({
         action: "read",
-        expires: "03-01-2035",
+        expires: new Date("2035-03-01"),
       });
 
       console.log("Signed URL generado:", signedUrl);
@@ -93,7 +89,6 @@ export const moveImageToFinal = onCall(
     }
   }
 );
-
 
 export const cancelSubscription = onCall(
   async (request: functions.https.CallableRequest) => {
