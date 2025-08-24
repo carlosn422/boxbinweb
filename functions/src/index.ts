@@ -17,6 +17,8 @@ export const moveImageToFinal = onCall(
     try {
       const { imageUrl, newFolder } = request.data;
 
+      console.log("Request received:", { imageUrl, newFolder });
+
       if (!imageUrl || typeof imageUrl !== "string") {
         throw new functions.https.HttpsError(
           "invalid-argument",
@@ -30,51 +32,68 @@ export const moveImageToFinal = onCall(
         );
       }
 
-      // 1. Remove query params
+      // 1. Quitar query params
       const withoutParams = imageUrl.split("?")[0];
+      console.log("URL sin query params:", withoutParams);
 
-      // 2. Extract the storage object path (strip bucket domain)
+      // 2. Extraer path real dentro del bucket
       let oldPath: string | null = null;
 
       const fileIndex = withoutParams.indexOf("/file_processing/");
       const videoIndex = withoutParams.indexOf("/video_processing/");
 
       if (fileIndex !== -1) {
-        oldPath = withoutParams.substring(fileIndex + 1); // remove leading "/"
+        oldPath = withoutParams.substring(fileIndex + 1);
       } else if (videoIndex !== -1) {
         oldPath = withoutParams.substring(videoIndex + 1);
       }
 
+      console.log("Old path extraído:", oldPath);
+
       if (!oldPath) {
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "Could not extract the storage path from the URL."
+          "No se pudo extraer el path del storage desde la URL."
         );
       }
 
-      // 3. Define new path
+      // 3. Definir nuevo path
       const fileName = oldPath.split("/").pop();
       const newPath = `${newFolder}/${fileName}`;
+      console.log("Nuevo path:", newPath);
 
       const bucket = storage.bucket();
 
-      // 4. Copy then delete (move)
-      await bucket.file(oldPath).copy(bucket.file(newPath));
-      await bucket.file(oldPath).delete();
 
-      // 5. Generate new signed URL
+      // 4. Obtener bucket explícitamente
+      //const bucketName = "binventory-ea555.appspot.com"; // <-- asegurar bucket correcto
+      //const bucket = storage.bucket(bucketName);
+      console.log("Usando bucket:", bucket.name);
+
+      // 5. Copiar y borrar (mover)
+      console.log(`Copiando ${oldPath} → ${newPath}`);
+      await bucket.file(oldPath).copy(bucket.file(newPath));
+      console.log(`Archivo copiado: ${newPath}`);
+
+      await bucket.file(oldPath).delete();
+      console.log(`Archivo original eliminado: ${oldPath}`);
+
+      // 6. Generar signed URL
       const [signedUrl] = await bucket.file(newPath).getSignedUrl({
         action: "read",
-        expires: "03-01-2035", // long expiration date
+        expires: "03-01-2035",
       });
+
+      console.log("Signed URL generado:", signedUrl);
 
       return { newUrl: signedUrl, newPath };
     } catch (err: any) {
-      console.error("Error moving image:", err);
+      console.error("Error moviendo imagen:", err);
       throw new functions.https.HttpsError("unknown", err.message);
     }
   }
 );
+
 
 export const cancelSubscription = onCall(
   async (request: functions.https.CallableRequest) => {
