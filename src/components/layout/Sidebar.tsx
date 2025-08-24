@@ -48,6 +48,7 @@ export function Sidebar({ className }: SidebarProps) {
     { title: t("sidebar.locations"), href: "/locations", icon: MapPin, badge: null },
     { title: "Shared Access", href: "/shared", icon: PersonStandingIcon, badge: t("sidebar.new") },
     { title: "Subscription", href: "/subscription", icon: Settings, badge: null },
+    { title: "Tokens AI", href: "/tokensai", icon: Settings, badge: null },
     { title: t("export.title"), href: "/export-inventory", icon: Download, badge: null },
     {
       title: "Smart Labels",

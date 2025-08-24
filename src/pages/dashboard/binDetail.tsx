@@ -61,6 +61,7 @@ import {
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import EnhancedVideoAIModal from "../billing/EnhancedVideoAIModal";
+import EnhancedImagesAIModal from "../billing/EnhancedImageAIModal";
 
 export interface TokenEstimate {
   success: boolean;
@@ -186,8 +187,6 @@ const BinDetailsScreen: React.FC = () => {
   const [binDescription, setBinDescription] = useState("");
   const [binAddress, setBinAddress] = useState("");
 
-  const [error, setError] = useState("");
-
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [isBulkUploading, setIsBulkUploading] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
@@ -250,19 +249,15 @@ const BinDetailsScreen: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log(error);
     const fetchData = async () => {
       try {
         setLoading(true);
 
         await fetchSubscription();
-        setError("");
-
         const binDocRef = doc(db, "bins", id!);
         const binSnap = await getDoc(binDocRef);
 
         if (!binSnap.exists()) {
-          setError("Container not found");
           setLoading(false);
           return;
         }
@@ -284,7 +279,6 @@ const BinDetailsScreen: React.FC = () => {
         setItems(itemsData);
       } catch (err) {
         console.error("Error fetching bin data:", err);
-        setError("Error fetching container data");
       } finally {
         setLoading(false);
       }
@@ -402,8 +396,6 @@ const BinDetailsScreen: React.FC = () => {
         type: "error",
         message: "Failed to update item",
       });
-    } finally {
-      //setIsUploading(false);
     }
   };
 
@@ -608,223 +600,7 @@ const BinDetailsScreen: React.FC = () => {
 
   // Add these state variables with your other useState declarations
   const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
-  //const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
-  //const [videoPreview, setVideoPreview] = useState<string | null>(null);
-
-  //const [detectedItems, setDetectedItems] = useState<any[]>([]);
-  //const [showResults, setShowResults] = useState<boolean>(false);
-  //const [processingId, setProcessingId] = useState<string | null>(null);
-  //const [isPolling, setIsPolling] = useState<boolean>(false);
-
-  /*const handleVideoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith("video/")) {
-      alert("Please select a valid video file");
-      return;
-    }
-
-    // Create video element to check duration
-    const video = document.createElement("video");
-    video.preload = "metadata";
-
-    video.onloadedmetadata = () => {
-      window.URL.revokeObjectURL(video.src);
-      const duration = video.duration;
-
-      // Check duration (5 seconds to 2 minutes)
-      if (duration < 5) {
-        alert("Video must be at least 5 seconds long");
-        return;
-      }
-
-      if (duration > 120) {
-        alert("Video must be less than 2 minutes long");
-        return;
-      }
-
-      // If validation passes, set the video
-      setSelectedVideo(file);
-      setVideoPreview(URL.createObjectURL(file));
-    };
-
-    video.src = URL.createObjectURL(file);
-  };*/
-
-  //const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
-
-  /*const handleVideoSubmit = async () => {
-    if (!selectedVideo) return;
-    setIsUploading(true);
-
-    const formData = new FormData();
-    formData.append("videoFile", selectedVideo);
-
-    let token = "";
-    if (currentUser) {
-      token = await currentUser.getIdToken();
-    }
-
-    try {
-      const estimateResponse = await fetch(
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
-        {
-          method: "POST",
-          body: formData,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const estimateJson = await estimateResponse.json();
-      console.log(estimateJson, " njnj");
-      setEstimateData(estimateJson);
-      setIsUploading(false);
-    } catch (err) {
-      console.error("Error:", err);
-      setIsUploading(false);
-    }
-  };
-
-  const confirmProcess = async () => {
-    if (!estimateData?.success) {
-      return;
-    }
-
-    const formData = new FormData();
-    if (selectedVideo) {
-      formData.append("videoFile", selectedVideo);
-    }
-
-    let token = "";
-    if (currentUser) {
-      token = await currentUser.getIdToken();
-    }
-    setIsUploading(true);
-    setShowResults(false);
-    setEstimateData(null);
-
-    const processResponse = await fetch(
-      "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
-      //"http://localhost:3000/api/v1/gemini-video/process-video",
-      {
-        method: "POST",
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    const processData = await processResponse.json();
-    if (processData.success && processData.processingId) {
-      setProcessingId(processData.processingId);
-      setIsPolling(true);
-      toast.success("🎥 Video processing started!");
-    } else {
-      toast.error("Failed to start video processing");
-    }
-  };
-
-  const resetVideoForm = () => {
-    setSelectedVideo(null);
-    if (videoPreview) {
-      URL.revokeObjectURL(videoPreview);
-      setVideoPreview(null);
-    }
-
-    setDetectedItems([]);
-    setShowResults(false);
-    setProcessingId(null);
-    setIsPolling(false);
-  };*/
-
-  /*useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPolling && processingId) {
-      interval = setInterval(async () => {
-        try {
-          let token = "";
-          if (currentUser) {
-            token = await currentUser.getIdToken();
-          }
-          const res = await fetch(
-            `https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-          const statusData = await res.json();
-          if (statusData.success && statusData.data?.status === "completed") {
-            setDetectedItems(statusData.data.result.items || []);
-            setShowResults(true);
-            setIsUploading(false);
-            setIsPolling(false);
-            toast.success("Video processing completed!");
-          } else if (statusData.data?.status === "failed") {
-            setIsUploading(false);
-            setIsPolling(false);
-            toast.error("Video processing failed");
-          }
-        } catch (err) {}
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isPolling, processingId]);
-
-  // Manejo de ítems detectados con subida a Firestore
-  const handleAddDetectedItem = async (item: any) => {
-    try {
-      const functions = getFunctions();
-      const newImageUrl: any = await httpsCallable(
-        functions,
-        "moveImageToFinal"
-      )({
-        imageUrl: item?.image_url,
-        newFolder: "items",
-      });
-
-      console.log(newImageUrl, " nueva");
-      // Crear datos para Firestore
-      const newItemData = {
-        name: item.label,
-        description: item.description || "",
-        quantity: 1,
-        value: 0,
-        tags: item.tags || [],
-        confidence: item.confidence,
-        timestamp: item.timestamp_seconds,
-        createdAt: new Date().toISOString(),
-        binId: id,
-        userId: "", // si necesitas asignar el usuario actual aquí
-        imageUrl: newImageUrl?.data.newUrl,
-      };
-
-      console.log(newItemData, " jn");
-
-      // Guardar en Firestore
-      const docRef = await addDoc(collection(db, "items"), newItemData);
-
-      // Actualizar estado local del contenedor
-      setItems((prev: any) => [...prev, { id: docRef.id, ...newItemData }]);
-
-      // Quitar el ítem del arreglo principal
-      setDetectedItems((prev: any[]) => prev.filter((d) => d.id !== item.id));
-
-      toast.success(`Added "${item.label}" to container`);
-    } catch (error) {
-      console.error("Error adding detected item:", error);
-      toast.error("Failed to add item to container");
-    }
-  };*/
+  const [isImagesUploadOpen, setIsImagesUploadOpen] = useState(false);
 
   if (loading) {
     return (
@@ -1045,7 +821,7 @@ const BinDetailsScreen: React.FC = () => {
                       <Input
                         id="itemQuantity"
                         type="number"
-                        min={0}
+                        min={1}
                         value={itemCuantity}
                         onChange={(e) =>
                           setItemCuantity(Number(e.target.value))
@@ -1179,7 +955,6 @@ const BinDetailsScreen: React.FC = () => {
               </AlertDialogContent>
             </AlertDialog>
 
-            {/* Bulk Upload Dialog */}
             <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
               <DialogTrigger asChild>
                 <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-200">
@@ -1239,421 +1014,21 @@ const BinDetailsScreen: React.FC = () => {
               </DialogContent>
             </Dialog>
 
+            <EnhancedImagesAIModal
+              setIsVideoUploadOpen={setIsImagesUploadOpen}
+              isVideoUploadOpen={isImagesUploadOpen}
+              itemId={id}
+              setItems={setItems}
+            />
+
             <EnhancedVideoAIModal
               setIsVideoUploadOpen={setIsVideoUploadOpen}
               isVideoUploadOpen={isVideoUploadOpen}
               itemId={id}
               setItems={setItems}
             />
-
-            {/* NEW: Video AI Button 
-            <Dialog
-              open={isVideoUploadOpen}
-              onOpenChange={(open) => {
-                setShowResults(false);
-                setIsVideoUploadOpen(open);
-                setSelectedVideo(null);
-              }}
-            >
-              <DialogTrigger asChild>
-                <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200">
-                  <Video className="h-4 w-4 mr-2" />
-                  Video AI
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="!max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
-                <DialogHeader className="pb-6">
-                  <DialogTitle className="text-2xl font-bold text-slate-900">
-                    {showResults
-                      ? `AI Detected Items (${detectedItems.length})`
-                      : "Upload Video for AI Analysis"}
-                  </DialogTitle>
-                </DialogHeader>
-
-                {!showResults && !estimateData ? (
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium text-slate-700">
-                        Video File (5s - 2min)
-                      </label>
-                      <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200">
-                        {selectedVideo ? (
-                          <div className="space-y-4">
-                            <video
-                              src={videoPreview ?? undefined}
-                              controls
-                              className="max-w-full h-48 rounded-xl mx-auto shadow-sm"
-                            />
-                            <div className="text-sm text-slate-600">
-                              {selectedVideo.name}
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={resetVideoForm}
-                              className="rounded-xl"
-                              disabled={isUploading}
-                            >
-                              <X className="h-4 w-4 mr-1" />
-                              Remove Video
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <Upload className="h-8 w-8 text-slate-400 mx-auto" />
-                            <div>
-                              <label className="cursor-pointer">
-                                <span className="text-sm text-purple-600 hover:text-purple-500 font-medium">
-                                  Click to upload a video
-                                </span>
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept="video/*"
-                                  onChange={handleVideoUpload}
-                                  disabled={isUploading}
-                                />
-                              </label>
-                            </div>
-                            <div className="text-xs text-slate-500">
-                              Supported formats: MP4, MOV, AVI, WebM
-                              <br />
-                              Duration: 5 seconds to 2 minutes
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {isUploading && (
-                      <div className="flex flex-col items-center justify-center py-4">
-                        <Loader2 className="w-6 h-6 text-purple-600 animate-spin mb-2" />
-                        <p className="text-center text-sm text-slate-600">
-                          Uploading video...
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex justify-end space-x-3 pt-6">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setIsVideoUploadOpen(false);
-                          if (!isUploading) resetVideoForm();
-                        }}
-                        className="rounded-xl border-slate-300 hover:bg-slate-50"
-                        disabled={isUploading}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        onClick={handleVideoSubmit} // <-- llama primero a estimate
-                        disabled={!selectedVideo || isUploading}
-                        className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-                      >
-                        {isUploading ? "Processing..." : "Analyze Video"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : !showResults && estimateData ? (
-                  <div className="space-y-6">
-                    {estimateData.success ? (
-                      <div>
-                        <div className="w-full bg-white shadow-md rounded-2xl p-4 md:p-5 flex flex-col md:flex-row items-center gap-4">
-                          <div className="flex-shrink-0 w-full md:w-28 flex items-center justify-center">
-                            <div className="relative w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center ring-1 ring-emerald-100">
-                              <span className="absolute -top-2 -right-2 bg-emerald-600 text-white text-xs font-semibold px-2 py-1 rounded-full shadow-sm">
-                                ✅
-                              </span>
-                              <div className="text-center">
-                                <div className="text-xs text-slate-400">
-                                  Tokens
-                                </div>
-                                <div className="mt-1 text-lg font-semibold text-slate-900">
-                                  {estimateData?.available_tokens}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex-1 w-full text-center md:text-left">
-                            <h2 className="text-lg font-semibold text-slate-900">
-                              You have enough tokens
-                            </h2>
-
-                            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-slate-600">
-                              <div className="flex flex-col items-center sm:items-start">
-                                <div className="text-xs text-slate-500">
-                                  Tokens required
-                                </div>
-                                <div className="font-medium text-slate-800">
-                                  {estimateData.MY_TOTAL_TOKENS}
-                                </div>
-                              </div>
-
-                              <div className="flex flex-col items-center sm:items-start">
-                                <div className="text-xs text-slate-500">
-                                  Tokens left
-                                </div>
-                                <div className="font-medium text-slate-800">
-                                  {estimateData?.tokens_remaining_after}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="mt-3 h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-2 rounded-full bg-emerald-500 transition-width"
-                                style={{
-                                  width: `${Math.min(
-                                    100,
-                                    Math.round(
-                                      ((estimateData?.available_tokens ?? 0) /
-                                        (estimateData.MY_TOTAL_TOKENS || 1)) *
-                                        100
-                                    )
-                                  )}%`,
-                                }}
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex w-full  mt-4 flex-col items-end gap-2">
-                          <div className="flex w-full gap-2 justify-end">
-                            <Button
-                              variant="outline"
-                              onClick={() => setEstimateData(null)}
-                              className="flex-1 rounded-xl border-slate-300"
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              onClick={confirmProcess}
-                              className="flex-1 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-                            >
-                              Confirm and Process
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (estimateData?.available_tokens ?? 0) > 0 ? (
-                      <div className="w-full bg-yellow-50/70 border border-yellow-100 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row items-center gap-4">
-                        <div className="flex-shrink-0 w-full md:w-20 flex items-center justify-center">
-                          <div className="w-16 h-16 rounded-full bg-yellow-100 flex items-center justify-center ring-1 ring-yellow-200">
-                            <div className="text-amber-700 font-semibold">
-                              ⚠️
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex-1 text-center md:text-left">
-                          <h2 className="text-lg font-semibold text-amber-800">
-                            Not enough tokens
-                          </h2>
-                          <div className="mt-2 text-sm text-slate-600 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                            <div>
-                              <div className="text-xs text-slate-500">
-                                My tokens
-                              </div>
-                              <div className="font-medium text-slate-800">
-                                {estimateData?.available_tokens}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-slate-500">
-                                Tokens required
-                              </div>
-                              <div className="font-medium text-slate-800">
-                                {estimateData?.required_tokens}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-xs text-slate-500">
-                                Tokens missing
-                              </div>
-                              <div className="font-semibold text-rose-600">
-                                {(estimateData?.required_tokens ?? 0) -
-                                  (estimateData?.available_tokens ?? 0)}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 text-xs text-slate-500">
-                            Top-up to continue immediately.
-                          </div>
-                        </div>
-
-                        <div className="flex-shrink-0 w-full md:w-44 flex items-center md:items-end">
-                          <Button
-                            className="w-full bg-red-500 text-white px-4 py-2 rounded-xl"
-                            onClick={() => {
-                              setEstimateData(null);
-                              window.open("/tokensai", "_blank");
-                            }}
-                          >
-                            Buy Tokens
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full bg-red-50/70 border border-red-100 rounded-2xl p-4 md:p-5 flex flex-col md:flex-row items-center gap-4">
-                        <div className="flex-shrink-0 w-full md:w-20 flex items-center justify-center">
-                          <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center ring-1 ring-red-200">
-                            <div className="text-red-600 font-semibold">❌</div>
-                          </div>
-                        </div>
-
-                        <div className="flex-1 text-center md:text-left">
-                          <h2 className="text-lg font-semibold text-red-700">
-                            No tokens
-                          </h2>
-                          <p className="mt-2 text-sm text-slate-600">
-                            You don’t have tokens available.
-                          </p>
-                          <div className="mt-3 text-xs text-slate-500">
-                            Purchase tokens to start processing jobs.
-                          </div>
-                        </div>
-
-                        <div className="flex-shrink-0 w-full md:w-44 flex items-center md:items-end">
-                          <Button
-                            className="w-full bg-red-500 text-white px-4 py-2 rounded-xl"
-                            onClick={() => {
-                              setEstimateData(null);
-                              setEstimateData(null);
-                              window.open("/tokensai", "_blank");
-                            }}
-                          >
-                            Buy Tokens
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[60vh] overflow-y-auto">
-                      {detectedItems.map((item: any) => (
-                        <div
-                          key={item.id}
-                          className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
-                        >
-                          <div className="relative">
-                            <img
-                              src={item.image_url}
-                              alt={item.label}
-                              className="w-full h-48 object-cover"
-                              onError={(e: any) => {
-                                e.target.style.display = "none";
-                                e.target.nextElementSibling.style.display =
-                                  "flex";
-                              }}
-                            />
-                            <div className="hidden w-full h-48 bg-slate-100 items-center justify-center">
-                              <span className="text-slate-400">
-                                Image not available
-                              </span>
-                            </div>
-
-                            <div className="absolute top-3 right-3">
-                              <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                                {Math.round(item.confidence * 100)}% confident
-                              </span>
-                            </div>
-
-                            <div className="absolute top-3 left-3">
-                              <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full flex items-center">
-                                <Clock className="h-3 w-3 mr-1" />
-                                {item.timestamp_seconds}s
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="p-4 space-y-3">
-                            <div>
-                              <h3 className="font-semibold text-slate-900 text-lg">
-                                {item.label}
-                              </h3>
-                              <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                                {item.description}
-                              </p>
-                            </div>
-
-                            {item.tags && item.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {item.tags
-                                  .slice(0, 3)
-                                  .map((tag: any, tagIndex: number) => (
-                                    <span
-                                      key={tagIndex}
-                                      className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                                    >
-                                      {tag}
-                                    </span>
-                                  ))}
-                                {item.tags.length > 3 && (
-                                  <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
-                                    +{item.tags.length - 3} more
-                                  </span>
-                                )}
-                              </div>
-                            )}
-
-                            <Button
-                              onClick={() => handleAddDetectedItem(item)}
-                              className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                              size="sm"
-                            >
-                              Add to Container
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="flex justify-between items-center pt-6 border-t border-slate-200">
-                      <Button
-                        variant="outline"
-                        onClick={() => {
-                          setShowResults(false);
-                          resetVideoForm();
-                        }}
-                        className="rounded-xl border-slate-300 hover:bg-slate-50"
-                      >
-                        Upload New Video
-                      </Button>
-
-                      <div className="flex space-x-3">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            detectedItems.forEach((item) =>
-                              handleAddDetectedItem(item)
-                            );
-                          }}
-                          className="rounded-xl border-blue-300 text-blue-600 hover:bg-blue-50"
-                        >
-                          Add All Items
-                        </Button>
-                        <Button
-                          onClick={() => {
-                            setIsVideoUploadOpen(false);
-                            resetVideoForm();
-                          }}
-                          className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
-                        >
-                          Done
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>*/}
           </div>
 
-          {/* Items Section */}
           <div>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-slate-900">
@@ -1807,7 +1182,6 @@ const BinDetailsScreen: React.FC = () => {
         </div>
       </div>
 
-      {/* Image Modal */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl ml-40">
           <div className="relative w-full h-full overflow-hidden">
@@ -1883,7 +1257,6 @@ const BinDetailsScreen: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Item Modal */}
       <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
           <DialogHeader className="pb-6">
@@ -2082,7 +1455,6 @@ const BinDetailsScreen: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Bin Modal */}
       <Dialog open={isEditBinOpen} onOpenChange={setIsEditBinOpen}>
         <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
           <DialogHeader className="pb-6">

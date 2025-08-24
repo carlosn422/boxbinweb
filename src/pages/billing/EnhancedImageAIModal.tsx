@@ -22,6 +22,7 @@ import {
   ArrowLeft,
   Zap,
   Star,
+  Image,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { TokenEstimate } from "../dashboard/binDetail";
@@ -34,17 +35,17 @@ import { Elements } from "@stripe/react-stripe-js";
 import TokenCheckoutForm from "./TokenCheckoutForm";
 import { loadStripe } from "@stripe/stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
+
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 const planIcons = [Coins, Zap, Star, Crown];
-const EnhancedVideoAIModal = ({
+
+const EnhancedImagesAIModal = ({
   isVideoUploadOpen,
   setIsVideoUploadOpen,
   itemId,
   setItems,
 }: any) => {
   const { currentUser } = useAuth();
-  const [selectedVideo, setSelectedVideo] = useState<any>(null);
-  const [videoPreview, setVideoPreview] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [detectedItems, setDetectedItems] = useState<any>([]);
@@ -60,6 +61,7 @@ const EnhancedVideoAIModal = ({
   const [hoveredPackage, setHoveredPackage] = useState("");
   const [tokenPackages, setTokenPackages] = useState<any[]>([]);
   const checkoutRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (selectedPackage && checkoutRef.current) {
       checkoutRef.current.scrollIntoView({
@@ -109,43 +111,85 @@ const EnhancedVideoAIModal = ({
     fetchTokenPackages();
   }, [fetchTokenPackages]);
 
-  const handleVideoUpload = (e: any) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedVideo(file);
-      const url = URL.createObjectURL(file);
-      setVideoPreview(url);
+  const [selectedImages, setSelectedImages] = useState<any>([]);
+  const [imagePreviews, setImagePreviews] = useState<any>([]);
+
+  const handleVideoUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    console.log(files);
+
+    setIsUploading(true);
+
+    const filesArray = Array.from(files);
+    setSelectedImages(filesArray);
+
+    // Crear previews para las imágenes
+    const previews = [];
+
+    for (let i = 0; i < filesArray.length; i++) {
+      const file = filesArray[i];
+      const reader = new FileReader();
+
+      const preview = await new Promise((resolve) => {
+        reader.onload = (e: any) => {
+          resolve({
+            file: file,
+            url: e.target.result,
+            name: file.name,
+          });
+        };
+        reader.readAsDataURL(file);
+      });
+
+      previews.push(preview);
     }
+
+    setImagePreviews(previews);
+    setIsUploading(false);
+  };
+
+  const removeImage = (index: any) => {
+    const newImages = selectedImages.filter((_: any, i: any) => i !== index);
+    const newPreviews = imagePreviews.filter((_: any, i: any) => i !== index);
+
+    setSelectedImages(newImages);
+    setImagePreviews(newPreviews);
   };
 
   const resetVideoForm = () => {
-    setSelectedVideo(null);
-    setVideoPreview(null);
+    setSelectedImages([]);
+    setImagePreviews([]);
     setEstimateData(null);
     setShowResults(false);
     setDetectedItems([]);
   };
 
   const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState<boolean>(false);
+  //const [processingId, setProcessingId] = useState<string | null>(null);
+  //const [isPolling, setIsPolling] = useState<boolean>(false);
 
   const handleVideoSubmit = async () => {
-    if (!selectedVideo) return;
+    if (selectedImages.length === 0) return;
+
     setIsUploading(true);
 
-    const formData = new FormData();
-    formData.append("videoFile", selectedVideo);
-
-    let token = "";
-    if (currentUser) {
-      token = await currentUser.getIdToken();
-    }
-
     try {
-      const estimateResponse = await fetch(
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
+      // Crear FormData para enviar las imágenes
+      const formData = new FormData();
+
+      // Agregar todas las imágenes al FormData
+      selectedImages.forEach((file: any) => {
+        formData.append("files", file);
+      });
+
+      let token = "";
+      if (currentUser) {
+        token = await currentUser.getIdToken();
+      }
+
+      // Llamada a la API
+      const response = await fetch(
+        "https://boxbinapi-iv6wi.ondigitalocean.app/api/process-images/estimate-tokens",
         {
           method: "POST",
           body: formData,
@@ -155,12 +199,18 @@ const EnhancedVideoAIModal = ({
         }
       );
 
-      const estimateJson = await estimateResponse.json();
-      console.log(estimateJson, " njnj");
-      setEstimateData(estimateJson);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      setEstimateData(result);
       setIsUploading(false);
-    } catch (err) {
-      console.error("Error:", err);
+    } catch (error: any) {
+      console.error("Error processing images:", error);
+      // Aquí puedes mostrar un mensaje de error al usuario
+      alert("Error processing images: " + error.message);
+    } finally {
       setIsUploading(false);
     }
   };
@@ -171,9 +221,9 @@ const EnhancedVideoAIModal = ({
     }
 
     const formData = new FormData();
-    if (selectedVideo) {
-      formData.append("videoFile", selectedVideo);
-    }
+    selectedImages.forEach((file: any) => {
+      formData.append("files", file);
+    });
 
     let token = "";
     if (currentUser) {
@@ -183,9 +233,9 @@ const EnhancedVideoAIModal = ({
     setShowResults(false);
     setEstimateData(null);
 
-    const processResponse = await fetch(
-      "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
-      //"http://localhost:3000/api/v1/gemini-video/process-video",
+    const response = await fetch(
+      "https://boxbinapi-iv6wi.ondigitalocean.app/api/process-images",
+      //"http://localhost:3000/api/process-images",
       {
         method: "POST",
         body: formData,
@@ -195,13 +245,15 @@ const EnhancedVideoAIModal = ({
       }
     );
 
-    const processData = await processResponse.json();
-    if (processData.success && processData.processingId) {
-      setProcessingId(processData.processingId);
-      setIsPolling(true);
-      toast.success("🎥 Video processing started!");
+    const result = await response.json();
+
+    if (result.success) {
+      console.log("Images processed successfully:", result);
+      setDetectedItems(result?.data?.items || []);
+      setShowResults(true);
+      setIsUploading(false);
     } else {
-      toast.error("Failed to start video processing");
+      throw new Error(result.error || "Failed to process images");
     }
   };
 
@@ -551,32 +603,65 @@ const EnhancedVideoAIModal = ({
     if (!showResults && !estimateData) {
       return (
         <div className="space-y-6">
-          {/* Video Upload */}
           <div className="space-y-3">
             <label className="text-sm font-medium text-slate-700">
-              Video File (5s - 2min)
+              Select images (multiple)
             </label>
             <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-purple-400 hover:bg-purple-50/50 transition-all duration-200">
-              {selectedVideo ? (
+              {selectedImages.length > 0 ? (
                 <div className="space-y-4">
-                  <video
-                    src={videoPreview ?? undefined}
-                    controls
-                    className="max-w-full h-48 rounded-xl mx-auto shadow-sm"
-                  />
-                  <div className="text-sm text-slate-600">
-                    {selectedVideo.name}
+                  {/* Grid de previews pequeños */}
+                  <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+                    {imagePreviews.map((preview: any, index: number) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={preview.url}
+                          alt={preview.name}
+                          className="w-16 h-16 object-cover rounded-lg shadow-sm border border-slate-200"
+                        />
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeImage(index)}
+                          className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                          disabled={isUploading}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={resetVideoForm}
-                    className="rounded-xl"
-                    disabled={isUploading}
-                  >
-                    <X className="h-4 w-4 mr-1" />
-                    Remove Video
-                  </Button>
+
+                  {/* Información y botón para agregar más */}
+                  <div className="space-y-2">
+                    <p className="text-sm text-slate-600">
+                      {selectedImages.length}{" "}
+                      {selectedImages.length === 1 ? "image" : "images"}{" "}
+                      selected
+                    </p>
+                    <label className="cursor-pointer">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        disabled={isUploading}
+                        asChild
+                      >
+                        <span>
+                          <Upload className="h-4 w-4 mr-1" />
+                          Add more images
+                        </span>
+                      </Button>
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*"
+                        multiple
+                        disabled={isUploading}
+                        onChange={(e) => handleVideoUpload(e.target.files)}
+                      />
+                    </label>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -584,21 +669,20 @@ const EnhancedVideoAIModal = ({
                   <div>
                     <label className="cursor-pointer">
                       <span className="text-sm text-purple-600 hover:text-purple-500 font-medium">
-                        Click to upload a video
+                        Click to upload images
                       </span>
                       <input
                         type="file"
-                        className="hidden"
-                        accept="video/*"
-                        onChange={handleVideoUpload}
+                        accept="image/*"
+                        multiple
                         disabled={isUploading}
+                        onChange={(e) => handleVideoUpload(e.target.files)}
+                        className="hidden"
                       />
                     </label>
-                  </div>
-                  <div className="text-xs text-slate-500">
-                    Supported formats: MP4, MOV, AVI, WebM
-                    <br />
-                    Duration: 5 seconds to 2 minutes
+                    <p className="text-xs text-slate-500 mt-1">
+                      Select multiple images at once
+                    </p>
                   </div>
                 </div>
               )}
@@ -610,7 +694,7 @@ const EnhancedVideoAIModal = ({
             <div className="flex flex-col items-center justify-center py-4">
               <Loader2 className="w-6 h-6 text-purple-600 animate-spin mb-2" />
               <p className="text-center text-sm text-slate-600">
-                Analyzing video requirements...
+                Processing images...
               </p>
             </div>
           )}
@@ -630,10 +714,10 @@ const EnhancedVideoAIModal = ({
             </Button>
             <Button
               onClick={handleVideoSubmit}
-              disabled={!selectedVideo || isUploading}
+              disabled={selectedImages.length === 0 || isUploading}
               className="rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700"
             >
-              {isUploading ? "Analyzing..." : "Analyze Video"}
+              {isUploading ? "Processing..." : "Analyze Images"}
             </Button>
           </div>
         </div>
@@ -890,11 +974,10 @@ const EnhancedVideoAIModal = ({
                     variant="outline"
                     onClick={() => {
                       setShowResults(false);
-                      resetVideoForm();
                     }}
                     className="rounded-xl border-slate-300 hover:bg-slate-50"
                   >
-                    Upload New Video
+                    Upload New Images
                   </Button>
 
                   <div className="flex space-x-3">
@@ -945,7 +1028,7 @@ const EnhancedVideoAIModal = ({
     );
   };
 
-  useEffect(() => {
+  /*useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isPolling && processingId) {
       interval = setInterval(async () => {
@@ -980,7 +1063,7 @@ const EnhancedVideoAIModal = ({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isPolling, processingId]);
+  }, [isPolling, processingId]);*/
 
   return (
     <Dialog
@@ -988,15 +1071,14 @@ const EnhancedVideoAIModal = ({
       onOpenChange={(open) => {
         setShowResults(false);
         setIsVideoUploadOpen(open);
-        setSelectedVideo(null);
         setShowTokenPurchase(false);
         setSelectedPackage("");
       }}
     >
       <DialogTrigger asChild>
-        <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 shadow-lg hover:shadow-xl transition-all duration-200">
-          <Video className="h-4 w-4 mr-2" />
-          Video AI
+        <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 shadow-lg hover:shadow-xl transition-all duration-200">
+          <Image className="h-4 w-4 mr-2" />
+          Images AI
         </Button>
       </DialogTrigger>
 
@@ -1009,7 +1091,7 @@ const EnhancedVideoAIModal = ({
               ? `AI Detected Items (${detectedItems.length})`
               : estimateData
               ? "Token Verification"
-              : "Upload Video for AI Analysis"}
+              : "Upload Images for AI Analysis"}
           </DialogTitle>
         </DialogHeader>
 
@@ -1019,4 +1101,4 @@ const EnhancedVideoAIModal = ({
   );
 };
 
-export default EnhancedVideoAIModal;
+export default EnhancedImagesAIModal;
