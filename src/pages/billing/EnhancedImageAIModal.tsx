@@ -260,7 +260,7 @@ const EnhancedImagesAIModal = ({
       const functions = getFunctions();
       const newImageUrl: any = await httpsCallable(
         functions,
-        "moveImageToFinal"
+        "moveImageToFinalImages"
       )({
         imageUrl: item?.image_url,
         newFolder: "items",
