@@ -12,7 +12,52 @@ const stripe = new Stripe(process.env.APIKEY || "", {
 
 const storage = admin.storage();
 
-export const moveImageToFinal = onCall(
+export const moveImageToFinal = onCall(async (request: functions.https.CallableRequest)  => {
+  try {
+    const { imageUrl, newFolder } = request.data;
+
+    if (!imageUrl || typeof imageUrl !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "Falta la URL de la imagen.");
+    }
+    if (!newFolder || typeof newFolder !== "string") {
+      throw new functions.https.HttpsError("invalid-argument", "Falta la carpeta destino.");
+    }
+
+    // 1. Quitar query params y extraer path
+    const withoutParams = imageUrl.split("?")[0];
+    const parts = withoutParams.split("/");
+    const index = parts.findIndex(p => p === "video_processing");
+    if (index === -1) {
+      throw new functions.https.HttpsError("invalid-argument", "No se pudo extraer el path.");
+    }
+    const oldPath = parts.slice(index).join("/");
+
+    // 2. Definir nuevo path
+    const fileName = oldPath.split("/").pop();
+    const newPath = `${newFolder}/${fileName}`;
+
+    const bucket = storage.bucket();
+
+    // 3. Copiar y borrar (mover)
+    await bucket.file(oldPath).copy(bucket.file(newPath));
+    await bucket.file(oldPath).delete();
+
+    // 4. Obtener signed URL nuevo
+    const [signedUrl] = await bucket
+      .file(newPath)
+      .getSignedUrl({
+        action: "read",
+        expires: "03-01-2035", // Fecha de expiración larga
+      });
+
+    return { newUrl: signedUrl, newPath };
+  } catch (err: any) {
+    console.error("Error moviendo imagen:", err);
+    throw new functions.https.HttpsError("unknown", err.message);
+  }
+});
+
+export const moveImageToFinalImages = onCall(
   async (request: functions.https.CallableRequest) => {
     try {
       const { imageUrl, newFolder } = request.data;
@@ -71,8 +116,8 @@ export const moveImageToFinal = onCall(
       await bucket.file(oldPath).copy(bucket.file(newPath));
       console.log(`Archivo copiado: ${newPath}`);
 
-      await bucket.file(oldPath).delete();
-      console.log(`Archivo original eliminado: ${oldPath}`);
+      //await bucket.file(oldPath).delete();
+      //console.log(`Archivo original eliminado: ${oldPath}`);
 
       // 6. Generar signed URL seguro
       const [signedUrl] = await bucket.file(newPath).getSignedUrl({
