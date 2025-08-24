@@ -20,56 +20,57 @@ export const moveImageToFinal = onCall(
       if (!imageUrl || typeof imageUrl !== "string") {
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "Falta la URL de la imagen."
+          "Image URL is missing."
         );
       }
       if (!newFolder || typeof newFolder !== "string") {
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "Falta la carpeta destino."
+          "Destination folder is missing."
         );
       }
 
-      // 1. Quitar query params y extraer path
+      // 1. Remove query params
       const withoutParams = imageUrl.split("?")[0];
-      const parts = withoutParams.split("/");
 
-      // buscar el índice de "video_processing" o "file_processing"
-      const index = parts.findIndex(
-        (p) => p === "video_processing" || p === "file_processing"
+      // 2. Extract the actual object path (file_processing/... or video_processing/...)
+      const match = withoutParams.match(
+        /(?:file_processing|video_processing)\/.+$/
       );
 
-      if (index === -1) {
+      if (!match) {
         throw new functions.https.HttpsError(
           "invalid-argument",
-          "No se pudo extraer el path."
+          "Could not extract the storage path from the URL."
         );
       }
-      const oldPath = parts.slice(index).join("/");
 
-      // 2. Definir nuevo path
+      const oldPath = match[0]; // ✅ correct path inside the bucket
+
+      // 3. Define new path
       const fileName = oldPath.split("/").pop();
       const newPath = `${newFolder}/${fileName}`;
 
       const bucket = storage.bucket();
 
-      // 3. Copiar y borrar (mover)
+      // 4. Copy then delete (move)
       await bucket.file(oldPath).copy(bucket.file(newPath));
       await bucket.file(oldPath).delete();
 
-      // 4. Obtener signed URL nuevo
+      // 5. Generate new signed URL
       const [signedUrl] = await bucket.file(newPath).getSignedUrl({
         action: "read",
-        expires: "03-01-2035", // Fecha de expiración larga
+        expires: "03-01-2035", // long expiration date
       });
 
       return { newUrl: signedUrl, newPath };
     } catch (err: any) {
-      console.error("Error moviendo imagen:", err);
+      console.error("Error moving image:", err);
       throw new functions.https.HttpsError("unknown", err.message);
     }
   }
 );
+
 
 export const cancelSubscription = onCall(
   async (request: functions.https.CallableRequest) => {
