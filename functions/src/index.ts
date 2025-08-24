@@ -33,19 +33,24 @@ export const moveImageToFinal = onCall(
       // 1. Remove query params
       const withoutParams = imageUrl.split("?")[0];
 
-      // 2. Extract the actual object path (file_processing/... or video_processing/...)
-      const match = withoutParams.match(
-        /(?:file_processing|video_processing)\/.+$/
-      );
+      // 2. Extract the storage object path (strip bucket domain)
+      let oldPath: string | null = null;
 
-      if (!match) {
+      const fileIndex = withoutParams.indexOf("/file_processing/");
+      const videoIndex = withoutParams.indexOf("/video_processing/");
+
+      if (fileIndex !== -1) {
+        oldPath = withoutParams.substring(fileIndex + 1); // remove leading "/"
+      } else if (videoIndex !== -1) {
+        oldPath = withoutParams.substring(videoIndex + 1);
+      }
+
+      if (!oldPath) {
         throw new functions.https.HttpsError(
           "invalid-argument",
           "Could not extract the storage path from the URL."
         );
       }
-
-      const oldPath = match[0]; // ✅ correct path inside the bucket
 
       // 3. Define new path
       const fileName = oldPath.split("/").pop();
@@ -70,7 +75,6 @@ export const moveImageToFinal = onCall(
     }
   }
 );
-
 
 export const cancelSubscription = onCall(
   async (request: functions.https.CallableRequest) => {
