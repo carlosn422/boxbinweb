@@ -165,8 +165,6 @@ const EnhancedImagesAIModal = ({
   };
 
   const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
-  //const [processingId, setProcessingId] = useState<string | null>(null);
-  //const [isPolling, setIsPolling] = useState<boolean>(false);
 
   const handleVideoSubmit = async () => {
     if (selectedImages.length === 0) return;
@@ -1027,43 +1025,6 @@ const EnhancedImagesAIModal = ({
       </div>
     );
   };
-
-  /*useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPolling && processingId) {
-      interval = setInterval(async () => {
-        try {
-          let token = "";
-          if (currentUser) {
-            token = await currentUser.getIdToken();
-          }
-          const res = await fetch(
-            `https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`,
-            {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            }
-          );
-          const statusData = await res.json();
-          if (statusData.success && statusData.data?.status === "completed") {
-            setDetectedItems(statusData.data.result.items || []);
-            setShowResults(true);
-            setIsUploading(false);
-            setIsPolling(false);
-            toast.success("Video processing completed!");
-          } else if (statusData.data?.status === "failed") {
-            setIsUploading(false);
-            setIsPolling(false);
-            toast.error("Video processing failed");
-          }
-        } catch (err) {}
-      }, 5000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isPolling, processingId]);*/
 
   return (
     <Dialog

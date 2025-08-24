@@ -41,7 +41,7 @@ export const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 import { STRIPE_SECRET_KEY } from "../config/stripe";
 
 const stripeClient = new Stripe(
-   STRIPE_SECRET_KEY,
+  STRIPE_SECRET_KEY,
   {
     apiVersion: "2025-07-30.basil" as const,
   }
