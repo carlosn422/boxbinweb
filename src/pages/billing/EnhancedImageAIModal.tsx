@@ -121,10 +121,13 @@ const EnhancedImagesAIModal = ({
     setIsUploading(true);
 
     const filesArray = Array.from(files);
-    setSelectedImages(filesArray);
 
-    // Crear previews para las imágenes
-    const previews = [];
+    // Concatenar con las imágenes ya seleccionadas
+    const updatedSelectedImages = [...selectedImages, ...filesArray];
+    setSelectedImages(updatedSelectedImages);
+
+    // Crear previews para las nuevas imágenes
+    const newPreviews: any[] = [];
 
     for (let i = 0; i < filesArray.length; i++) {
       const file = filesArray[i];
@@ -141,10 +144,12 @@ const EnhancedImagesAIModal = ({
         reader.readAsDataURL(file);
       });
 
-      previews.push(preview);
+      newPreviews.push(preview);
     }
 
-    setImagePreviews(previews);
+    // Concatenar con los previews ya existentes
+    setImagePreviews([...imagePreviews, ...newPreviews]);
+
     setIsUploading(false);
   };
 
