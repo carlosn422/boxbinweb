@@ -228,7 +228,7 @@ const BinDetailsScreen: React.FC = () => {
           tags: [],
           createdAt: new Date().toISOString(),
           binId: id,
-          userId: "",
+          userId: currentUser?.uid,
           imageUrl: url,
         };
 
@@ -245,7 +245,6 @@ const BinDetailsScreen: React.FC = () => {
     setItems((prev: any) => [...prev, ...newItems]);
     setIsBulkUploading(false);
     setIsBulkUploadOpen(false);
-    //alert(`Bulk upload complete: ${newItems.length} items created.`);
   };
 
   useEffect(() => {
@@ -275,6 +274,8 @@ const BinDetailsScreen: React.FC = () => {
           id: doc.id,
           ...doc.data(),
         })) as Item[];
+
+        console.log(itemsData, " response")
 
         setItems(itemsData);
       } catch (err) {
@@ -450,7 +451,6 @@ const BinDetailsScreen: React.FC = () => {
         if (sub.planId) {
           const stripePlan = await getStripePlanById(sub.planId);
 
-          console.log(stripePlan);
           const fullSubscription = {
             ...sub,
             plan: stripePlan?.product?.name ?? "Unknown Plan",
@@ -458,8 +458,6 @@ const BinDetailsScreen: React.FC = () => {
             interval: stripePlan?.recurring?.interval ?? "month",
             metadata: stripePlan?.metadata ?? {},
           };
-
-          console.log(fullSubscription);
 
           setSubscription(fullSubscription);
         } else {

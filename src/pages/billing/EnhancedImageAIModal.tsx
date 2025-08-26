@@ -280,10 +280,9 @@ const EnhancedImagesAIModal = ({
         value: 1,
         tags: item.tags || [],
         confidence: item.confidence,
-        //timestamp: item.timestamp_seconds,
         createdAt: new Date().toISOString(),
         binId: itemId,
-        userId: "", // si necesitas asignar el usuario actual aquí
+        userId: currentUser?.uid,
         imageUrl: newImageUrl?.data.newUrl,
       };
 

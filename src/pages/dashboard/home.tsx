@@ -132,7 +132,6 @@ export default function HomeScreen() {
         if (sub.planId) {
           const stripePlan = await getStripePlanById(sub.planId);
 
-          console.log(stripePlan);
           const fullSubscription = {
             ...sub,
             plan: stripePlan?.product?.name ?? "Unknown Plan",
@@ -140,8 +139,6 @@ export default function HomeScreen() {
             interval: stripePlan?.recurring?.interval ?? "month",
             metadata: stripePlan?.metadata ?? {},
           };
-
-          console.log(fullSubscription);
 
           setSubscription(fullSubscription);
         } else {

@@ -8,10 +8,22 @@ import {
   loginWithApple,
   loginWithYahoo,
   auth,
+  db,
 } from "@/lib/firebase";
 import { getRedirectResult } from "firebase/auth";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+} from "firebase/firestore";
 
 const LoginPage = () => {
   const [isLoading, setIsLoading] = useState({
@@ -33,11 +45,78 @@ const LoginPage = () => {
       console.error(`Login error with ${provider}:`, response.error);
       // Aquí podrías mostrar un toast o mensaje de error
       toast.error(`Login error with ${provider}`);
+      return;
     } else {
       console.log(`Logged in with ${provider}`, response?.user);
     }
-
+    await saveUserToFirestore(response?.user);
     setIsLoading((prev) => ({ ...prev, [provider]: false }));
+  };
+
+  const generateUniqueUsername = async (email: string) => {
+    try {
+      if (!email) return "";
+
+      const baseUsername = email.split("@")[0];
+
+      while (true) {
+        // Genera un número aleatorio de 4 dígitos
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const username = `${baseUsername}${randomNum}`;
+
+        // Busca si ya existe un usuario con ese username
+        const q = query(
+          collection(db, "users"),
+          where("username", "==", username)
+        );
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+          return username;
+        }
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  const saveUserToFirestore = async (user: any) => {
+    try {
+      if (!user) return;
+
+      const userRef = doc(db, "users", user.uid);
+      const userSnapshot = await getDoc(userRef);
+
+      if (!userSnapshot.exists()) {
+        const username = await generateUniqueUsername(user.email);
+        await setDoc(userRef, {
+          uid: user.uid,
+          email: user.email || "",
+          username: username,
+          displayName: user.displayName || "",
+          photoURL: user.photoURL || "",
+          createdAt: serverTimestamp(),
+        });
+      } else {
+        const userData = userSnapshot.data();
+        let updateData: any = {
+          email: user.email || userData?.email || "",
+          displayName: user.displayName || userData?.displayName || "",
+          photoURL: user.photoURL || userData?.photoURL || "",
+          lastLogin: serverTimestamp(),
+        };
+
+        if (!userData?.username) {
+          updateData.username = await generateUniqueUsername(user.email);
+        }
+
+        await updateDoc(userRef, updateData);
+        console.log("jnjn")
+      }
+    } catch (error) {
+      console.log(error);
+      return;
+    }
   };
 
   useEffect(() => {
