@@ -137,15 +137,15 @@ export default function TokensPurchasePage() {
             </span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">
-            Power Your
-            <br />
-            <span className="text-blue-600">Video Processing</span>
-          </h1>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Purchase AI tokens to unlock video processing capabilities and
-            automatically add items to your containers with advanced AI
-            recognition.
-          </p>
+          Supercharge Your
+          <br />
+          <span className="text-blue-600">Video & Image Recognition</span>
+        </h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+          Unlock AI-powered video and image processing—automatically detect, 
+          identify, and organize items into your containers with ease.
+        </p>
+
         </div>
 
         {/* Current Usage Info */}
