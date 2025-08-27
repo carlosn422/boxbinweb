@@ -1181,7 +1181,7 @@ const BinDetailsScreen: React.FC = () => {
       </div>
 
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl ml-40">
+        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl ml-40" showCloseButton={false}>
           <div className="relative w-full h-full overflow-hidden">
             <div
               className="relative w-full h-full cursor-move"
