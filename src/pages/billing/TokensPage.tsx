@@ -3,7 +3,14 @@ import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { doc, getDoc, addDoc, collection, updateDoc } from "firebase/firestore";
+import {
+  doc,
+  getDoc,
+  addDoc,
+  collection,
+  updateDoc,
+  increment,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { getStripePlans } from "../../lib/stripe";
@@ -137,15 +144,14 @@ export default function TokensPurchasePage() {
             </span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">
-          Supercharge Your
-          <br />
-          <span className="text-blue-600">Video & Image Recognition</span>
-        </h1>
-        <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-          Unlock AI-powered video and image processing—automatically detect, 
-          identify, and organize items into your containers with ease.
-        </p>
-
+            Supercharge Your
+            <br />
+            <span className="text-blue-600">Video & Image Recognition</span>
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
+            Unlock AI-powered video and image processing—automatically detect,
+            identify, and organize items into your containers with ease.
+          </p>
         </div>
 
         {/* Current Usage Info */}
@@ -228,9 +234,11 @@ export default function TokensPurchasePage() {
                       return;
                     }
                     setIsLoading(true);
-                    await updateDoc(doc(db, "users", currentUser?.uid ?? ""), {
-                      tokens: 1000,
+
+                    await updateDoc(doc(db, "users", currentUser.uid), {
+                      tokens: increment(1000),
                     });
+
                     setIsLoading(false);
                     window.location.reload();
                   } catch (error) {
@@ -511,13 +519,15 @@ export default function TokensPurchasePage() {
                   </div>
                 ) : (
                   <Elements stripe={stripePromise}>
-                    <TokenCheckoutForm 
-                      userId={currentUser?.uid ?? ""} 
+                    <TokenCheckoutForm
+                      userId={currentUser?.uid ?? ""}
                       tokens={parseInt(
-                        tokenPackages.find((p) => p.id === selectedPackage)?.metadata?.tokens || "0"
+                        tokenPackages.find((p) => p.id === selectedPackage)
+                          ?.metadata?.tokens || "0"
                       )}
                       price={
-                        tokenPackages.find((p) => p.id === selectedPackage)?.unit_amount || 0
+                        tokenPackages.find((p) => p.id === selectedPackage)
+                          ?.unit_amount || 0
                       }
                     />
                   </Elements>
