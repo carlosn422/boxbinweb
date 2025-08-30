@@ -26,7 +26,7 @@ const LoginByToken = () => {
 
         const auth = getAuth();
         await signInWithCustomToken(auth, customToken);
-
+        console.log(url, " jnj")
         navigate(url || "/billing", { replace: true });
       } catch (e: any) {
         console.error("Login by token falló:", e);

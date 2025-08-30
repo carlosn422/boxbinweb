@@ -8,6 +8,7 @@ import {
   createBrowserRouter,
   Navigate,
   RouterProvider,
+  useLocation,
 } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { collection, query, where, getDocs } from "firebase/firestore";
@@ -131,6 +132,7 @@ const RedirectIfAuthenticated = ({
   children: React.ReactNode;
 }) => {
   const { currentUser, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -140,11 +142,15 @@ const RedirectIfAuthenticated = ({
     );
   }
 
-  if (currentUser) {
+   if (currentUser) {
+    if (location.pathname === "/login-by-token") {
+      return <>{children}</>;
+    }
     return <Navigate to="/home" replace />;
   }
 
   return <>{children}</>;
+
 };
 
 const router = createBrowserRouter([
