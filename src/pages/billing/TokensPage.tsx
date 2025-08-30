@@ -133,6 +133,31 @@ export default function TokensPurchasePage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-2">
+      {(window as any).ReactNativeWebView && (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 py-2">
+            <div className="flex justify-between items-center">
+              {(window as any).ReactNativeWebView ? (
+                <Button
+                  onClick={() => {
+                    (window as any).ReactNativeWebView.postMessage(
+                      JSON.stringify({
+                        type: "SUBSCRIPTION_SUCCESS",
+                      })
+                    );
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Back
+                </Button>
+              ) : (
+                <></>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto py-2">
         {/* Hero Section */}
