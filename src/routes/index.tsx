@@ -256,6 +256,14 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: "/subscriptions",
+    element: (
+      <ProtectedAuthRouteLayout>
+        <ActiveSubscriptionPage />
+      </ProtectedAuthRouteLayout>
+    ),
+  },
+  {
     path: "/export-inventory",
     element: (
       <ProtectedRoute>
