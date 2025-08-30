@@ -286,6 +286,24 @@ export default function ActiveSubscriptionPage() {
                 My Subscription
               </h1>
             </div>
+            <div className="flex justify-between items-center">
+              {(window as any).ReactNativeWebView ? (
+                <Button
+                  onClick={() => {
+                    (window as any).ReactNativeWebView.postMessage(
+                      JSON.stringify({
+                        type: "SUBSCRIPTION_SUCCESS",
+                      })
+                    );
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Back
+                </Button>
+              ) : (
+                <></>
+              )}
+            </div>
           </div>
         </div>
       </div>
