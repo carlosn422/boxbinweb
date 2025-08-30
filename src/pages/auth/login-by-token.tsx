@@ -27,7 +27,7 @@ const LoginByToken = () => {
         const auth = getAuth();
         await signInWithCustomToken(auth, customToken);
 
-        navigate(url || "/", { replace: true });
+        navigate(url || "/billing", { replace: true });
       } catch (e: any) {
         console.error("Login by token falló:", e);
         navigate("/login?error=invalid_token");
