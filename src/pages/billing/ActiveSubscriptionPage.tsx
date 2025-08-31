@@ -146,7 +146,7 @@ export default function ActiveSubscriptionPage() {
 
       console.log(superiorPlans);
 
-      const filteredPlans = superiorPlans.filter(plan => {
+      const filteredPlans = superiorPlans.filter((plan) => {
         const keys = plan.metadata ? Object.keys(plan.metadata) : [];
         return keys.includes("tokens") && keys.length > 1;
       });
@@ -277,15 +277,9 @@ export default function ActiveSubscriptionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-2">
-          <div className="flex justify-between items-center">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-                My Subscription
-              </h1>
-            </div>
+      {(window as any).ReactNativeWebView ? (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 py-2">
             <div className="flex justify-between items-center">
               {(window as any).ReactNativeWebView ? (
                 <Button
@@ -306,7 +300,19 @@ export default function ActiveSubscriptionPage() {
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 py-2">
+            <div className="flex justify-between items-center">
+              <div className="space-y-1">
+                <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+                  My Subscription
+                </h1>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Subscription Info */}
       <div className="max-w-3xl mx-auto py-4">
