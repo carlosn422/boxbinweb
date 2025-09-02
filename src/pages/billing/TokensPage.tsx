@@ -8,8 +8,6 @@ import {
   getDoc,
   addDoc,
   collection,
-  updateDoc,
-  increment,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
