@@ -336,7 +336,7 @@ export default function ActiveSubscriptionPage() {
 
         <Card className="border border-gray-200 shadow-lg">
           <CardHeader className="text-center relative">
-            <div className="absolute top-4 right-4">
+            <div className="relative">
               <Button
                 disabled={redirecting}
                 onClick={() => setShowCancelDialog(true)}
