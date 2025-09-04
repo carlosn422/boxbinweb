@@ -28,7 +28,7 @@ import type { TokenEstimate } from "../dashboard/binDetail";
 import { useAuth } from "@/context/AuthContext";
 import { getStripePlans } from "@/lib/stripe";
 import { getFunctions, httpsCallable } from "firebase/functions";
-import { addDoc, collection, doc, getDoc, updateDoc } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Elements } from "@stripe/react-stripe-js";
 import TokenCheckoutForm from "./TokenCheckoutForm";
@@ -296,7 +296,7 @@ const EnhancedVideoAIModal = ({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[50vh] overflow-y-auto">
-        <div
+        {/* <div
           key={"0ai"}
           onClick={async () => {
             try {
@@ -386,7 +386,7 @@ const EnhancedVideoAIModal = ({
               </Button>
             </CardContent>
           </Card>
-        </div>
+        </div> */}
 
         {tokenPackages.map((pkg, index) => {
           const IconComponent = planIcons[index % planIcons.length];

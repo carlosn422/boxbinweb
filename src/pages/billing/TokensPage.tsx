@@ -8,8 +8,6 @@ import {
   getDoc,
   addDoc,
   collection,
-  updateDoc,
-  increment,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
@@ -252,7 +250,7 @@ export default function TokensPurchasePage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 max-w-5xl mx-auto">
-              <div
+              {/* <div
                 key={"0ai"}
                 onClick={async () => {
                   try {
@@ -284,7 +282,7 @@ export default function TokensPurchasePage() {
                       : "border border-gray-200 hover:border-gray-300 shadow-md bg-white"
                   }`}
                 >
-                  {/* Selected Indicator */}
+              
                   {selectedPackage === "0ai" && (
                     <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-lg z-10">
                       <Check className="w-4 h-4 text-white" />
@@ -312,7 +310,7 @@ export default function TokensPurchasePage() {
                       </div>
                     </div>
 
-                    {/* Features */}
+            
                     <div className="mb-4 space-y-2 text-sm text-gray-700 flex-1">
                       <div className="flex items-center space-x-2">
                         <Video className="w-4 h-4 text-blue-500" />
@@ -350,7 +348,7 @@ export default function TokensPurchasePage() {
                     </Button>
                   </CardContent>
                 </Card>
-              </div>
+              </div> */}
               {tokenPackages.map((pkg, index) => {
                 const IconComponent = planIcons[index % planIcons.length];
                 const isSelected = selectedPackage === pkg.id;
