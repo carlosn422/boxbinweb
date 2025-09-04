@@ -148,7 +148,7 @@ export default function TokensPurchasePage() {
                   }}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
-                  Back
+                  {t("tokens.back")}
                 </Button>
               ) : (
                 <></>
@@ -165,17 +165,16 @@ export default function TokensPurchasePage() {
           <div className="inline-flex items-center space-x-2 text-blue-600">
             <Bot className="w-6 h-6" />
             <span className="text-sm font-semibold uppercase tracking-wide">
-              AI Tokens
+              {t("tokens.heroTag")}
             </span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">
-            Supercharge Your
+            {t("tokens.heroTitle1")}
             <br />
-            <span className="text-blue-600">Video & Image Recognition</span>
+            <span className="text-blue-600">{t("tokens.heroTitle2")}</span>
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto leading-relaxed">
-            Unlock AI-powered video and image processing—automatically detect,
-            identify, and organize items into your containers with ease.
+            {t("tokens.heroSubtitle")}
           </p>
         </div>
 
@@ -184,14 +183,16 @@ export default function TokensPurchasePage() {
           <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-4 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-xl font-bold mb-2">Your Token Balance</h3>
-                <p className="text-blue-100">
-                  Use tokens to process videos and add items automatically
-                </p>
+                <h3 className="text-xl font-bold mb-2">
+                  {t("tokens.balanceTitle")}
+                </h3>
+                <p className="text-blue-100">{t("tokens.balanceSubtitle")}</p>
               </div>
               <div className="text-right">
                 <div className="text-3xl font-bold">{userTokens}</div>
-                <div className="text-blue-200">Available Tokens</div>
+                <div className="text-blue-200">
+                  {t("tokens.availableTokens")}
+                </div>
               </div>
             </div>
             <div className="mt-4 flex items-center space-x-4 text-sm text-blue-100">
@@ -200,7 +201,7 @@ export default function TokensPurchasePage() {
               </div>
               <div className="flex items-center space-x-1">
                 <Bot className="w-4 h-4" />
-                <span>AI-powered item recognition</span>
+                <span>{t("tokens.aiRecognition")}</span>
               </div>
             </div>
           </div>
@@ -213,7 +214,7 @@ export default function TokensPurchasePage() {
               <div className="text-center">
                 <div className="w-12 h-12 border-4 border-gray-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
                 <p className="text-gray-600 font-medium">
-                  Loading token packages...
+                  {t("tokens.loadingPackages")}
                 </p>
               </div>
             </div>
@@ -224,14 +225,14 @@ export default function TokensPurchasePage() {
                   <span className="text-white text-3xl">⚠️</span>
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  Oops! Something went wrong
+                  {t("tokens.errorTitle")}
                 </h3>
                 <p className="text-gray-600 mb-6">{error}</p>
                 <Button
                   onClick={fetchTokenPackages}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  Try Again
+                  {t("tokens.tryAgain")}
                 </Button>
               </div>
             </div>
@@ -242,10 +243,10 @@ export default function TokensPurchasePage() {
                   <Coins className="text-white text-3xl" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                  No token packages available
+                  {t("tokens.noPackagesTitle")}
                 </h3>
                 <p className="text-gray-600">
-                  Check back later for token purchasing options
+                  {t("tokens.noPackagesSubtitle")}
                 </p>
               </div>
             </div>
@@ -471,7 +472,9 @@ export default function TokensPurchasePage() {
                           <div className="flex items-center justify-center space-x-2">
                             {isSelected && <Check className="w-4 h-4" />}
                             <span>
-                              {isSelected ? "Selected" : "Buy Tokens"}
+                              {isSelected
+                                ? t("tokens.selected")
+                                : t("tokens.buyTokens")}
                             </span>
                           </div>
                         </Button>
@@ -492,10 +495,10 @@ export default function TokensPurchasePage() {
                     <Coins className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    Complete Your Purchase
+                    {t("tokens.checkoutTitle")}
                   </h3>
                   <p className="text-gray-600">
-                    Get instant access to AI tokens for video processing
+                    {t("tokens.checkoutSubtitle")}
                   </p>
                 </div>
 
@@ -503,7 +506,7 @@ export default function TokensPurchasePage() {
                   ?.unit_amount === 0 ? (
                   <div className="space-y-4">
                     <p className="text-sm text-gray-600">
-                      This is a free token package - no payment required.
+                      {t("tokens.freePackageNote")}
                     </p>
                     <Button
                       onClick={async () => {
@@ -539,7 +542,7 @@ export default function TokensPurchasePage() {
                       }}
                       className="w-full"
                     >
-                      Get Free Tokens
+                      {t("tokens.getFreeTokens")}
                     </Button>
                   </div>
                 ) : (

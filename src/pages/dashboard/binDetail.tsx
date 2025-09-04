@@ -12,6 +12,7 @@ import {
   X,
   Minus,
   Loader2,
+  Home,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
@@ -62,6 +63,7 @@ import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import EnhancedVideoAIModal from "../billing/EnhancedVideoAIModal";
 import EnhancedImagesAIModal from "../billing/EnhancedImageAIModal";
+import { useTranslation } from "react-i18next";
 
 export interface TokenEstimate {
   success: boolean;
@@ -134,9 +136,11 @@ export interface Item {
   imageUrl?: string;
   cuantity: string;
   value: string;
+  quantity?: string;
 }
 
 const BinDetailsScreen: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -223,7 +227,7 @@ const BinDetailsScreen: React.FC = () => {
         const itemData = {
           name: itemName,
           description: "",
-          cuantity: "0",
+          cuantity: "1",
           value: "0",
           tags: [],
           createdAt: new Date().toISOString(),
@@ -264,6 +268,8 @@ const BinDetailsScreen: React.FC = () => {
         const binData = binSnap.data() as Omit<BinDetails, "id">;
         setBin({ id: binSnap.id, ...binData });
 
+        console.log(binData, " data");
+
         const itemsQuery = query(
           collection(db, "items"),
           where("binId", "==", id)
@@ -275,7 +281,7 @@ const BinDetailsScreen: React.FC = () => {
           ...doc.data(),
         })) as Item[];
 
-        console.log(itemsData, " response")
+        console.log(itemsData, " response");
 
         setItems(itemsData);
       } catch (err) {
@@ -302,10 +308,11 @@ const BinDetailsScreen: React.FC = () => {
   const handleEditItem = (item: Item) => {
     console.log(currentItem);
     console.log(item);
+    const qty = Number(item?.quantity ?? item?.cuantity ?? 0);
+    setItemCuantity(qty);
     setCurrentItem(item);
     setItemName(item.name);
     setItemDescription(item.description);
-    setItemCuantity(Number(item.cuantity));
     setItemValue(Number(item.value));
     setItemTags(item.tags);
     setSelectedImage(item.imageUrl || null);
@@ -340,7 +347,7 @@ const BinDetailsScreen: React.FC = () => {
         description: itemDescription.trim(),
         tags: itemTags,
         value: itemValue?.toString(),
-        cuantity: itemCuantity?.toString(),
+        cuantity: itemCuantity?.toString() ?? "1",
       };
 
       // Si la imagen cambió y hay una imagen anterior
@@ -518,7 +525,7 @@ const BinDetailsScreen: React.FC = () => {
       const itemData = {
         name: itemName.trim(),
         description: itemDescription.trim(),
-        cuantity: itemCuantity?.toString()?.trim(),
+        cuantity: itemCuantity?.toString()?.trim() ?? "1",
         value: itemValue?.toString()?.trim(),
         tags: itemTags,
         createdAt: new Date().toISOString(),
@@ -540,8 +547,50 @@ const BinDetailsScreen: React.FC = () => {
     }
   };
 
-  const handleUpdateBin = async () => {
-    // aquí va tu lógica de update en Firestore…
+  const handleUpdateBin = async (): Promise<void> => {
+    try {
+      if (!binName?.trim()) {
+        throw new Error("Name is required");
+      }
+
+      const newBin = {
+        name: binName,
+        address: binAddress,
+        description: binDescription,
+        updatedAt: new Date().toISOString(),
+        location: selectedLocation ?? bin?.location,
+      };
+
+      if (!id) return;
+      await updateDoc(doc(db, "bins", id), newBin);
+      console.log("Bin updated with ID: ", id);
+      if (bin) {
+        setBin({
+          ...bin,
+          id: bin.id,
+          name: newBin.name,
+          location: newBin.location,
+          address: newBin.address,
+          description: newBin.description,
+          createdAt: bin.createdAt,
+        });
+      }
+
+      setIsEditBinOpen(false);
+      openModal("success", "Container updated successfully!", "");
+    } catch (error: any) {
+      console.error("Error creating bin:", error);
+      toast.error(error);
+    }
+  };
+
+  const openModal = (type: ModalType, message: string, title?: string) => {
+    setModalState({
+      isOpen: true,
+      type,
+      message,
+      title,
+    });
   };
 
   const deleteItem = async (itemId: string, imageUrl: string | undefined) => {
@@ -648,10 +697,10 @@ const BinDetailsScreen: React.FC = () => {
               </Button>
               <div>
                 <h1 className="text-xl font-semibold text-slate-900">
-                  Container Details
+                  {t("containers.detailsTitle")}
                 </h1>
                 <p className="text-xs text-slate-500">
-                  Manage your storage Container
+                  {t("containers.detailsSubtitle")}
                 </p>
               </div>
             </div>
@@ -661,7 +710,7 @@ const BinDetailsScreen: React.FC = () => {
               size="sm"
               className="rounded-xl border-slate-300 hover:bg-slate-50"
             >
-              Done
+              {t("containers.done")}
             </Button>
           </div>
         </div>
@@ -688,9 +737,15 @@ const BinDetailsScreen: React.FC = () => {
                         {bin.location.name}
                       </div>
                     )}
+                    {bin.address && (
+                      <div className="flex items-center text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
+                        <Home className="h-4 w-4 mr-2" />
+                        {bin.address}
+                      </div>
+                    )}
                     <div className="flex items-center text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
                       <Calendar className="h-4 w-4 mr-2" />
-                      Created: {new Date(bin.createdAt).toLocaleDateString()}
+                      {t("containers.created")} {new Date(bin.createdAt).toLocaleDateString()}
                     </div>
                   </div>
                 </div>
@@ -701,7 +756,7 @@ const BinDetailsScreen: React.FC = () => {
                   className="shrink-0 rounded-xl border-slate-300 hover:bg-slate-50 shadow-sm"
                 >
                   <Edit className="h-4 w-4 mr-2" />
-                  Edit
+                  {t("containers.edit")}
                 </Button>
               </div>
             </CardHeader>
@@ -713,20 +768,20 @@ const BinDetailsScreen: React.FC = () => {
               <DialogTrigger asChild>
                 <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Item
+                  {t("containers.addItem")}
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
                 <DialogHeader className="pb-6">
                   <DialogTitle className="text-2xl font-bold text-slate-900">
-                    Add New Item
+                    {t("containers.addNewItem")}
                   </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-6">
                   {/* Image Upload */}
                   <div className="space-y-3">
                     <Label className="text-sm font-medium text-slate-700">
-                      Image
+                      {t("containers.image")}
                     </Label>
                     <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-all duration-200">
                       {selectedImage ? (
@@ -742,7 +797,7 @@ const BinDetailsScreen: React.FC = () => {
                             onClick={() => setSelectedImage(null)}
                             className="rounded-xl"
                           >
-                            Remove Image
+                           {t("containers.removeImage")}
                           </Button>
                         </div>
                       ) : (
@@ -1030,7 +1085,7 @@ const BinDetailsScreen: React.FC = () => {
           <div>
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-slate-900">
-                Items ({items.length})
+                {t("containers.items")} ({items.length})
               </h3>
             </div>
 
@@ -1181,7 +1236,10 @@ const BinDetailsScreen: React.FC = () => {
       </div>
 
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl ml-40" showCloseButton={false}>
+        <DialogContent
+          className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl ml-40"
+          showCloseButton={false}
+        >
           <div className="relative w-full h-full overflow-hidden">
             <div
               className="relative w-full h-full cursor-move"
@@ -1513,7 +1571,7 @@ const BinDetailsScreen: React.FC = () => {
               />
             </div>
 
-            {/* Location */}
+            {/* Location 
             <div className="space-y-3">
               <Label className="text-sm font-medium text-slate-700">
                 Location{" "}
@@ -1531,7 +1589,7 @@ const BinDetailsScreen: React.FC = () => {
                   </div>
                 </div>
               )}
-            </div>
+            </div> */}
 
             {/* Actions */}
             <div className="flex justify-end space-x-3 pt-6">

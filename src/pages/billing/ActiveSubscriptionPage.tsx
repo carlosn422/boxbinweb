@@ -51,10 +51,12 @@ import CheckoutForm from "./CheckoutForm";
 import { loadStripe } from "@stripe/stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
+import { useTranslation } from "react-i18next";
 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 export default function ActiveSubscriptionPage() {
+  const { t } = useTranslation();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [subscription, setSubscription] = useState<any>(null);
@@ -268,7 +270,7 @@ export default function ActiveSubscriptionPage() {
             ></div>
           </div>
           <p className="text-gray-600 font-medium">
-            Loading your subscription...
+            {t("subscription.loading")}
           </p>
         </div>
       </div>
@@ -292,7 +294,7 @@ export default function ActiveSubscriptionPage() {
                   }}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
-                  Back
+                  {t("subscription.back")}
                 </Button>
               ) : (
                 <></>
@@ -306,7 +308,7 @@ export default function ActiveSubscriptionPage() {
             <div className="flex justify-between items-center">
               <div className="space-y-1">
                 <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-                  My Subscription
+                  {t("subscription.title")}
                 </h1>
               </div>
             </div>
@@ -320,17 +322,17 @@ export default function ActiveSubscriptionPage() {
           <div className="inline-flex items-center space-x-2 text-indigo-600">
             <Sparkles className="w-6 h-6" />
             <span className="text-sm font-semibold uppercase tracking-wide">
-              Current Plan
+              {t("subscription.currentPlan")}
             </span>
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Your <span className="text-indigo-600">Subscription</span>
+            {t("subscription.yourSubscription")}
           </h1>
           <p className="text-lg text-gray-600 max-w-xl mx-auto leading-relaxed">
-            Here are the details of your current subscription.
+            {t("subscription.details")}
           </p>
           <p className="text-lg text-gray-600 max-w-xl mx-auto leading-relaxed">
-            You can manage or cancel anytime.
+            {t("subscription.manage")}
           </p>
         </div>
 
@@ -343,7 +345,7 @@ export default function ActiveSubscriptionPage() {
                 className="bg-red-600 hover:bg-red-700 text-white text-sm px-3 py-1 h-8"
                 size="sm"
               >
-                Cancel Subscription
+                {t("subscription.cancel")}
               </Button>
 
               <AlertDialog
@@ -352,15 +354,16 @@ export default function ActiveSubscriptionPage() {
               >
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Cancel Subscription</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      {t("subscription.cancelConfirmTitle")}
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      Are you sure you want to cancel your subscription? This
-                      action cannot be undone.
+                      {t("subscription.cancelConfirmMsg")}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>
-                      No, keep my subscription
+                      {t("subscription.cancelKeep")}
                     </AlertDialogCancel>
                     <AlertDialogAction
                       onClick={handleCancelSubscription}
@@ -370,10 +373,10 @@ export default function ActiveSubscriptionPage() {
                       {redirecting ? (
                         <span className="flex items-center justify-center space-x-1">
                           <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Cancelling...</span>
+                          <span>{t("subscription.cancelling")}</span>
                         </span>
                       ) : (
-                        "Yes, cancel subscription"
+                        t("subscription.cancelYes")
                       )}
                     </AlertDialogAction>
                   </AlertDialogFooter>
@@ -384,13 +387,13 @@ export default function ActiveSubscriptionPage() {
               <CheckCircle className="w-6 h-6 text-white" />
             </div>
             <CardTitle className="text-2xl text-gray-900 font-bold">
-              {subscription?.plan || "Unknown Plan"}
+              {subscription?.plan || t("subscription.planUnknown")}
             </CardTitle>
           </CardHeader>
 
           <CardContent className="space-y-2 px-4 pb-4">
             <div className="flex justify-between text-sm text-gray-700">
-              <span>Status</span>
+              <span>{t("subscription.status")}</span>
               <span
                 className={`font-semibold ${
                   subscription?.status !== "active"
@@ -398,29 +401,31 @@ export default function ActiveSubscriptionPage() {
                     : "text-green-600"
                 }`}
               >
-                {subscription?.status !== "active" ? "Inactive" : "Active"}
+                {subscription?.status !== "active"
+                  ? t("subscription.statusInactive")
+                  : t("subscription.statusActive")}
               </span>
             </div>
 
             <div className="flex justify-between text-sm text-gray-700">
-              <span>Price</span>
+              <span>{t("subscription.price")}</span>
               <span>
                 ${subscription?.price?.toFixed(2)} / {subscription?.interval}
               </span>
             </div>
 
             <div className="flex justify-between text-sm text-gray-700">
-              <span>Included Bins</span>
+              <span>{t("subscription.includedBins")}</span>
               <span>{subscription?.metadata?.bins || "?"}</span>
             </div>
 
             <div className="flex justify-between text-sm text-gray-700">
-              <span>Included Items</span>
+              <span>{t("subscription.includedItems")}</span>
               <span>{subscription?.metadata?.items || "?"}</span>
             </div>
 
             <div className="flex justify-between text-sm text-gray-700">
-              <span>Locations</span>
+              <span>{t("subscription.locations")}</span>
               <span>{subscription?.metadata?.locations || "?"}</span>
             </div>
 
@@ -432,12 +437,12 @@ export default function ActiveSubscriptionPage() {
               {redirecting ? (
                 <span className="flex items-center justify-center space-x-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Redirecting...</span>
+                  <span>{t("subscription.redirecting")}</span>
                 </span>
               ) : (
                 <>
                   <Sparkles className="w-5 h-5" />
-                  <span>Upgrade subscription</span>
+                  <span>{t("subscription.upgrade")}</span>
                 </>
               )}
             </Button>
@@ -447,13 +452,12 @@ export default function ActiveSubscriptionPage() {
 
       <Dialog open={showUpgradeModal} onOpenChange={setShowUpgradeModal}>
         <DialogContent className="max-w-[95vw] sm:max-w-5xl max-h-[90vh] flex flex-col">
-          {/* Header compacto y fijo */}
           <DialogHeader className="text-center space-y-2 pb-2 flex-shrink-0 border-b border-gray-100">
             <DialogTitle className="text-2xl font-bold text-gray-900">
-              Upgrade Your Plan
+              {t("subscription.upgradeTitle")}
             </DialogTitle>
             <p className="text-gray-600 text-sm">
-              Choose a higher plan to unlock more features
+              {t("subscription.upgradeSubtitle")}
             </p>
           </DialogHeader>
 
@@ -461,15 +465,17 @@ export default function ActiveSubscriptionPage() {
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-3">
               {plansLoading ? (
-                <div className="flex flex-col items-center justify-center py-8">
+               <div className="flex flex-col items-center justify-center py-8">
                   <div className="relative mb-4">
                     <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full animate-pulse"></div>
                     <Loader2 className="w-6 h-6 text-white absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 animate-spin" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-800 mb-1">
-                    Loading......
+                    {t("subscription.loadingPlans")}
                   </h3>
-                  <p className="text-gray-600 text-sm">Please wait...</p>
+                  <p className="text-gray-600 text-sm">
+                    {t("subscription.pleaseWait")}
+                  </p>
                 </div>
               ) : plansError ? (
                 <div className="text-center py-6">
@@ -477,7 +483,7 @@ export default function ActiveSubscriptionPage() {
                     <Crown className="w-8 h-8 text-red-500" />
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    Something went wrong
+                    {t("subscription.errorTitle")}
                   </h3>
                   <p className="text-red-600 mb-4 text-sm">{plansError}</p>
                   <Button
@@ -487,7 +493,7 @@ export default function ActiveSubscriptionPage() {
                     className="hover:bg-red-50 border-red-200"
                   >
                     <Zap className="w-4 h-4 mr-2" />
-                    Try Again
+                    {t("subscription.tryAgain")}
                   </Button>
                 </div>
               ) : plans.length === 0 ? (
@@ -500,12 +506,11 @@ export default function ActiveSubscriptionPage() {
                       <Check className="w-4 h-4 text-white" />
                     </div>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                    You're Already at the Top! 👑
+                 <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                    {t("subscription.alreadyTopTitle")}
                   </h3>
                   <p className="text-gray-600 max-w-md mx-auto text-sm leading-relaxed">
-                    You're already enjoying our highest tier with all premium
-                    features.
+                    {t("subscription.alreadyTopMsg")}
                   </p>
                 </div>
               ) : (
@@ -530,7 +535,7 @@ export default function ActiveSubscriptionPage() {
                             <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 z-10">
                               <div className="bg-gradient-to-r from-orange-400 to-pink-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center shadow-lg">
                                 <Star className="w-3 h-3 mr-1" />
-                                Popular
+                                {t("subscription.planPopular")}
                               </div>
                             </div>
                           )}
@@ -579,7 +584,8 @@ export default function ActiveSubscriptionPage() {
                               </div>
 
                               <CardTitle className="text-lg font-bold text-gray-900 mb-1">
-                                {plan.product?.name || "Premium Plan"}
+                                {plan.product?.name ||
+                                  t("subscription.planDefaultName")}
                                 {isSelected && (
                                   <span className="ml-2 text-indigo-600">
                                     ✓

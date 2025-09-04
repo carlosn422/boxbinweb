@@ -116,7 +116,27 @@ const EnhancedImagesAIModal = ({
 
   const handleVideoUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    console.log(files);
+    // Límite total 25 MB
+    const maxTotalSize = 25 * 1024 * 1024;
+
+    // Suma del tamaño de imágenes ya seleccionadas
+    const existingTotalSize = selectedImages.reduce(
+      (acc: any, file: any) => acc + file.size,
+      0
+    );
+
+    // Suma del tamaño de las nuevas imágenes
+    const newFilesArray = Array.from(files);
+    const newTotalSize = newFilesArray.reduce(
+      (acc, file) => acc + file.size,
+      0
+    );
+
+    // Verificar si el total combinado excede el límite
+    if (existingTotalSize + newTotalSize > maxTotalSize) {
+      alert("The total size of the images cannot exceed 25 MB.");
+      return;
+    }
 
     setIsUploading(true);
 

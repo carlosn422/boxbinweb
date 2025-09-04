@@ -36,12 +36,14 @@ import { loadStripe } from "@stripe/stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 const planIcons = [Coins, Zap, Star, Crown];
+
 const EnhancedVideoAIModal = ({
   isVideoUploadOpen,
   setIsVideoUploadOpen,
   itemId,
   setItems,
 }: any) => {
+
   const { currentUser } = useAuth();
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [videoPreview, setVideoPreview] = useState<any>(null);
@@ -53,13 +55,16 @@ const EnhancedVideoAIModal = ({
 
   // Token estimation states
   const [userTokens, setUserTokens] = useState(0);
-
+  const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState<boolean>(false);
   // Token purchase states
   const [showTokenPurchase, setShowTokenPurchase] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState("");
   const [hoveredPackage, setHoveredPackage] = useState("");
   const [tokenPackages, setTokenPackages] = useState<any[]>([]);
   const checkoutRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (selectedPackage && checkoutRef.current) {
       checkoutRef.current.scrollIntoView({
@@ -110,12 +115,22 @@ const EnhancedVideoAIModal = ({
   }, [fetchTokenPackages]);
 
   const handleVideoUpload = (e: any) => {
-    const file = e.target.files[0];
-    if (file) {
-      setSelectedVideo(file);
-      const url = URL.createObjectURL(file);
-      setVideoPreview(url);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Límite 20 MB
+    const maxSize = 20 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      alert("The file exceeds 20 MB. Please upload a smaller video.");
+
+      e.target.value = ""; // limpia el input
+      return;
     }
+
+    setSelectedVideo(file);
+    const url = URL.createObjectURL(file);
+    setVideoPreview(url);
   };
 
   const resetVideoForm = () => {
@@ -125,10 +140,6 @@ const EnhancedVideoAIModal = ({
     setShowResults(false);
     setDetectedItems([]);
   };
-
-  const [estimateData, setEstimateData] = useState<TokenEstimate | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
-  const [isPolling, setIsPolling] = useState<boolean>(false);
 
   const handleVideoSubmit = async () => {
     if (!selectedVideo) return;
@@ -774,6 +785,7 @@ const EnhancedVideoAIModal = ({
         </div>
       );
     }
+    
     return (
       <div className="space-y-6">
         {isUploading && (

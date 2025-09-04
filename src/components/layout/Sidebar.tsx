@@ -47,12 +47,12 @@ export function Sidebar({ className }: SidebarProps) {
   const sidebarItems = [
     { title: t("sidebar.dashboard"), href: "/home", icon: Home, badge: null },
     { title: t("sidebar.locations"), href: "/locations", icon: MapPin, badge: null },
-    { title: "Shared Access", href: "/shared", icon: PersonStandingIcon, badge: t("sidebar.new") },
-    { title: "Subscription", href: "/subscription", icon: Settings, badge: null },
-    { title: "Tokens AI", href: "/tokensai", icon: Bot, badge: null },
-    { title: t("export.title"), href: "/export-inventory", icon: Download, badge: null },
+    { title: t("sidebar.sharedAccess"), href: "/shared", icon: PersonStandingIcon, badge: t("sidebar.new") },
+    { title: t("sidebar.subscription"), href: "/subscription", icon: Settings, badge: null },
+    { title: t("sidebar.tokensAI"), href: "/tokensai", icon: Bot, badge: null },
+    { title: t("sidebar.exportInventory"), href: "/export-inventory", icon: Download, badge: null },
     {
-      title: "Smart Labels",
+      title: t("sidebar.smartLabels"),
       href: "/smart-labels",
       icon: () => (
         <svg

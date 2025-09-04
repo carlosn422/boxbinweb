@@ -789,7 +789,7 @@ export default function HomeScreen() {
                 className="ml-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
               >
                 <Plus size={20} />
-                <span>Add New Container</span>
+                <span>{t("dashboard.new")}</span>
               </button>
             )}
           </div>
