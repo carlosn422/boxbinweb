@@ -880,6 +880,7 @@ const EnhancedImagesAIModal = ({
         </div>
       );
     }
+
     return (
       <div className="space-y-6">
         {isUploading && (
@@ -908,87 +909,116 @@ const EnhancedImagesAIModal = ({
               </>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto">
-                  {detectedItems.map((item: any) => (
-                    <div
-                      key={item.id}
-                      className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
-                    >
-                      {/* Item Image */}
-                      <div className="relative">
-                        <img
-                          src={item.image_url}
-                          alt={item.label}
-                          className="w-full h-40 object-cover"
-                          onError={(e: any) => {
-                            e.target.style.display = "none";
-                            e.target.nextElementSibling.style.display = "flex";
-                          }}
-                        />
-                        <div className="hidden w-full h-40 bg-slate-100 items-center justify-center">
-                          <span className="text-slate-400">
-                            Image not available
-                          </span>
-                        </div>
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[60vh] overflow-y-auto">
+  {detectedItems.map((item: any) => (
+    <div
+      key={item.id}
+      className="bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden"
+    >
+      {/* Item Image */}
+      <div className="relative">
+        <img
+          src={item.image_url}
+          alt={item.label}
+          className="w-full h-40 object-cover"
+          onError={(e: any) => {
+            e.target.style.display = "none";
+            e.target.nextElementSibling.style.display = "flex";
+          }}
+        />
+        <div className="hidden w-full h-40 bg-slate-100 items-center justify-center">
+          <span className="text-slate-400">
+            Image not available
+          </span>
+        </div>
 
-                        {/* Badges */}
-                        <div className="absolute top-2 right-2">
-                          <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
-                            {Math.round(item.confidence * 100)}%
-                          </span>
-                        </div>
-                        <div className="absolute top-2 left-2">
-                          <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full flex items-center">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {item.timestamp_seconds}s
-                          </span>
-                        </div>
-                      </div>
+        {/* Badges */}
+        <div className="absolute top-2 right-2">
+          <span className="px-2 py-1 bg-green-500 text-white text-xs font-medium rounded-full">
+            {Math.round(item.confidence * 100)}%
+          </span>
+        </div>
+        <div className="absolute top-2 left-2">
+          <span className="px-2 py-1 bg-purple-500 text-white text-xs font-medium rounded-full flex items-center">
+            <Clock className="h-3 w-3 mr-1" />
+            {item.timestamp_seconds}s
+          </span>
+        </div>
+      </div>
 
-                      {/* Item Details */}
-                      <div className="p-4 space-y-3">
-                        <div>
-                          <h3 className="font-semibold text-slate-900">
-                            {item.label}
-                          </h3>
-                          <p className="text-sm text-slate-600 mt-1 line-clamp-2">
-                            {item.description}
-                          </p>
-                        </div>
+      {/* Item Details */}
+      <div className="p-4 space-y-3">
+        <div>
+          <h3 className="font-semibold text-slate-900">
+            {item.label}
+          </h3>
+          <p className="text-sm text-slate-600 mt-1 line-clamp-2">
+            {item.description}
+          </p>
+        </div>
 
-                        {/* Tags */}
-                        {item.tags && item.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {item.tags
-                              .slice(0, 3)
-                              .map((tag: any, tagIndex: number) => (
-                                <span
-                                  key={tagIndex}
-                                  className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
-                            {item.tags.length > 3 && (
-                              <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
-                                +{item.tags.length - 3}
-                              </span>
-                            )}
-                          </div>
-                        )}
+        {/* Estimated Price */}
+        {item.estimated_value_usd && (
+          <div className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+            <span className="text-sm font-medium text-slate-700">
+              Estimated Value:
+            </span>
+            <span className="text-lg font-bold text-green-600">
+              ${item.estimated_value_usd}
+            </span>
+          </div>
+        )}
 
-                        {/* Add Button */}
-                        <Button
-                          onClick={() => handleAddDetectedItem(item)}
-                          className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                          size="sm"
-                        >
-                          Add to Container
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        {/* Tags */}
+        {item.tags && item.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {item.tags
+              .slice(0, 3)
+              .map((tag: any, tagIndex: number) => (
+                <span
+                  key={tagIndex}
+                  className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full"
+                >
+                  {tag}
+                </span>
+              ))}
+            {item.tags.length > 3 && (
+              <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
+                +{item.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="space-y-2">
+          <Button
+            onClick={() => handleAddDetectedItem(item)}
+            className="w-full rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+            size="sm"
+          >
+            Add to Container
+          </Button>
+          
+          {/* eBay Link Button */}
+          {item.reference_url && (
+            <Button
+              onClick={() => window.open(item.reference_url, '_blank')}
+              variant="outline"
+              className="w-full rounded-xl border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300"
+              size="sm"
+            >
+              <svg className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7.4 5.8c-.3.5-.4 1.1-.4 1.7 0 1.2.5 2.3 1.4 3.1-.2-.1-.4-.1-.6-.1-1.1 0-2 .9-2 2s.9 2 2 2c.2 0 .4 0 .6-.1-.9.8-1.4 1.9-1.4 3.1 0 .6.1 1.2.4 1.7h9.2c.3-.5.4-1.1.4-1.7 0-1.2-.5-2.3-1.4-3.1.2.1.4.1.6.1 1.1 0 2-.9 2-2s-.9-2-2-2c-.2 0-.4 0-.6.1.9-.8 1.4-1.9 1.4-3.1 0-.6-.1-1.2-.4-1.7H7.4z"/>
+              </svg>
+              View Similar on eBay
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  ))}
+</div>
 
                 {/* Results Actions */}
                 <div className="flex justify-between items-center pt-6 border-t border-slate-200">
