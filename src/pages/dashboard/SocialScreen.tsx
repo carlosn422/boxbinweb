@@ -494,7 +494,7 @@ export default function SocialScreen() {
           </div>
         </div>
       )}
-<ModalMessage
+      <ModalMessage
         isOpen={modalState.isOpen}
         onClose={closeModal}
         type={modalState.type}

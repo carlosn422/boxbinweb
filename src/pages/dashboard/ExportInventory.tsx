@@ -54,9 +54,8 @@ export default function ExportInventory() {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const filename = `inventory-export-${
-        new Date().toISOString().split("T")[0]
-      }.pdf`;
+      const filename = `inventory-export-${new Date().toISOString().split("T")[0]
+        }.pdf`;
 
       a.href = url;
       a.download = filename;

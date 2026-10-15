@@ -91,7 +91,7 @@ export const LocationsManager = () => {
   const closeModal = () => {
     setModalState((prev: any) => ({ ...prev, isOpen: false }));
   };
-  
+
   // Estados para navegación de páginas
   // Pagination handled by page offset
   const [hasNextPage, setHasNextPage] = useState(false);
@@ -447,7 +447,7 @@ export const LocationsManager = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-     
+
       {userImpersonated && (
         <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-200/50 backdrop-blur-sm">
           <div className="container mx-auto px-6 py-3 max-w-7xl flex items-center justify-end space-x-4">
@@ -464,7 +464,7 @@ export const LocationsManager = () => {
           </div>
         </div>
       )}
-      
+
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
@@ -496,8 +496,8 @@ export const LocationsManager = () => {
               />
               {t("locations.refresh")}
             </Button>
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className="px-3 py-1.5 bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 font-medium"
             >
               {totalLocations} {t("locations.count")}
@@ -634,31 +634,28 @@ export const LocationsManager = () => {
               {filteredLocations.map((location: any) => (
                 <Card
                   key={location.id}
-                  className={`group cursor-pointer transition-all duration-200 hover:shadow-md border ${
-                    selectedLocation?.id === location.id
-                      ? "border-blue-500 bg-blue-50"
-                      : "border-gray-200 hover:border-gray-300"
-                  }`}
+                  className={`group cursor-pointer transition-all duration-200 hover:shadow-md border ${selectedLocation?.id === location.id
+                    ? "border-blue-500 bg-blue-50"
+                    : "border-gray-200 hover:border-gray-300"
+                    }`}
                   onClick={() => handleLocationSelect(location)}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4 flex-1">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                          selectedLocation?.id === location.id ? 'bg-blue-100' : 'bg-gray-100'
-                        }`}>
-                          <MapPin className={`h-5 w-5 ${
-                            selectedLocation?.id === location.id ? 'text-blue-600' : 'text-gray-600'
-                          }`} />
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${selectedLocation?.id === location.id ? 'bg-blue-100' : 'bg-gray-100'
+                          }`}>
+                          <MapPin className={`h-5 w-5 ${selectedLocation?.id === location.id ? 'text-blue-600' : 'text-gray-600'
+                            }`} />
                         </div>
-                        
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-1">
                             <h3 className="text-lg font-semibold text-gray-900 truncate">
                               {location.name}
                             </h3>
-                            <Badge 
-                              variant="secondary" 
+                            <Badge
+                              variant="secondary"
                               className="text-xs px-2 py-0.5"
                             >
                               {t("locations.badge")}
@@ -669,7 +666,7 @@ export const LocationsManager = () => {
                               </Badge>
                             )}
                           </div>
-                          
+
                           <div className="flex items-center gap-4 text-sm text-gray-600">
                             <div className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
@@ -681,7 +678,7 @@ export const LocationsManager = () => {
                               </span>
                             )}
                           </div>
-                          
+
                           {location.description && (
                             <p className="text-sm text-gray-700 mt-2 line-clamp-2">
                               {location.description}
@@ -936,7 +933,7 @@ export const LocationsManager = () => {
         </DialogContent>
       </Dialog>
 
-       <ModalMessage
+      <ModalMessage
         isOpen={modalState.isOpen}
         onClose={closeModal}
         type={modalState.type}
