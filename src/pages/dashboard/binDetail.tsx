@@ -1,21 +1,35 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+//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
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
-  Edit,
+  Edit3,
   Plus,
   Trash2,
   MapPin,
-  Calendar,
   Package,
   ImageIcon,
   X,
   Minus,
   Loader2,
-  Home,
+  Search,
+  Grid,
+  List,
+  Sparkles,
+  UploadCloud,
+  DollarSign,
+  TrendingUp,
+  Layers,
+  Tag,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Video,
+  ArrowUpDown,
+  Check,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +39,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -38,6 +51,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   addDoc,
   collection,
@@ -88,29 +109,25 @@ export const uploadImage = async (file: File): Promise<string> => {
 const extractStoragePath = (url: string | null): string | null => {
   if (!url) return null;
 
-  // 1. Si ya es un path válido (sin dominios ni tokens)
   if (!url.includes("http") && !url.startsWith("gs://")) {
     return url;
   }
 
-  // 2. Si es una URL pública de Firebase Storage
   if (url.includes("firebasestorage.googleapis.com")) {
     const match = decodeURIComponent(url).match(/\/o\/(.*?)\?/);
     return match?.[1] || null;
   }
 
-  // 3. Si es una URL gs://bucket/path
   if (url.startsWith("gs://")) {
     const parts = url.replace("gs://", "").split("/");
-    parts.shift(); // remove bucket name
+    parts.shift();
     return parts.join("/");
   }
 
-  // Si no coincide con ningún formato conocido
   return null;
 };
 
-// types.ts
+// types
 export interface BinDetails {
   id: string;
   name: string;
@@ -160,48 +177,159 @@ const BinDetailsScreen: React.FC = () => {
     setModalState((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // States
+  const openModal = (type: ModalType, message: string, title?: string) => {
+    setModalState({
+      isOpen: true,
+      type,
+      message,
+      title,
+    });
+  };
+
+  // Main data states
   const [bin, setBin] = useState<BinDetails | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [isEditBinOpen, setIsEditBinOpen] = useState(false);
-  const [isEditItemOpen, setIsEditItemOpen] = useState(false);
-  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
-  const [selectedModalImage, setSelectedModalImage] = useState<
-    string | undefined | null
-  >(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [subscription, setSubscription] = useState<any | null>(null);
 
-  const incrementQuantity = () => setItemCuantity((prev: any) => prev + 1);
-  const decrementQuantity = () =>
-    setItemCuantity((prev: any) => Math.max(0, prev - 1));
-  // Form states
+  // View & Filter states
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"date" | "name" | "value-desc" | "qty-desc">("date");
+
+  // Modal visibility states
+  const [isAddItemOpen, setIsAddItemOpen] = useState(false);
+  const [isEditItemOpen, setIsEditItemOpen] = useState(false);
+  const [isEditBinOpen, setIsEditBinOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
+  const [isBulkUploading, setIsBulkUploading] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  const [isDeletingBin, setIsDeletingBin] = useState(false);
+
+  // Zoom image modal states
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [selectedModalImage, setSelectedModalImage] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+
+  // Item form states
+  const [currentItem, setCurrentItem] = useState<Item | null>(null);
   const [itemName, setItemName] = useState("");
   const [itemDescription, setItemDescription] = useState("");
   const [itemCuantity, setItemCuantity] = useState<number>(1);
-  const [itemValue, setItemValue] = useState<any>("");
+  const [itemValue, setItemValue] = useState<string | number>("");
   const [itemTags, setItemTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [currentItem, setCurrentItem] = useState<Item | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isSavingItem, setIsSavingItem] = useState(false);
 
   // Bin form states
   const [binName, setBinName] = useState("");
   const [binDescription, setBinDescription] = useState("");
   const [binAddress, setBinAddress] = useState("");
+  const [selectedLocation, setSelectedLocation] = useState<{
+    name: string;
+    coordinates: { lat: number; lng: number };
+  } | null>(null);
+  const [isUpdatingBin, setIsUpdatingBin] = useState(false);
 
-  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
-  const [isBulkUploading, setIsBulkUploading] = useState(false);
-  const [bulkProgress, setBulkProgress] = useState({ done: 0, total: 0 });
+  // AI Modal states
+  const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
+  const [isImagesUploadOpen, setIsImagesUploadOpen] = useState(false);
 
+  const incrementQuantity = () => setItemCuantity((prev) => prev + 1);
+  const decrementQuantity = () => setItemCuantity((prev) => Math.max(1, prev - 1));
+
+  // Fetch subscription
+  const fetchSubscription = async () => {
+    if (!currentUser?.uid) return;
+    try {
+      const q = query(
+        collection(db, "subscriptions"),
+        where("userId", "==", currentUser.uid)
+      );
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        const sub = querySnapshot.docs[0].data();
+        if (sub.planId) {
+          const stripePlan = await getStripePlanById(sub.planId);
+          const fullSubscription = {
+            ...sub,
+            plan: stripePlan?.product?.name ?? "Unknown Plan",
+            price: (stripePlan?.unit_amount ?? 0) / 100,
+            interval: stripePlan?.recurring?.interval ?? "month",
+            metadata: stripePlan?.metadata ?? {},
+          };
+          setSubscription(fullSubscription);
+        } else {
+          setSubscription(sub);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching subscription:", error);
+    }
+  };
+
+  // Fetch bin and items
+  const loadData = async (showLoading = true) => {
+    if (!id) return;
+    try {
+      if (showLoading) setLoading(true);
+      await fetchSubscription();
+
+      const binDocRef = doc(db, "bins", id);
+      const binSnap = await getDoc(binDocRef);
+
+      if (!binSnap.exists()) {
+        setBin(null);
+        setLoading(false);
+        return;
+      }
+
+      const binData = binSnap.data() as Omit<BinDetails, "id">;
+      setBin({ id: binSnap.id, ...binData });
+
+      const itemsQuery = query(
+        collection(db, "items"),
+        where("binId", "==", id)
+      );
+      const itemsSnap = await getDocs(itemsQuery);
+
+      const itemsData = itemsSnap.docs.map((itemDoc) => ({
+        id: itemDoc.id,
+        ...itemDoc.data(),
+      })) as Item[];
+
+      setItems(itemsData);
+    } catch (err) {
+      console.error("Error fetching bin data:", err);
+      toast.error("Failed to load container data");
+    } finally {
+      if (showLoading) setLoading(false);
+      setIsRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData(true);
+  }, [id]);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadData(false);
+    toast.success("Inventory updated");
+  };
+
+  // Bulk Upload
   const handleBulkUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
 
-    // Control de límites (opcional)
     const limit = Number(subscription?.metadata?.items) || 100;
-    if (files.length > limit) {
-      alert(`You can upload up to ${limit} items at once.`);
+    if (items.length + files.length > limit) {
+      toast.error(`Your plan allows up to ${limit} items.`);
       return;
     }
 
@@ -214,86 +342,40 @@ const BinDetailsScreen: React.FC = () => {
     for (let i = 0; i < files.length; i++) {
       try {
         const file = files[i];
-        // Aquí podrías agregar redimensionamiento con una librería web si quieres
-
-        // Subir a Firebase Storage
         const filename = `bins/${id}/${Date.now()}_${file.name}`;
         const storageRef = ref(storage, filename);
         await uploadBytes(storageRef, file);
         const url = await getDownloadURL(storageRef);
 
-        // Crear item minimalista en Firestore
-        const itemName = `${bin?.name}_${String(i + 1).padStart(3, "0")}`;
+        const generatedName = `${bin?.name || "Item"} #${String(items.length + i + 1).padStart(2, "0")}`;
         const itemData = {
-          name: itemName,
+          name: generatedName,
           description: "",
           cuantity: "1",
           value: "0",
           tags: [],
           createdAt: new Date().toISOString(),
-          binId: id,
+          binId: id!,
           userId: currentUser?.uid,
           imageUrl: url,
         };
 
         const docRef = await addDoc(collection(db, "items"), itemData);
-        newItems.push({ id: docRef.id, ...itemData, binId: id! });
+        newItems.push({ id: docRef.id, ...itemData });
       } catch (err) {
         console.error("Error uploading file index", i, err);
-        // Puedes decidir mostrar error o continuar
       } finally {
         setBulkProgress((p) => ({ ...p, done: p.done + 1 }));
       }
     }
 
-    setItems((prev: any) => [...prev, ...newItems]);
+    setItems((prev) => [...prev, ...newItems]);
     setIsBulkUploading(false);
     setIsBulkUploadOpen(false);
+    toast.success(`Successfully uploaded ${newItems.length} items`);
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-
-        await fetchSubscription();
-        const binDocRef = doc(db, "bins", id!);
-        const binSnap = await getDoc(binDocRef);
-
-        if (!binSnap.exists()) {
-          setLoading(false);
-          return;
-        }
-
-        const binData = binSnap.data() as Omit<BinDetails, "id">;
-        setBin({ id: binSnap.id, ...binData });
-
-        console.log(binData, " data");
-
-        const itemsQuery = query(
-          collection(db, "items"),
-          where("binId", "==", id)
-        );
-        const itemsSnap = await getDocs(itemsQuery);
-
-        const itemsData = itemsSnap.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Item[];
-
-        console.log(itemsData, " response");
-
-        setItems(itemsData);
-      } catch (err) {
-        console.error("Error fetching bin data:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) fetchData();
-  }, [id]);
-
+  // Tags management
   const handleAddTag = () => {
     if (newTag.trim() && !itemTags.includes(newTag.trim())) {
       setItemTags([...itemTags, newTag.trim()]);
@@ -305,128 +387,31 @@ const BinDetailsScreen: React.FC = () => {
     setItemTags(itemTags.filter((tag) => tag !== tagToRemove));
   };
 
+  // Edit item trigger
   const handleEditItem = (item: Item) => {
-    console.log(currentItem);
-    console.log(item);
-    const qty = Number(item?.quantity ?? item?.cuantity ?? 0);
-    setItemCuantity(qty);
+    const qty = Number(item.quantity ?? item.cuantity ?? 1);
+    setItemCuantity(qty > 0 ? qty : 1);
     setCurrentItem(item);
     setItemName(item.name);
-    setItemDescription(item.description);
-    setItemValue(Number(item.value));
-    setItemTags(item.tags);
+    setItemDescription(item.description || "");
+    setItemValue(item.value || "");
+    setItemTags(item.tags || []);
     setSelectedImage(item.imageUrl || null);
+    setSelectedFile(null);
     setIsEditItemOpen(true);
-  };
-
-  const handleUpdateItem = async () => {
-    if (!itemName.trim()) {
-      setModalState({
-        isOpen: true,
-        type: "error",
-        message: "Please enter an item name",
-      });
-      return;
-    }
-
-    try {
-      if (!currentItem) {
-        setModalState({
-          isOpen: true,
-          type: "error",
-          message: "No item selected",
-        });
-        return;
-      }
-
-      const itemRef = doc(db, "items", currentItem.id);
-
-      // Prepara datos a actualizar
-      const updateData: Partial<Item> = {
-        name: itemName.trim(),
-        description: itemDescription.trim(),
-        tags: itemTags,
-        value: itemValue?.toString(),
-        cuantity: itemCuantity?.toString() ?? "1",
-      };
-
-      // Si la imagen cambió y hay una imagen anterior
-      if (selectedFile && selectedImage !== currentItem.imageUrl) {
-        if (currentItem.imageUrl) {
-          try {
-            const storage = getStorage();
-            // Extraer ruta relativa en storage para eliminar
-            const oldImagePath = extractStoragePath(
-              currentItem?.imageUrl ?? null
-            );
-            if (oldImagePath) {
-              const oldImageRef = ref(storage, oldImagePath);
-              await deleteObject(oldImageRef);
-              console.log("Old image deleted");
-            } else {
-              console.warn("No se pudo extraer un path válido de la URL");
-            }
-
-            console.log("Old image deleted");
-          } catch (error) {
-            console.warn("Error deleting old image", error);
-          }
-        }
-
-        // Subir nueva imagen
-        const newImageUrl = await uploadImage(selectedFile);
-        updateData.imageUrl = newImageUrl;
-      }
-
-      // Actualizar Firestore
-      await updateDoc(itemRef, updateData);
-
-      // Actualizar estado local
-      setItems((prev: any) =>
-        prev.map((item: any) =>
-          item.id === currentItem.id ? { ...item, ...updateData } : item
-        )
-      );
-
-      // Reset form y cerrar modal
-      resetItemForm();
-      setIsEditItemOpen(false);
-
-      setModalState({
-        isOpen: true,
-        type: "success",
-        message: "Item updated successfully",
-      });
-    } catch (error) {
-      console.error("Error updating item", error);
-      setModalState({
-        isOpen: true,
-        type: "error",
-        message: "Failed to update item",
-      });
-    }
-  };
-
-  const handleEditBin = () => {
-    if (bin) {
-      setBinName(bin.name);
-      setBinDescription(bin.description);
-      setBinAddress(bin.address);
-      setIsEditBinOpen(true);
-      console.log(bin);
-      setSelectedLocation(bin.location ?? null);
-    }
   };
 
   const resetItemForm = () => {
     setItemName("");
     setItemDescription("");
+    setItemCuantity(1);
+    setItemValue("");
     setItemTags([]);
+    setNewTag("");
     setSelectedImage(null);
+    setSelectedFile(null);
     setCurrentItem(null);
   };
-
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -440,62 +425,23 @@ const BinDetailsScreen: React.FC = () => {
     reader.readAsDataURL(file);
   };
 
-  const [subscription, setSubscription] = useState<any | null>(null);
-
-  const fetchSubscription = async () => {
-    if (!currentUser?.uid) return;
-
-    try {
-      const q = query(
-        collection(db, "subscriptions"),
-        where("userId", "==", currentUser.uid)
-      );
-      const querySnapshot = await getDocs(q);
-
-      if (!querySnapshot.empty) {
-        const sub = querySnapshot.docs[0].data();
-
-        if (sub.planId) {
-          const stripePlan = await getStripePlanById(sub.planId);
-
-          const fullSubscription = {
-            ...sub,
-            plan: stripePlan?.product?.name ?? "Unknown Plan",
-            price: (stripePlan?.unit_amount ?? 0) / 100,
-            interval: stripePlan?.recurring?.interval ?? "month",
-            metadata: stripePlan?.metadata ?? {},
-          };
-
-          setSubscription(fullSubscription);
-        } else {
-          setSubscription(sub);
-        }
-      } else {
-        console.log("❌ No se encontró suscripción para el usuario.");
-      }
-    } catch (error) {
-      console.error("🔥 Error al obtener suscripción:", error);
-    }
-  };
-
+  // Create new item
   const handleSubmitItem = async () => {
-    // Verificar si ya alcanzó el límite
-    if (items.length >= Number(subscription?.metadata?.items)) {
-      toast.error(
-        `You have reached the limit of ${subscription?.metadata?.items} items for your plan.`
-      );
+    const limit = Number(subscription?.metadata?.items) || 100;
+    if (items.length >= limit) {
+      toast.error(`Plan limit of ${limit} items reached.`);
       return;
     }
 
     if (!itemName.trim()) {
-      toast.error("Please enter an item name"); // o un alert nativo
+      toast.error("Please enter an item name");
       return;
     }
 
     try {
+      setIsSavingItem(true);
       let imageUrl: string | null = null;
 
-      console.log(selectedFile, " archivo");
       if (selectedFile) {
         try {
           imageUrl = await uploadImage(selectedFile);
@@ -505,31 +451,20 @@ const BinDetailsScreen: React.FC = () => {
             "Image upload failed. Do you want to continue without an image?"
           );
           if (!proceed) {
-            //setIsUploading(false);
+            setIsSavingItem(false);
             return;
           }
         }
       }
 
-      await createItem(imageUrl);
-    } catch (error) {
-      console.error("Error adding item:", error);
-      toast.error("Failed to add item");
-    } finally {
-      //setIsUploading(false);
-    }
-  };
-
-  const createItem = async (imageUrl: string | null = null) => {
-    try {
       const itemData = {
         name: itemName.trim(),
         description: itemDescription.trim(),
-        cuantity: itemCuantity?.toString()?.trim() ?? "1",
-        value: itemValue?.toString()?.trim(),
+        cuantity: itemCuantity.toString(),
+        value: itemValue ? itemValue.toString().trim() : "0",
         tags: itemTags,
         createdAt: new Date().toISOString(),
-        binId: id,
+        binId: id!,
         userId: currentUser?.uid,
         ...(imageUrl && { imageUrl }),
       };
@@ -537,143 +472,272 @@ const BinDetailsScreen: React.FC = () => {
       const docRef = await addDoc(collection(db, "items"), itemData);
       const newItem = { id: docRef.id, ...itemData };
 
-      setItems((prevItems: any) => [...prevItems, newItem]);
+      setItems((prev) => [newItem, ...prev]);
       setIsAddItemOpen(false);
       resetItemForm();
-
       toast.success("Item added successfully");
     } catch (error) {
-      console.log(error);
+      console.error("Error adding item:", error);
+      toast.error("Failed to add item");
+    } finally {
+      setIsSavingItem(false);
     }
   };
 
-  const handleUpdateBin = async (): Promise<void> => {
+  // Update existing item
+  const handleUpdateItem = async () => {
+    if (!itemName.trim()) {
+      toast.error("Please enter an item name");
+      return;
+    }
+
+    if (!currentItem) return;
+
     try {
-      if (!binName?.trim()) {
-        throw new Error("Name is required");
+      setIsSavingItem(true);
+      const itemRef = doc(db, "items", currentItem.id);
+
+      const updateData: Partial<Item> = {
+        name: itemName.trim(),
+        description: itemDescription.trim(),
+        tags: itemTags,
+        value: itemValue ? itemValue.toString().trim() : "0",
+        cuantity: itemCuantity.toString(),
+      };
+
+      if (selectedFile && selectedImage !== currentItem.imageUrl) {
+        if (currentItem.imageUrl) {
+          try {
+            const oldImagePath = extractStoragePath(currentItem.imageUrl);
+            if (oldImagePath) {
+              const storage = getStorage();
+              await deleteObject(ref(storage, oldImagePath));
+            }
+          } catch (e) {
+            console.warn("Could not delete old image:", e);
+          }
+        }
+
+        const newImageUrl = await uploadImage(selectedFile);
+        updateData.imageUrl = newImageUrl;
       }
 
-      const newBin = {
-        name: binName,
-        address: binAddress,
-        description: binDescription,
+      await updateDoc(itemRef, updateData);
+
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === currentItem.id ? { ...item, ...updateData } : item
+        )
+      );
+
+      resetItemForm();
+      setIsEditItemOpen(false);
+      toast.success("Item updated successfully");
+    } catch (error) {
+      console.error("Error updating item:", error);
+      toast.error("Failed to update item");
+    } finally {
+      setIsSavingItem(false);
+    }
+  };
+
+  // Delete item
+  const deleteItem = async (itemId: string, imageUrl: string | undefined) => {
+    try {
+      await deleteDoc(doc(db, "items", itemId));
+
+      if (imageUrl) {
+        try {
+          const path = extractStoragePath(imageUrl);
+          if (path) {
+            const storage = getStorage();
+            await deleteObject(ref(storage, path));
+          }
+        } catch (e) {
+          console.warn("Could not delete item image:", e);
+        }
+      }
+
+      setItems((prev) => prev.filter((item) => item.id !== itemId));
+      toast.success("Item deleted");
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error("Failed to delete item");
+    }
+  };
+
+  // Edit container setup
+  const handleEditBin = () => {
+    if (bin) {
+      setBinName(bin.name || "");
+      setBinDescription(bin.description || "");
+      setBinAddress(bin.address || "");
+      setSelectedLocation(bin.location ?? null);
+      setIsEditBinOpen(true);
+    }
+  };
+
+  // Update container
+  const handleUpdateBin = async () => {
+    try {
+      if (!binName.trim()) {
+        toast.error("Container name is required");
+        return;
+      }
+
+      setIsUpdatingBin(true);
+      const updatePayload = {
+        name: binName.trim(),
+        address: binAddress.trim(),
+        description: binDescription.trim(),
         updatedAt: new Date().toISOString(),
         location: selectedLocation ?? bin?.location,
       };
 
       if (!id) return;
-      await updateDoc(doc(db, "bins", id), newBin);
-      console.log("Bin updated with ID: ", id);
-      if (bin) {
-        setBin({
-          ...bin,
-          id: bin.id,
-          name: newBin.name,
-          location: newBin.location,
-          address: newBin.address,
-          description: newBin.description,
-          createdAt: bin.createdAt,
-        });
-      }
+      await updateDoc(doc(db, "bins", id), updatePayload);
+
+      setBin((prev) =>
+        prev
+          ? {
+            ...prev,
+            name: updatePayload.name,
+            address: updatePayload.address,
+            description: updatePayload.description,
+            location: updatePayload.location,
+          }
+          : null
+      );
 
       setIsEditBinOpen(false);
-      openModal("success", "Container updated successfully!", "");
+      toast.success("Container updated successfully");
+      openModal("success", "Container updated successfully!");
     } catch (error: any) {
-      console.error("Error creating bin:", error);
-      toast.error(error);
+      console.error("Error updating bin:", error);
+      toast.error("Failed to update container");
+      openModal("error", error?.message || "Failed to update container");
+    } finally {
+      setIsUpdatingBin(false);
     }
   };
 
-  const openModal = (type: ModalType, message: string, title?: string) => {
-    setModalState({
-      isOpen: true,
-      type,
-      message,
-      title,
-    });
-  };
-
-  const deleteItem = async (itemId: string, imageUrl: string | undefined) => {
+  // Delete container entirely
+  const handleDeleteBin = async () => {
+    if (!id) return;
     try {
-      await deleteDoc(doc(db, "items", itemId));
+      setIsDeletingBin(true);
 
-      try {
-        if (imageUrl) {
-          const path = extractStoragePath(imageUrl);
-
+      for (const item of items) {
+        await deleteDoc(doc(db, "items", item.id));
+        if (item.imageUrl) {
+          const path = extractStoragePath(item.imageUrl);
           if (path) {
-            const storage = getStorage();
-            const storageRef = ref(storage, path);
-            await deleteObject(storageRef);
-            console.log("Archivo eliminado");
-          } else {
-            console.warn("No se pudo extraer un path válido de la URL");
+            try {
+              const storage = getStorage();
+              await deleteObject(ref(storage, path));
+            } catch (e) {
+              console.warn("Storage deletion ignored:", e);
+            }
           }
         }
-      } catch (error) {
-        console.log(error);
       }
 
-      // Update the local state
-      setItems((prevItems: any) =>
-        prevItems.filter((item: any) => item.id !== itemId)
-      );
-      //toast.success( 'Item deleted successfully');
-      setModalState({
-        isOpen: true,
-        type: "success",
-        message: "Item deleted successfully",
-      });
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      //toast.error( 'Failed to delete item');
-      setModalState({
-        isOpen: true,
-        type: "error",
-        message: "Failed to delete item",
-      });
+      await deleteDoc(doc(db, "bins", id));
+      toast.success("Container deleted successfully");
+      navigate("/home");
+    } catch (err) {
+      console.error("Error deleting bin:", err);
+      toast.error("Failed to delete container");
+    } finally {
+      setIsDeletingBin(false);
     }
   };
 
-  const [selectedLocation, setSelectedLocation] = useState<{
-    name: string;
-    coordinates: { lat: number; lng: number };
-  } | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
+  // Inventory KPI calculations
+  const totalItemsCount = items.length;
+  const totalUnitsCount = useMemo(() => {
+    return items.reduce((acc, it) => {
+      const q = Number(it.quantity ?? it.cuantity);
+      return acc + (isNaN(q) || q <= 0 ? 1 : q);
+    }, 0);
+  }, [items]);
 
-  useEffect(() => {
-    setIsUploading(false);
-  }, []);
+  const totalValuation = useMemo(() => {
+    return items.reduce((acc, it) => {
+      const v = Number(it.value);
+      const q = Number(it.quantity ?? it.cuantity);
+      const qty = isNaN(q) || q <= 0 ? 1 : q;
+      const val = isNaN(v) || v <= 0 ? 0 : v;
+      return acc + val * qty;
+    }, 0);
+  }, [items]);
 
-  // Add these state variables with your other useState declarations
-  const [isVideoUploadOpen, setIsVideoUploadOpen] = useState(false);
-  const [isImagesUploadOpen, setIsImagesUploadOpen] = useState(false);
+  const allTags = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((it) => {
+      if (Array.isArray(it.tags)) {
+        it.tags.forEach((t) => set.add(t));
+      }
+    });
+    return Array.from(set);
+  }, [items]);
+
+  // Filtered & Sorted items
+  const filteredItems = useMemo(() => {
+    return items
+      .filter((it) => {
+        const matchesQuery =
+          searchQuery.trim() === "" ||
+          it.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          it.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          it.tags?.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        const matchesTag = !selectedTag || it.tags?.includes(selectedTag);
+
+        return matchesQuery && matchesTag;
+      })
+      .sort((a, b) => {
+        if (sortBy === "name") {
+          return a.name.localeCompare(b.name);
+        }
+        if (sortBy === "value-desc") {
+          return (Number(b.value) || 0) - (Number(a.value) || 0);
+        }
+        if (sortBy === "qty-desc") {
+          const qA = Number(a.quantity ?? a.cuantity) || 1;
+          const qB = Number(b.quantity ?? b.cuantity) || 1;
+          return qB - qA;
+        }
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+  }, [items, searchQuery, selectedTag, sortBy]);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">Loading container details...</p>
-        </div>
+      <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-slate-800 mb-3" />
+        <p className="text-xs text-slate-500 font-medium">Loading container details...</p>
       </div>
     );
   }
 
   if (!bin) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <Package className="h-16 w-16 text-gray-400 mx-auto" />
-          <h2 className="text-xl font-semibold text-gray-900">
-            Container not found
-          </h2>
-          <p className="text-gray-600">
-            The requested container could not be found.
+      <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4 font-sans">
+        <div className="bg-white rounded-xl border border-slate-200/80 p-8 max-w-md w-full text-center shadow-xs">
+          <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto text-slate-400 mb-3">
+            <Package className="w-6 h-6" />
+          </div>
+          <h2 className="text-base font-bold text-slate-900">Container not found</h2>
+          <p className="text-xs text-slate-500 mt-1 mb-5">
+            The requested container could not be found or may have been deleted.
           </p>
-          <Button onClick={() => navigate("/")} variant="outline">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
+          <Button
+            onClick={() => navigate("/home")}
+            className="h-8 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+            Back to Dashboard
           </Button>
         </div>
       </div>
@@ -681,944 +745,1334 @@ const BinDetailsScreen: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => navigate("/")}
-                className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div>
-                <h1 className="text-xl font-semibold text-slate-900">
-                  {t("containers.detailsTitle")}
-                </h1>
-                <p className="text-xs text-slate-500">
-                  {t("containers.detailsSubtitle")}
-                </p>
-              </div>
-            </div>
+    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+      <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
+        {/* Compact Top Bar matching home.tsx */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Left: Identity */}
+          <div className="flex items-center space-x-3 min-w-0">
             <Button
-              onClick={() => navigate("/")}
               variant="outline"
               size="sm"
-              className="rounded-xl border-slate-300 hover:bg-slate-50"
+              onClick={() => navigate("/home")}
+              className="h-8 w-8 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg shrink-0 shadow-2xs"
+              title="Back to Dashboard"
             >
-              {t("containers.done")}
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Bin Information Card */}
-          <Card className="shadow-lg border-0 bg-white/70 backdrop-blur-sm rounded-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 h-2"></div>
-            <CardHeader className="pb-6 pt-6">
-              <div className="flex items-start justify-between">
-                <div className="space-y-3 flex-1">
-                  <h2 className="text-3xl font-bold text-slate-900">
-                    {bin.name}
-                  </h2>
-                  <p className="text-slate-600 text-lg leading-relaxed">
-                    {bin.description}
-                  </p>
-                  <div className="flex flex-wrap gap-4 pt-2">
-                    {bin.location && (
-                      <div className="flex items-center text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
-                        <MapPin className="h-4 w-4 mr-2" />
-                        {bin.location.name}
-                      </div>
-                    )}
-                    {bin.address && (
-                      <div className="flex items-center text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
-                        <Home className="h-4 w-4 mr-2" />
-                        {bin.address}
-                      </div>
-                    )}
-                    <div className="flex items-center text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {t("containers.created")} {new Date(bin.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleEditBin}
-                  className="shrink-0 rounded-xl border-slate-300 hover:bg-slate-50 shadow-sm"
-                >
-                  <Edit className="h-4 w-4 mr-2" />
-                  {t("containers.edit")}
-                </Button>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight truncate">
+                  {bin.name}
+                </h1>
+                {bin.location?.name && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 inline-flex items-center gap-1 shrink-0">
+                    <MapPin className="w-2.5 h-2.5" />
+                    <span>{bin.location.name}</span>
+                  </span>
+                )}
               </div>
-            </CardHeader>
-          </Card>
+              <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xl">
+                {bin.description || bin.address || (
+                  <span className="text-slate-400">Created {new Date(bin.createdAt).toLocaleDateString()}</span>
+                )}
+              </p>
+            </div>
+          </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-wrap gap-4">
-            <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200">
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t("containers.addItem")}
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
-                <DialogHeader className="pb-6">
-                  <DialogTitle className="text-2xl font-bold text-slate-900">
-                    {t("containers.addNewItem")}
-                  </DialogTitle>
-                </DialogHeader>
-                <div className="space-y-6">
-                  {/* Image Upload */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-slate-700">
-                      {t("containers.image")}
-                    </Label>
-                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-all duration-200">
-                      {selectedImage ? (
-                        <div className="space-y-4">
-                          <img
-                            src={selectedImage}
-                            alt="Preview"
-                            className="max-w-full h-32 object-cover rounded-xl mx-auto shadow-sm"
-                          />
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedImage(null)}
-                            className="rounded-xl"
-                          >
-                           {t("containers.removeImage")}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <ImageIcon className="h-8 w-8 text-slate-400 mx-auto" />
-                          <div>
-                            <label className="cursor-pointer">
-                              <span className="text-sm text-blue-600 hover:text-blue-500 font-medium">
-                                Click to upload an image
-                              </span>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                onChange={handleImageUpload}
-                              />
-                            </label>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+          {/* Right: Actions */}
+          <div className="flex items-center space-x-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
+              title="Refresh container"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"
+                  }`}
+              />
+              <span className="ml-1.5 hidden sm:inline">Refresh</span>
+            </Button>
 
-                  <div className="space-y-3">
-                    <Label
-                      htmlFor="itemName"
-                      className="text-sm font-medium text-slate-700"
-                    >
-                      Name *
-                    </Label>
-                    <Input
-                      id="itemName"
-                      value={itemName}
-                      onChange={(e) => setItemName(e.target.value)}
-                      placeholder="Enter item name"
-                      className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label
-                      htmlFor="itemDescription"
-                      className="text-sm font-medium text-slate-700"
-                    >
-                      Description
-                    </Label>
-                    <Textarea
-                      id="itemDescription"
-                      value={itemDescription}
-                      onChange={(e) => setItemDescription(e.target.value)}
-                      placeholder="Enter item description"
-                      rows={3}
-                      className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
-                    />
-                  </div>
-
-                  {/* Cantidad */}
-                  <div className="space-y-3">
-                    <Label
-                      htmlFor="itemQuantity"
-                      className="text-sm font-medium text-slate-700"
-                    >
-                      Quantity
-                    </Label>
-                    <div className="flex items-center space-x-3">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={decrementQuantity}
-                        className="rounded-xl h-10 w-10 border-slate-300 hover:bg-slate-50"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </Button>
-                      <Input
-                        id="itemQuantity"
-                        type="number"
-                        min={1}
-                        value={itemCuantity}
-                        onChange={(e) =>
-                          setItemCuantity(Number(e.target.value))
-                        }
-                        className="w-20 text-center rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
-                      />
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={incrementQuantity}
-                        className="rounded-xl h-10 w-10 border-slate-300 hover:bg-slate-50"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Valor */}
-                  <div className="space-y-3">
-                    <Label
-                      htmlFor="itemValue"
-                      className="text-sm font-medium text-slate-700"
-                    >
-                      Value
-                    </Label>
-                    <Input
-                      id="itemValue"
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={itemValue}
-                      onChange={(e) => setItemValue(Number(e.target.value))}
-                      placeholder="Enter item value"
-                      className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium text-slate-700">
-                      Tags
-                    </Label>
-                    <div className="flex space-x-2">
-                      <Input
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        placeholder="Add a tag"
-                        onKeyPress={(e) => e.key === "Enter" && handleAddTag()}
-                        className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
-                      />
-                      <Button
-                        onClick={handleAddTag}
-                        size="sm"
-                        className="rounded-xl"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {itemTags.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {itemTags.map((tag, index) => (
-                          <Badge
-                            key={index}
-                            variant="secondary"
-                            className="pr-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
-                          >
-                            {tag}
-                            <button
-                              onClick={() => handleRemoveTag(tag)}
-                              className="ml-1 hover:bg-blue-300 rounded-full p-0.5 transition-colors"
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-end space-x-3 pt-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setIsAddItemOpen(false);
-                        resetItemForm();
-                      }}
-                      className="rounded-xl border-slate-300 hover:bg-slate-50"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={() => handleSubmitItem()}
-                      disabled={!itemName.trim()}
-                      className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-                    >
-                      Add Item
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEditBin}
+              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
+            >
+              <Edit3 className="w-3.5 h-3.5 mr-1 text-slate-500" />
+              <span>{t("containers.edit", { defaultValue: "Edit" })}</span>
+            </Button>
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
-                  variant="destructive"
-                  className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2.5 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 border-slate-200 text-slate-500 rounded-lg text-xs shadow-2xs"
+                  title="Delete Container"
                 >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Delete Container
+                  <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
+              <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl bg-white max-w-md">
                 <AlertDialogHeader>
-                  <AlertDialogTitle className="text-xl font-bold text-slate-900">
-                    Delete Container
+                  <AlertDialogTitle className="text-base font-bold text-slate-900">
+                    Delete "{bin.name}"?
                   </AlertDialogTitle>
-                  <AlertDialogDescription className="text-slate-600">
-                    Are you sure you want to delete this container? This action
-                    cannot be undone and will also delete all items in this
-                    container.
+                  <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
+                    This will permanently delete this container and all{" "}
+                    <strong>{items.length} items</strong> stored inside it.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="rounded-xl border-slate-300 hover:bg-slate-50">
+                <AlertDialogFooter className="pt-2">
+                  <AlertDialogCancel className="rounded-lg border-slate-200 text-xs h-8">
                     Cancel
                   </AlertDialogCancel>
-                  <AlertDialogAction className="bg-red-600 hover:bg-red-700 rounded-xl">
-                    Delete
+                  <AlertDialogAction
+                    onClick={handleDeleteBin}
+                    disabled={isDeletingBin}
+                    className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-medium"
+                  >
+                    {isDeletingBin ? "Deleting..." : "Delete Container"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
 
-            <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
-              <DialogTrigger asChild>
-                <Button className="flex-1 sm:flex-none rounded-xl bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-lg hover:shadow-xl transition-all duration-200">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Bulk Upload
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
-                <DialogHeader className="pb-6">
-                  <DialogTitle className="text-2xl font-bold text-slate-900">
-                    Bulk Upload Items
-                  </DialogTitle>
-                </DialogHeader>
+            <Button
+              onClick={() => {
+                resetItemForm();
+                setIsAddItemOpen(true);
+              }}
+              className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t("containers.addItem", { defaultValue: "Add Item" })}</span>
+            </Button>
+          </div>
+        </div>
 
-                <div className="space-y-6">
-                  <label className="block text-sm font-medium text-slate-700">
-                    Select images (multiple)
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    disabled={isBulkUploading}
-                    onChange={(e) => handleBulkUpload(e.target.files)}
-                    className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
-                  />
-
-                  {isBulkUploading && (
-                    <div>
-                      <div className="w-full bg-gray-200 rounded-full h-4">
-                        <div
-                          className="bg-green-600 h-4 rounded-full transition-all"
-                          style={{
-                            width: `${
-                              (bulkProgress.done / bulkProgress.total) * 100
-                            }%`,
-                          }}
-                        />
-                      </div>
-                      <p className="mt-2 text-center text-sm text-gray-700">
-                        Uploading {bulkProgress.done} of {bulkProgress.total}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end space-x-3 pt-6">
-                    <Button
-                      variant="outline"
-                      onClick={() => setIsBulkUploadOpen(false)}
-                      className="rounded-xl border-slate-300 hover:bg-slate-50"
-                      disabled={isBulkUploading}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <EnhancedImagesAIModal
-              setIsVideoUploadOpen={setIsImagesUploadOpen}
-              isVideoUploadOpen={isImagesUploadOpen}
-              itemId={id}
-              setItems={setItems}
-            />
-
-            <EnhancedVideoAIModal
-              setIsVideoUploadOpen={setIsVideoUploadOpen}
-              isVideoUploadOpen={isVideoUploadOpen}
-              itemId={id}
-              setItems={setItems}
-            />
+        {/* Space-Optimized KPI Stat Ribbon (Exactly 62px height, 3 cards matching home.tsx) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Card 1: Total Items */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <Package className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Total Items
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {totalItemsCount}
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              In this container
+            </span>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-slate-900">
-                {t("containers.items")} ({items.length})
-              </h3>
+          {/* Card 2: Total Units */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <Layers className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Total Units
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {totalUnitsCount}
+                </h3>
+              </div>
             </div>
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              Quantity sum
+            </span>
+          </div>
 
-            {items.length === 0 ? (
-              <Card className="text-center py-16 rounded-2xl border-0 shadow-lg bg-white/70 backdrop-blur-sm">
-                <CardContent>
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Package className="h-10 w-10 text-blue-500" />
-                  </div>
-                  <h4 className="text-xl font-semibold text-slate-900 mb-3">
-                    No items yet
-                  </h4>
-                  <p className="text-slate-500 mb-6 max-w-md mx-auto">
-                    Add your first item to get started organizing your container
-                  </p>
+          {/* Card 3: Total Valuation */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                <TrendingUp className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Estimated Value
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  ${totalValuation.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              Valuation
+            </span>
+          </div>
+        </div>
+
+        {/* Integrated Unified Controls Row matching home.tsx */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+          {/* Search Box */}
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search items by name, tag, or description..."
+              className="pl-8 pr-7 h-8 bg-slate-50/80 border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:bg-white focus:border-slate-300"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter, Sort, Tools & View Mode Toggle */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
+            {/* Tag Filter Dropdown */}
+            {allTags.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
-                    onClick={() => setIsAddItemOpen(true)}
-                    className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg hover:shadow-xl transition-all duration-200"
+                    variant="outline"
+                    size="sm"
+                    className={`h-8 px-2.5 rounded-lg border-slate-200 text-xs font-medium ${selectedTag ? "bg-blue-50 text-blue-700 border-blue-200" : "text-slate-600 bg-white"
+                      }`}
                   >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add First Item
+                    <Tag className="w-3 h-3 mr-1 text-slate-400" />
+                    <span>{selectedTag ? `#${selectedTag}` : "All Tags"}</span>
                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {items.map((item: any) => (
-                  <Card
-                    key={item.id}
-                    className="overflow-hidden hover:shadow-xl transition-all duration-300 rounded-2xl border-0 bg-white/70 backdrop-blur-sm group"
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44 text-xs">
+                  <DropdownMenuLabel className="text-[11px] text-slate-400 uppercase">
+                    Filter by Tag
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => setSelectedTag(null)}
+                    className="cursor-pointer"
                   >
+                    <span className={!selectedTag ? "font-bold text-slate-900" : ""}>
+                      All tags
+                    </span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {allTags.map((tItem) => (
+                    <DropdownMenuItem
+                      key={tItem}
+                      onClick={() => setSelectedTag(tItem)}
+                      className="cursor-pointer flex items-center justify-between"
+                    >
+                      <span className={selectedTag === tItem ? "font-bold text-blue-600" : ""}>
+                        #{tItem}
+                      </span>
+                      {selectedTag === tItem && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
+            {/* Sort Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-400" />
+                  <span className="hidden sm:inline">Sort</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40 text-xs">
+                <DropdownMenuLabel className="text-[11px] text-slate-400 uppercase">
+                  Sort Order
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("date")}
+                  className={`cursor-pointer ${sortBy === "date" ? "font-bold text-slate-900" : ""}`}
+                >
+                  Recently Added
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("name")}
+                  className={`cursor-pointer ${sortBy === "name" ? "font-bold text-slate-900" : ""}`}
+                >
+                  Name (A - Z)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("value-desc")}
+                  className={`cursor-pointer ${sortBy === "value-desc" ? "font-bold text-slate-900" : ""}`}
+                >
+                  Value (Highest)
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setSortBy("qty-desc")}
+                  className={`cursor-pointer ${sortBy === "qty-desc" ? "font-bold text-slate-900" : ""}`}
+                >
+                  Quantity (Highest)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Bulk Upload Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBulkUploadOpen(true)}
+              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
+            >
+              <UploadCloud className="w-3.5 h-3.5 mr-1 text-slate-500" />
+              <span>Bulk Upload</span>
+            </Button>
+
+            {/* AI Tools Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
+                >
+                  <Sparkles className="w-3.5 h-3.5 mr-1 text-slate-500" />
+                  <span>AI Tools</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 text-xs">
+                <DropdownMenuLabel className="text-[11px] text-slate-400 uppercase">
+                  AI Recognition
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => setIsImagesUploadOpen(true)}
+                  className="cursor-pointer space-x-2"
+                >
+                  <ImageIcon className="w-4 h-4 text-slate-600" />
+                  <div>
+                    <div className="font-medium text-slate-900">Scan from Photos</div>
+                    <div className="text-[10px] text-slate-400">Detect items automatically</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setIsVideoUploadOpen(true)}
+                  className="cursor-pointer space-x-2"
+                >
+                  <Video className="w-4 h-4 text-slate-600" />
+                  <div>
+                    <div className="font-medium text-slate-900">Scan from Video</div>
+                    <div className="text-[10px] text-slate-400">Process video walk-through</div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* View Mode Toggle matching home.tsx */}
+            <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200/80 rounded-lg">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode("grid")}
+                className={`h-7 w-7 p-0 rounded-md ${viewMode === "grid"
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-400 hover:text-slate-700"
+                  }`}
+                title="Grid view"
+              >
+                <Grid className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setViewMode("list")}
+                className={`h-7 w-7 p-0 rounded-md ${viewMode === "list"
+                    ? "bg-white text-slate-900 shadow-2xs font-bold"
+                    : "text-slate-400 hover:text-slate-700"
+                  }`}
+                title="List view"
+              >
+                <List className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Empty State matching home.tsx */}
+        {filteredItems.length === 0 ? (
+          <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center max-w-md mx-auto my-6">
+            <div className="w-10 h-10 mx-auto mb-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400">
+              <Package className="w-5 h-5" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-900 mb-1">
+              {searchQuery || selectedTag ? "No items found" : "No items yet"}
+            </h3>
+            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+              {searchQuery || selectedTag
+                ? "Try adjusting your search terms or filters."
+                : "Add items manually or use bulk upload to populate this container."}
+            </p>
+            {searchQuery || selectedTag ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSearchQuery("");
+                  setSelectedTag(null);
+                }}
+                className="h-8 px-3 border-slate-200 text-xs text-slate-700"
+              >
+                Clear filter
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  resetItemForm();
+                  setIsAddItemOpen(true);
+                }}
+                className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+              >
+                <Plus className="w-3.5 h-3.5 mr-1" />
+                <span>Add First Item</span>
+              </Button>
+            )}
+          </div>
+        ) : viewMode === "grid" ? (
+          /* Grid View matching home.tsx card proportions */
+          <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5">
+            {filteredItems.map((item) => {
+              const qty = Number(item.quantity ?? item.cuantity) || 1;
+              const val = Number(item.value) || 0;
+
+              return (
+                <div
+                  key={item.id}
+                  className="group relative bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+                >
+                  <div>
+                    {/* Item Image */}
                     <div
-                      className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 relative overflow-hidden group cursor-pointer"
+                      className="relative aspect-[16/10] bg-slate-100 rounded-lg overflow-hidden cursor-pointer select-none"
                       onClick={() => {
                         if (item.imageUrl) {
                           setSelectedModalImage(item.imageUrl);
+                          setZoomLevel(1);
                           setIsImageModalOpen(true);
                         }
                       }}
                     >
                       {item.imageUrl ? (
-                        <>
-                          <img
-                            src={item.imageUrl}
-                            alt={item.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          />
-                          <div className="absolute top-2 right-2 p-2 bg-black/20 hover:bg-black/40 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                              <circle cx="12" cy="12" r="3" />
-                            </svg>
-                          </div>
-                        </>
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                        />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <ImageIcon className="h-12 w-12 text-slate-400" />
+                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
+                          <ImageIcon className="w-6 h-6" />
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                      {/* Top Badges */}
+                      <div className="absolute top-2 left-2 flex items-center gap-1.5">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-white/95 border border-slate-200/80 text-slate-800 font-mono text-[10px] font-semibold shadow-2xs">
+                          x{qty}
+                        </span>
+                      </div>
+
+                      {val > 0 && (
+                        <div className="absolute top-2 right-2">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-900/90 text-white font-mono text-[10px] font-semibold shadow-2xs">
+                            ${val.toFixed(2)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Hover Zoom Eye */}
+                      {item.imageUrl && (
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <div className="w-7 h-7 rounded-full bg-white/90 text-slate-800 flex items-center justify-center shadow-xs">
+                            <ZoomIn className="w-3.5 h-3.5" />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <CardContent className="p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <h4 className="font-semibold text-slate-900 truncate flex-1 text-lg">
-                          {item.name}
-                        </h4>
-                        <div className="flex space-x-1 ml-3">
+
+                    {/* Title & Description */}
+                    <div className="mt-2.5">
+                      <h3
+                        className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight"
+                        title={item.name}
+                      >
+                        {item.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mt-1">
+                        {item.description || (
+                          <span className="text-slate-300 italic">No description</span>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Tags */}
+                    {item.tags && item.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {item.tags.map((tg, idx) => (
+                          <span
+                            key={idx}
+                            className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium"
+                          >
+                            #{tg}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Footer Info & Actions */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 mt-2.5">
+                    <span className="text-[10px] text-slate-400">
+                      {new Date(item.createdAt || 0).toLocaleDateString()}
+                    </span>
+
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditItem(item)}
+                        className="h-6 w-6 p-0 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded"
+                        title="Edit Item"
+                      >
+                        <Edit3 className="w-3 h-3" />
+                      </Button>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleEditItem(item)}
-                            className="p-2 h-8 w-8 rounded-lg hover:bg-slate-100"
+                            className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Delete Item"
                           >
-                            <Edit className="h-4 w-4" />
+                            <Trash2 className="w-3 h-3" />
                           </Button>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="p-2 h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-2xl border-0 shadow-2xl">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle className="text-xl font-bold text-slate-900">
-                                  Delete Item
-                                </AlertDialogTitle>
-                                <AlertDialogDescription className="text-slate-600">
-                                  Are you sure you want to delete "{item.name}"?
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel className="rounded-xl border-slate-300 hover:bg-slate-50">
-                                  Cancel
-                                </AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => {
-                                    deleteItem(item.id, item.imageUrl);
-                                  }}
-                                  className="bg-red-600 hover:bg-red-700 rounded-xl"
-                                >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      </div>
-
-                      <p className="text-sm text-slate-600 mb-4 line-clamp-2 leading-relaxed">
-                        {item.description}
-                      </p>
-
-                      {item.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {item.tags.map((tag: any, index: number) => (
-                            <Badge
-                              key={index}
-                              variant="outline"
-                              className="text-xs rounded-full border-slate-300 text-slate-600 hover:bg-slate-50"
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl bg-white max-w-sm">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-base font-bold text-slate-900">
+                              Delete "{item.name}"?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-xs text-slate-500">
+                              Are you sure you want to delete this item?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="pt-2">
+                            <AlertDialogCancel className="rounded-lg border-slate-200 text-xs h-8">
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteItem(item.id, item.imageUrl)}
+                              className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-medium"
                             >
-                              {tag}
-                            </Badge>
-                          ))}
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* List View matching renderListView in home.tsx */
+          <div className="divide-y divide-slate-100 bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+            {filteredItems.map((item) => {
+              const qty = Number(item.quantity ?? item.cuantity) || 1;
+              const val = Number(item.value) || 0;
+
+              return (
+                <div
+                  key={item.id}
+                  className="group flex items-center justify-between px-4 py-2.5 hover:bg-slate-50/80 transition-colors"
+                >
+                  {/* Left: Thumbnail & Name */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div
+                      className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden cursor-pointer shrink-0 border border-slate-200/70"
+                      onClick={() => {
+                        if (item.imageUrl) {
+                          setSelectedModalImage(item.imageUrl);
+                          setZoomLevel(1);
+                          setIsImageModalOpen(true);
+                        }
+                      }}
+                    >
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-300">
+                          <ImageIcon className="w-4 h-4" />
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-xs">
+                          {item.name}
+                        </span>
+                        {val > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="bg-slate-100 text-slate-700 font-mono text-[10px] h-4 px-1"
+                          >
+                            ${val.toFixed(2)}
+                          </Badge>
+                        )}
+                      </div>
+                      {item.description && (
+                        <p className="text-[11px] text-slate-400 truncate max-w-md">
+                          {item.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Quantity & Actions */}
+                  <div className="flex items-center gap-4 shrink-0 text-xs">
+                    <span className="font-semibold text-slate-700 min-w-[60px] text-right">
+                      x{qty} units
+                    </span>
+
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEditItem(item)}
+                        className="h-7 w-7 p-0 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded"
+                        title="Edit Item"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </Button>
+
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Delete Item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl bg-white max-w-sm">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle className="text-base font-bold text-slate-900">
+                              Delete "{item.name}"?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-xs text-slate-500">
+                              Are you sure you want to delete this item?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter className="pt-2">
+                            <AlertDialogCancel className="rounded-lg border-slate-200 text-xs h-8">
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteItem(item.id, item.imageUrl)}
+                              className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-medium"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </div>
+        )}
       </div>
 
-      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
-        <DialogContent
-          className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl ml-40"
-          showCloseButton={false}
-        >
-          <div className="relative w-full h-full overflow-hidden">
-            <div
-              className="relative w-full h-full cursor-move"
-              onMouseDown={(e) => {
-                const container = e.currentTarget;
-                const img = container.querySelector("img");
-                if (!img || zoomLevel <= 1) return;
+      {/* =========================================================================
+          MODALS & DIALOGS
+         ========================================================================= */}
 
-                const startX = e.clientX - container.offsetLeft;
-                const startY = e.clientY - container.offsetTop;
-                const startScrollLeft = container.scrollLeft;
-                const startScrollTop = container.scrollTop;
+      {/* 1. Add Item Dialog */}
+      <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
+        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+          <DialogHeader className="pb-3 border-b border-slate-100">
+            <DialogTitle className="text-sm font-bold text-slate-900">
+              {t("containers.addNewItem", { defaultValue: "Add New Item" })}
+            </DialogTitle>
+          </DialogHeader>
 
-                const handleMouseMove = (e: MouseEvent) => {
-                  const x = e.clientX - container.offsetLeft;
-                  const y = e.clientY - container.offsetTop;
-                  const walkX = (x - startX) * -1;
-                  const walkY = (y - startY) * -1;
-                  container.scrollLeft = startScrollLeft + walkX;
-                  container.scrollTop = startScrollTop + walkY;
-                };
+          <div className="space-y-3.5 pt-2">
+            {/* Image Dropzone */}
+            <div>
+              <Label className="text-xs font-medium text-slate-700 block mb-1">
+                Photo (Optional)
+              </Label>
+              <div className="border border-dashed border-slate-200 rounded-lg p-2.5 text-center hover:border-slate-400 transition-all bg-slate-50/50">
+                {selectedImage ? (
+                  <div className="flex items-center space-x-3">
+                    <img
+                      src={selectedImage}
+                      alt="Preview"
+                      className="w-14 h-14 object-cover rounded-md border border-slate-200"
+                    />
+                    <div className="text-left flex-1">
+                      <p className="text-xs font-medium text-slate-800">Photo attached</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setSelectedFile(null);
+                        }}
+                        className="text-xs text-red-600 hover:underline mt-0.5"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="cursor-pointer flex items-center justify-center space-x-2 py-2">
+                    <ImageIcon className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs text-blue-600 hover:underline font-medium">
+                      Select photo
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
 
-                const handleMouseUp = () => {
-                  document.removeEventListener("mousemove", handleMouseMove);
-                  document.removeEventListener("mouseup", handleMouseUp);
-                };
-
-                document.addEventListener("mousemove", handleMouseMove);
-                document.addEventListener("mouseup", handleMouseUp);
-              }}
-              style={{ overflow: zoomLevel > 1 ? "auto" : "hidden" }}
-            >
-              <img
-                src={selectedModalImage || ""}
-                alt="Full size image"
-                style={{
-                  transform: `scale(${zoomLevel})`,
-                  transformOrigin: "0 0",
-                }}
-                className="w-full h-full object-contain transition-transform duration-300"
-                draggable="false"
+            {/* Name */}
+            <div>
+              <Label htmlFor="itemName" className="text-xs font-medium text-slate-700 block mb-1">
+                Name *
+              </Label>
+              <Input
+                id="itemName"
+                value={itemName}
+                onChange={(e) => setItemName(e.target.value)}
+                placeholder="Item name"
+                className="h-8 text-xs rounded-lg border-slate-200"
               />
             </div>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2">
-              <Button
-                variant="ghost"
-                className="rounded-full p-2 bg-black/20 hover:bg-black/40 text-white"
-                onClick={() => setZoomLevel(Math.max(1, zoomLevel - 0.5))}
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                className="rounded-full p-2 bg-black/20 hover:bg-black/40 text-white"
-                onClick={() => setZoomLevel(Math.min(3, zoomLevel + 0.5))}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
+
+            {/* Description */}
+            <div>
+              <Label htmlFor="itemDesc" className="text-xs font-medium text-slate-700 block mb-1">
+                Description
+              </Label>
+              <Textarea
+                id="itemDesc"
+                value={itemDescription}
+                onChange={(e) => setItemDescription(e.target.value)}
+                placeholder="Description, model, notes..."
+                rows={2}
+                className="text-xs rounded-lg border-slate-200"
+              />
             </div>
+
+            {/* Quantity & Value */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="itemQty" className="text-xs font-medium text-slate-700 block mb-1">
+                  Quantity
+                </Label>
+                <div className="flex items-center space-x-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={decrementQuantity}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <Input
+                    id="itemQty"
+                    type="number"
+                    min={1}
+                    value={itemCuantity}
+                    onChange={(e) => setItemCuantity(Math.max(1, Number(e.target.value)))}
+                    className="h-8 text-xs text-center rounded-lg border-slate-200"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={incrementQuantity}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="itemVal" className="text-xs font-medium text-slate-700 block mb-1">
+                  Value ($)
+                </Label>
+                <div className="relative">
+                  <DollarSign className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="itemVal"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={itemValue}
+                    onChange={(e) => setItemValue(e.target.value)}
+                    placeholder="0.00"
+                    className="h-8 pl-6 text-xs rounded-lg border-slate-200"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tags */}
+            <div>
+              <Label className="text-xs font-medium text-slate-700 block mb-1">
+                Tags
+              </Label>
+              <div className="flex space-x-1.5">
+                <Input
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  placeholder="Add a tag..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  className="h-8 text-xs rounded-lg border-slate-200"
+                />
+                <Button
+                  type="button"
+                  onClick={handleAddTag}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2.5 rounded-lg text-xs border-slate-200 bg-white"
+                >
+                  Add
+                </Button>
+              </div>
+
+              {itemTags.length > 0 && (
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {itemTags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md"
+                    >
+                      #{tag}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTag(tag)}
+                        className="text-slate-400 hover:text-slate-700"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 mt-2">
             <Button
-              variant="ghost"
-              className="absolute top-2 right-2 rounded-full p-2 bg-black/20 hover:bg-black/40 text-white"
+              variant="outline"
+              size="sm"
               onClick={() => {
-                setIsImageModalOpen(false);
-                setZoomLevel(1);
+                setIsAddItemOpen(false);
+                resetItemForm();
               }}
+              className="rounded-lg text-xs h-8 border-slate-200"
             >
-              <X className="h-4 w-4" />
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSubmitItem}
+              disabled={isSavingItem || !itemName.trim()}
+              size="sm"
+              className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 font-semibold"
+            >
+              {isSavingItem ? "Saving..." : "Add Item"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* 2. Edit Item Dialog */}
       <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
-          <DialogHeader className="pb-6">
-            <DialogTitle className="text-2xl font-bold text-slate-900">
+        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+          <DialogHeader className="pb-3 border-b border-slate-100">
+            <DialogTitle className="text-sm font-bold text-slate-900">
               Edit Item
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6">
-            {/* Similar form as Add Item but with update functionality */}
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-slate-700">
-                Image
+
+          <div className="space-y-3.5 pt-2">
+            {/* Image Dropzone */}
+            <div>
+              <Label className="text-xs font-medium text-slate-700 block mb-1">
+                Photo
               </Label>
-              <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 hover:bg-blue-50/50 transition-all duration-200">
+              <div className="border border-dashed border-slate-200 rounded-lg p-2.5 text-center hover:border-slate-400 transition-all bg-slate-50/50">
                 {selectedImage ? (
-                  <div className="space-y-4">
+                  <div className="flex items-center space-x-3">
                     <img
                       src={selectedImage}
                       alt="Preview"
-                      className="max-w-full h-32 object-cover rounded-xl mx-auto shadow-sm"
+                      className="w-14 h-14 object-cover rounded-md border border-slate-200"
                     />
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedImage(null)}
-                      className="rounded-xl"
-                    >
-                      Remove Image
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    <ImageIcon className="h-8 w-8 text-slate-400 mx-auto" />
-                    <div>
-                      <label className="cursor-pointer">
-                        <span className="text-sm text-blue-600 hover:text-blue-500 font-medium">
-                          Click to upload an image
-                        </span>
-                        <input
-                          type="file"
-                          className="hidden"
-                          accept="image/*"
-                          onChange={handleImageUpload}
-                        />
-                      </label>
+                    <div className="text-left flex-1">
+                      <p className="text-xs font-medium text-slate-800">Photo attached</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedImage(null);
+                          setSelectedFile(null);
+                        }}
+                        className="text-xs text-red-600 hover:underline mt-0.5"
+                      >
+                        Remove
+                      </button>
                     </div>
                   </div>
+                ) : (
+                  <label className="cursor-pointer flex items-center justify-center space-x-2 py-2">
+                    <ImageIcon className="w-4 h-4 text-slate-400" />
+                    <span className="text-xs text-blue-600 hover:underline font-medium">
+                      Select photo
+                    </span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                    />
+                  </label>
                 )}
               </div>
             </div>
 
-            <div className="space-y-3">
-              <Label
-                htmlFor="editItemName"
-                className="text-sm font-medium text-slate-700"
-              >
+            {/* Name */}
+            <div>
+              <Label htmlFor="editItemName" className="text-xs font-medium text-slate-700 block mb-1">
                 Name *
               </Label>
               <Input
                 id="editItemName"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
-                placeholder="Enter item name"
-                className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
+                placeholder="Item name"
+                className="h-8 text-xs rounded-lg border-slate-200"
               />
             </div>
 
-            <div className="space-y-3">
-              <Label
-                htmlFor="editItemDescription"
-                className="text-sm font-medium text-slate-700"
-              >
+            {/* Description */}
+            <div>
+              <Label htmlFor="editItemDesc" className="text-xs font-medium text-slate-700 block mb-1">
                 Description
               </Label>
               <Textarea
-                id="editItemDescription"
+                id="editItemDesc"
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
-                placeholder="Enter item description"
-                rows={3}
-                className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
+                placeholder="Item description"
+                rows={2}
+                className="text-xs rounded-lg border-slate-200"
               />
             </div>
 
-            {/* Cantidad */}
-            <div className="space-y-3">
-              <Label
-                htmlFor="itemQuantity"
-                className="text-sm font-medium text-slate-700"
-              >
-                Quantity
-              </Label>
-              <div className="flex items-center space-x-3">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={decrementQuantity}
-                  className="rounded-xl h-10 w-10 border-slate-300 hover:bg-slate-50"
-                >
-                  <Minus className="w-4 h-4" />
-                </Button>
-                <Input
-                  id="itemQuantity"
-                  type="number"
-                  min={1}
-                  value={itemCuantity}
-                  onChange={(e) => setItemCuantity(Number(e.target.value))}
-                  className="w-20 text-center rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={incrementQuantity}
-                  className="rounded-xl h-10 w-10 border-slate-300 hover:bg-slate-50"
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
+            {/* Quantity & Value */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="editItemQty" className="text-xs font-medium text-slate-700 block mb-1">
+                  Quantity
+                </Label>
+                <div className="flex items-center space-x-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={decrementQuantity}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </Button>
+                  <Input
+                    id="editItemQty"
+                    type="number"
+                    min={1}
+                    value={itemCuantity}
+                    onChange={(e) => setItemCuantity(Math.max(1, Number(e.target.value)))}
+                    className="h-8 text-xs text-center rounded-lg border-slate-200"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={incrementQuantity}
+                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="editItemVal" className="text-xs font-medium text-slate-700 block mb-1">
+                  Value ($)
+                </Label>
+                <div className="relative">
+                  <DollarSign className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Input
+                    id="editItemVal"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={itemValue}
+                    onChange={(e) => setItemValue(e.target.value)}
+                    placeholder="0.00"
+                    className="h-8 pl-6 text-xs rounded-lg border-slate-200"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Valor */}
-            <div className="space-y-3">
-              <Label
-                htmlFor="itemValue"
-                className="text-sm font-medium text-slate-700"
-              >
-                Value
+            {/* Tags */}
+            <div>
+              <Label className="text-xs font-medium text-slate-700 block mb-1">
+                Tags
               </Label>
-              <Input
-                id="itemValue"
-                type="number"
-                min={0}
-                step={0.01}
-                value={itemValue}
-                onChange={(e) => setItemValue(Number(e.target.value))}
-                placeholder="Enter item value"
-                className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
-              />
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-slate-700">Tags</Label>
-              <div className="flex space-x-2">
+              <div className="flex space-x-1.5">
                 <Input
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Add a tag"
-                  onKeyPress={(e) => e.key === "Enter" && handleAddTag()}
-                  className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
+                  placeholder="Add a tag..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  className="h-8 text-xs rounded-lg border-slate-200"
                 />
-                <Button onClick={handleAddTag} size="sm" className="rounded-xl">
-                  <Plus className="h-4 w-4" />
+                <Button
+                  type="button"
+                  onClick={handleAddTag}
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-2.5 rounded-lg text-xs border-slate-200 bg-white"
+                >
+                  Add
                 </Button>
               </div>
+
               {itemTags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-3">
-                  {itemTags.map((tag, index) => (
-                    <Badge
-                      key={index}
-                      variant="secondary"
-                      className="pr-1 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                <div className="flex flex-wrap gap-1 mt-2">
+                  {itemTags.map((tag, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md"
                     >
-                      {tag}
+                      #{tag}
                       <button
+                        type="button"
                         onClick={() => handleRemoveTag(tag)}
-                        className="ml-1 hover:bg-blue-300 rounded-full p-0.5 transition-colors"
+                        className="text-slate-400 hover:text-slate-700"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="w-3 h-3" />
                       </button>
-                    </Badge>
+                    </span>
                   ))}
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="flex justify-end space-x-3 pt-6">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsEditItemOpen(false);
-                  resetItemForm();
-                }}
-                className="rounded-xl border-slate-300 hover:bg-slate-50"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => handleUpdateItem()}
-                disabled={!itemName.trim()}
-                className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
-              >
-                Update Item
-              </Button>
-            </div>
+          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsEditItemOpen(false);
+                resetItemForm();
+              }}
+              className="rounded-lg text-xs h-8 border-slate-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateItem}
+              disabled={isSavingItem || !itemName.trim()}
+              size="sm"
+              className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 font-semibold"
+            >
+              {isSavingItem ? "Updating..." : "Update Item"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* 3. Edit Container Dialog */}
       <Dialog open={isEditBinOpen} onOpenChange={setIsEditBinOpen}>
-        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto rounded-2xl border-0 shadow-2xl">
-          <DialogHeader className="pb-6">
-            <DialogTitle className="text-2xl font-bold text-slate-900">
+        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+          <DialogHeader className="pb-3 border-b border-slate-100">
+            <DialogTitle className="text-sm font-bold text-slate-900">
               Edit Container
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6">
-            {/* Name */}
-            <div className="space-y-3">
-              <Label
-                htmlFor="binName"
-                className="text-sm font-medium text-slate-700"
-              >
+
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label htmlFor="binName" className="text-xs font-medium text-slate-700 block mb-1">
                 Name *
               </Label>
               <Input
                 id="binName"
                 value={binName}
                 onChange={(e) => setBinName(e.target.value)}
-                placeholder="Enter container name"
-                className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
+                placeholder="Container name"
+                className="h-8 text-xs rounded-lg border-slate-200"
               />
             </div>
 
-            {/* Description */}
-            <div className="space-y-3">
-              <Label
-                htmlFor="binDescription"
-                className="text-sm font-medium text-slate-700"
-              >
+            <div>
+              <Label htmlFor="binDesc" className="text-xs font-medium text-slate-700 block mb-1">
                 Description
               </Label>
               <Textarea
-                id="binDescription"
+                id="binDesc"
                 value={binDescription}
                 onChange={(e) => setBinDescription(e.target.value)}
-                placeholder="Enter container description"
-                rows={3}
-                className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
+                placeholder="Description or notes"
+                rows={2}
+                className="text-xs rounded-lg border-slate-200"
               />
             </div>
 
-            {/* Address */}
-            <div className="space-y-3">
-              <Label
-                htmlFor="binAddress"
-                className="text-sm font-medium text-slate-700"
-              >
-                Address
+            <div>
+              <Label htmlFor="binAddress" className="text-xs font-medium text-slate-700 block mb-1">
+                Address / Location
               </Label>
               <Input
                 id="binAddress"
                 value={binAddress}
                 onChange={(e) => setBinAddress(e.target.value)}
-                placeholder="Enter container address"
-                className="rounded-xl border-slate-300 focus:border-blue-400 focus:ring-blue-400"
+                placeholder="Shelf, room, or physical address"
+                className="h-8 text-xs rounded-lg border-slate-200"
               />
             </div>
+          </div>
 
-            {/* Location 
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-slate-700">
-                Location{" "}
-                {!selectedLocation && <span className="text-red-500">*</span>}
-              </Label>
-              {!selectedLocation ? (
-                <></>
+          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100 mt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditBinOpen(false)}
+              className="rounded-lg text-xs h-8 border-slate-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleUpdateBin}
+              disabled={isUpdatingBin || !binName.trim()}
+              size="sm"
+              className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 font-semibold"
+            >
+              {isUpdatingBin ? (
+                <span className="flex items-center space-x-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Updating...</span>
+                </span>
               ) : (
-                <div className="flex items-center space-x-3">
-                  <div className="inline-flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-full border border-blue-200">
-                    <MapPin className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-blue-700 font-medium">
-                      {selectedLocation?.name}
-                    </span>
-                  </div>
-                </div>
+                "Update Container"
               )}
-            </div> */}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-            {/* Actions */}
-            <div className="flex justify-end space-x-3 pt-6">
-              <Button
-                variant="outline"
-                onClick={() => setIsEditBinOpen(false)}
-                className="rounded-xl border-slate-300 hover:bg-slate-50"
+      {/* 4. Bulk Upload Dialog */}
+      <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
+        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+          <DialogHeader className="pb-3 border-b border-slate-100">
+            <DialogTitle className="text-sm font-bold text-slate-900">
+              Bulk Upload Photos
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3.5 pt-2">
+            <div className="border border-dashed border-slate-200 rounded-lg p-5 text-center bg-slate-50/50 hover:border-slate-400 transition-all">
+              <input
+                type="file"
+                id="bulkUploadInput"
+                accept="image/*"
+                multiple
+                disabled={isBulkUploading}
+                onChange={(e) => handleBulkUpload(e.target.files)}
+                className="hidden"
+              />
+              <label
+                htmlFor="bulkUploadInput"
+                className="cursor-pointer flex flex-col items-center justify-center space-y-1.5"
               >
-                Cancel
-              </Button>
-              <Button
-                disabled={isUploading || !binName.trim()}
-                onClick={handleUpdateBin}
-                className="rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 shadow-2xs">
+                  <UploadCloud className="w-4.5 h-4.5 text-slate-700" />
+                </div>
+                <span className="text-xs font-semibold text-slate-900">
+                  Select multiple photos
+                </span>
+                <p className="text-[11px] text-slate-400">
+                  Each photo will create an item in this container
+                </p>
+              </label>
+            </div>
+
+            {isBulkUploading && (
+              <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
+                <div className="flex justify-between text-xs text-slate-600 font-medium">
+                  <span>Uploading photos...</span>
+                  <span>{bulkProgress.done} of {bulkProgress.total}</span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-slate-900 h-full rounded-full transition-all duration-200"
+                    style={{
+                      width: `${(bulkProgress.done / bulkProgress.total) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end space-x-2 pt-2 border-t border-slate-100">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsBulkUploadOpen(false)}
+              disabled={isBulkUploading}
+              className="rounded-lg text-xs h-8 border-slate-200"
+            >
+              Cancel
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 5. Clean Image Zoom Modal */}
+      <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
+        <DialogContent
+          className="max-w-3xl max-h-[85vh] p-0 overflow-hidden rounded-xl border-0 shadow-2xl bg-black/90 text-white"
+          showCloseButton={false}
+        >
+          <div className="relative w-full h-[70vh] flex items-center justify-center select-none overflow-hidden">
+            {selectedModalImage && (
+              <img
+                src={selectedModalImage}
+                alt="Full Preview"
+                style={{
+                  transform: `scale(${zoomLevel})`,
+                  transformOrigin: "center center",
+                }}
+                className="max-h-full max-w-full object-contain transition-transform duration-150"
+                draggable={false}
+              />
+            )}
+
+            {/* Top Close Button */}
+            <button
+              onClick={() => {
+                setIsImageModalOpen(false);
+                setZoomLevel(1);
+              }}
+              className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-white transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Bottom Zoom Bar */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-xs">
+              <button
+                type="button"
+                onClick={() => setZoomLevel((z) => Math.max(1, z - 0.5))}
+                className="p-1 text-white hover:text-slate-300 rounded"
+                title="Zoom Out"
               >
-                {isUploading ? (
-                  <span className="flex items-center space-x-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Updating...</span>
-                  </span>
-                ) : (
-                  "Update Container"
-                )}
-              </Button>
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <span className="font-mono text-[11px] text-slate-300">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+              <button
+                type="button"
+                onClick={() => setZoomLevel((z) => Math.min(3, z + 0.5))}
+                className="p-1 text-white hover:text-slate-300 rounded"
+                title="Zoom In"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoomLevel(1)}
+                className="p-1 text-white hover:text-slate-300 rounded ml-1"
+                title="Reset"
+              >
+                <RotateCcw className="w-3 h-3" />
+              </button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
+      {/* 6. AI Image & Video Recognition Modals */}
+      <EnhancedImagesAIModal
+        setIsVideoUploadOpen={setIsImagesUploadOpen}
+        isVideoUploadOpen={isImagesUploadOpen}
+        itemId={id}
+        setItems={setItems}
+      />
+
+      <EnhancedVideoAIModal
+        setIsVideoUploadOpen={setIsVideoUploadOpen}
+        isVideoUploadOpen={isVideoUploadOpen}
+        itemId={id}
+        setItems={setItems}
+      />
+
+      {/* Feedback Modal */}
       <ModalMessage
         isOpen={modalState.isOpen}
         onClose={closeModal}

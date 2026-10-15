@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,11 +14,13 @@ import {
   List,
   ArrowUpRight,
   ScanLine,
-  Clock,
   Building2,
   Plus,
   TrendingUp,
   Filter,
+  RefreshCw,
+  QrCode,
+  Layers,
 } from "lucide-react";
 import {
   collection,
@@ -49,24 +50,21 @@ interface Bin {
   createdAt: string;
   qrGuid: string;
   qrcodeId?: string;
+  itemCount?: number;
+  lastUpdated?: string;
+  updatedAt?: string;
   location?: {
     id: string;
     name: string;
   };
 }
 
-/*interface Item {
-  id: string;
-  name: string;
-  description: string;
-  tags: string[];
-  binId: string;
-  createdAt: string;
-}
-*/
 interface Location {
   id: string;
   name: string;
+  description?: string;
+  type?: string;
+  binCount?: number;
   itemCount?: number;
 }
 
@@ -144,23 +142,19 @@ export default function HomeScreen() {
         } else {
           setSubscription(sub);
         }
-      } else {
-        console.log("❌ No se encontró suscripción para el usuario.");
       }
     } catch (error) {
-      console.error("🔥 Error al obtener suscripción:", error);
+      console.error("Error fetching subscription:", error);
     }
   };
 
   // UI state
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"bins" | "locations" | any>(
-    "bins"
-  );
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<"bins" | "locations">("bins");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Bins state
-  //const [bins, setBins] = useState<Bin[]>([]);
   const [filteredBins, setFilteredBins] = useState<Bin[]>([]);
   const [searchTextBins, setSearchTextBins] = useState("");
   const [binsPagination, setBinsPagination] = useState<PaginationState>({
@@ -173,7 +167,6 @@ export default function HomeScreen() {
   });
 
   // Locations state
-  //const [locations, setLocations] = useState<Location[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<Location[]>([]);
   const [searchTextLocations, setSearchTextLocations] = useState("");
   const [locationsPagination, setLocationsPagination] =
@@ -210,7 +203,7 @@ export default function HomeScreen() {
     page: number = 1,
     searchTerm: string = "",
     isNextPage: boolean = false,
-    filterLocation: Location | null = null
+    selectedLocation: Location | null = null
   ) => {
     if (!effectiveUserId) return;
     setLoading(true);
@@ -239,18 +232,23 @@ export default function HomeScreen() {
       const binsWithQRCodes = await Promise.all(
         binsData.map(async (bin) => {
           if (!bin.qrGuid) return bin;
-          const qrSnap = await getDocs(
-            query(collection(db, "qrcodes"), where("guid", "==", bin.qrGuid))
-          );
-          return qrSnap.empty
-            ? bin
-            : { ...bin, qrcodeId: qrSnap.docs[0].data().qrcodeId };
+          try {
+            const qrSnap = await getDocs(
+              query(collection(db, "qrcodes"), where("guid", "==", bin.qrGuid))
+            );
+            return qrSnap.empty
+              ? bin
+              : { ...bin, qrcodeId: qrSnap.docs[0].data().qrcodeId };
+          } catch {
+            return bin;
+          }
         })
       );
 
-      //setBins(binsWithQRCodes);
-
       const normalizedSearch = normalizeText(searchTerm);
+
+      const currentLocFilter =
+        selectedLocation !== undefined ? selectedLocation : filterLocation;
 
       const filtered = binsWithQRCodes.filter((bin) => {
         const matchesSearch = searchTerm
@@ -259,8 +257,8 @@ export default function HomeScreen() {
             )
           : true;
 
-        const matchesLocation = filterLocation
-          ? bin.location?.id === filterLocation.id
+        const matchesLocation = currentLocFilter
+          ? bin.location?.id === currentLocFilter.id
           : true;
 
         return matchesSearch && matchesLocation;
@@ -308,7 +306,6 @@ export default function HomeScreen() {
         (doc) => ({ id: doc.id, ...doc.data() } as Location)
       );
 
-      //setLocations(locData);
       const filtered = searchTerm
         ? locData.filter((loc) =>
             normalizeText(loc.name).includes(normalizeText(searchTerm))
@@ -362,18 +359,27 @@ export default function HomeScreen() {
     }
   };
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await Promise.all([
+      activeTab === "bins"
+        ? fetchBins(1, searchTextBins, false, filterLocation)
+        : fetchLocations(1, searchTextLocations),
+      fetchStats(),
+    ]);
+    setIsRefreshing(false);
+  };
+
   // --- EFFECTS ---
-  // Initial and impersonation reload
   useEffect(() => {
     if (activeTab === "bins") {
-      fetchBins(1, searchTextBins, false, filterLocation); // importante
+      fetchBins(1, searchTextBins, false, filterLocation);
     } else {
-      fetchLocations();
+      fetchLocations(1, searchTextLocations);
     }
     fetchStats();
   }, [activeTab, effectiveUserId, filterLocation]);
 
-  // Search effects
   useEffect(() => {
     if (activeTab === "bins") {
       const timer = setTimeout(() => {
@@ -395,190 +401,18 @@ export default function HomeScreen() {
 
   const handleLocationFilter = (location: Location) => {
     setActiveTab("bins");
-    setFilterLocation(location); // guarda la location seleccionada
-    fetchBins(1, searchTextBins, false, location); // aplica el filtro
+    setFilterLocation(location);
+    fetchBins(1, searchTextBins, false, location);
   };
 
   const clearLocationFilter = () => {
     setFilterLocation(null);
-    fetchBins(1, searchTextBins);
+    fetchBins(1, searchTextBins, false, null);
   };
 
   const clearImpersonation = () => {
     localStorage.removeItem("impersonatedUser");
     setUserImpersonated(null);
-  };
-
-  const renderBinCard = (bin: any) => (
-    <Card
-      key={bin.id}
-      className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/70 backdrop-blur-sm hover:bg-white hover:-translate-y-1"
-      onClick={() => navigate(`/bin-details/${bin.id}`)}
-    >
-      <CardContent className="p-6">
-        {/* Header con QR Code */}
-        <div className="flex items-start justify-between mb-4">
-          {bin.qrcodeId && (
-            <Badge
-              variant="secondary"
-              className="bg-emerald-100 text-emerald-700 border-emerald-200 font-medium"
-            >
-              <ScanLine className="w-3 h-3 mr-1" />
-              {bin.qrcodeId}
-            </Badge>
-          )}
-          <ArrowUpRight className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-        </div>
-
-        {/* Icono principal */}
-        <div className="w-14 h-14 mx-auto mb-4 bg-gradient-to-br from-slate-100 to-slate-200 rounded-2xl flex items-center justify-center group-hover:from-emerald-100 group-hover:to-emerald-200 transition-all duration-300">
-          <Package className="w-7 h-7 text-slate-600 group-hover:text-emerald-600 transition-colors" />
-        </div>
-
-        {/* Contenido principal */}
-        <div className="text-center mb-4">
-          <h3 className="font-semibold text-slate-900 mb-2 truncate">
-            {bin.name}
-          </h3>
-          {bin.description && (
-            <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
-              {bin.description}
-            </p>
-          )}
-        </div>
-
-        {/* Footer con stats */}
-        <div className="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-100">
-          <div className="flex items-center gap-1">
-            <Package className="w-3 h-3" />
-            <span>{bin.itemCount} items</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3" />
-            <span>{bin.lastUpdated}</span>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderLocationCard = (location: any) => (
-    <Card
-      key={location.id}
-      className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-0 bg-white/70 backdrop-blur-sm hover:bg-white hover:-translate-y-1"
-      onClick={() => handleLocationFilter(location)}
-    >
-      <CardContent className="p-6 relative">
-        {/* Indicador de actividad */}
-        {location.itemCount > 20 && (
-          <div className="absolute top-3 right-3">
-            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-          </div>
-        )}
-
-        {/* Icono principal */}
-        <div className="w-14 h-14 mx-auto mb-4 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center group-hover:from-blue-200 group-hover:to-blue-300 transition-all duration-300">
-          {location.type === "warehouse" ? (
-            <Building2 className="w-7 h-7 text-blue-600 transition-colors" />
-          ) : (
-            <MapPin className="w-7 h-7 text-blue-600 transition-colors" />
-          )}
-        </div>
-
-        {/* Contenido */}
-        <div className="text-center mb-4">
-          <h3 className="font-semibold text-slate-900 mb-2">{location.name}</h3>
-          <p className="text-sm text-slate-500 mb-3">{location.description}</p>
-        </div>
-
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
-          <div className="text-center">
-            <div className="text-lg font-semibold text-slate-900">
-              {location.binCount}
-            </div>
-            <div className="text-xs text-slate-500">Bins</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-slate-900">
-              {location.itemCount}
-            </div>
-            <div className="text-xs text-slate-500">Items</div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
-  const renderListView = (items: any, type: any) => {
-    return (
-      <div className="space-y-3">
-        {items.map((item: any) => (
-          <Card
-            key={item.id}
-            className="hover:shadow-md transition-all duration-200 cursor-pointer border-0 bg-white/70 backdrop-blur-sm hover:bg-white"
-            onClick={() =>
-              navigate(
-                type === "bin"
-                  ? `/bin-details/${item.id}`
-                  : `/location-details/${item.id}`
-              )
-            }
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                      type === "bin"
-                        ? "bg-gradient-to-br from-slate-100 to-slate-200"
-                        : "bg-gradient-to-br from-blue-100 to-blue-200"
-                    }`}
-                  >
-                    {type === "bin" ? (
-                      <Package className="w-5 h-5 text-slate-600" />
-                    ) : (
-                      <MapPin className="w-5 h-5 text-blue-600" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-slate-900">{item.name}</h3>
-                    {item.description && (
-                      <p className="text-sm text-slate-500 truncate max-w-md">
-                        {item.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  {type === "bin" && item.qrcodeId && (
-                    <Badge
-                      variant="secondary"
-                      className="bg-emerald-100 text-emerald-700"
-                    >
-                      {item?.qrcodeId ?? ""}
-                    </Badge>
-                  )}
-                  <div className="text-right">
-                    <div className="font-medium text-slate-900">
-                      {type === "bin"
-                        ? `${item?.itemCount ?? "0"} items`
-                        : `${item.binCount} bins`}
-                    </div>
-                    {type === "bin" && (
-                      <div className="text-xs text-slate-500">
-                        {item.updatedAt} ago
-                      </div>
-                    )}
-                  </div>
-                  <ArrowUpRight className="w-4 h-4 text-slate-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
   };
 
   const currentData = activeTab === "bins" ? filteredBins : filteredLocations;
@@ -608,246 +442,464 @@ export default function HomeScreen() {
       openModal("success", "Container created successfully!", "");
 
       await fetchBins();
+      fetchStats();
     } catch (error: any) {
       console.error("Error creating bin:", error);
-      toast.error(error);
+      toast.error(error.message || "Error creating bin");
     }
   };
 
-  if (loading && currentData.length === 0) {
-    return (
-      <div className="min-h-screen">
-        <div className="container mx-auto px-6 py-8">
-          <div className="flex justify-center items-center min-h-96">
-            <div className="flex flex-col items-center gap-4">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-200 border-t-emerald-600"></div>
-              <p className="text-slate-600">{t("dashboard.loading")}</p>
-            </div>
+  // --- COMPACT SPACE-OPTIMIZED CARDS ---
+  const renderBinCard = (bin: Bin) => (
+    <div
+      key={bin.id}
+      className="group relative bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[152px]"
+      onClick={() => navigate(`/bin-details/${bin.id}`)}
+    >
+      {/* Top Header Row */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center space-x-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors shrink-0">
+            <Package className="w-4 h-4" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight">
+              {bin.name}
+            </h3>
+            {bin.location?.name && (
+              <span className="inline-flex items-center text-[11px] text-slate-400 truncate mt-0.5">
+                <MapPin className="w-2.5 h-2.5 mr-1 shrink-0" />
+                <span className="truncate">{bin.location.name}</span>
+              </span>
+            )}
           </div>
         </div>
+
+        {/* QR Badge / Icon */}
+        <div className="flex items-center space-x-1.5 shrink-0">
+          {bin.qrcodeId ? (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono text-[10px] font-semibold">
+              <ScanLine className="w-2.5 h-2.5" />
+              <span>{bin.qrcodeId}</span>
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 font-mono text-[10px]">
+              <QrCode className="w-2.5 h-2.5" />
+              <span>No QR</span>
+            </span>
+          )}
+          <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 transition-colors" />
+        </div>
+      </div>
+
+      {/* Description */}
+      <div className="my-1.5">
+        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+          {bin.description || (
+            <span className="text-slate-300 italic">No description</span>
+          )}
+        </p>
+      </div>
+
+      {/* Footer Info Row */}
+      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+        <div className="flex items-center gap-1.5 font-medium text-slate-700">
+          <Layers className="w-3 h-3 text-slate-400" />
+          <span>{bin.itemCount ?? 0} items</span>
+        </div>
+        <span className="text-[10px] text-slate-400 font-medium">Details →</span>
+      </div>
+    </div>
+  );
+
+  const renderLocationCard = (location: Location) => (
+    <div
+      key={location.id}
+      className="group relative bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[152px]"
+      onClick={() => handleLocationFilter(location)}
+    >
+      {/* Top Header Row */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center space-x-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100/70 flex items-center justify-center text-blue-600 shrink-0">
+            {location.type === "warehouse" ? (
+              <Building2 className="w-4 h-4" />
+            ) : (
+              <MapPin className="w-4 h-4" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight">
+              {location.name}
+            </h3>
+            <span className="text-[11px] text-slate-400">Location</span>
+          </div>
+        </div>
+
+        <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 transition-colors shrink-0" />
+      </div>
+
+      {/* Description */}
+      <div className="my-1.5">
+        <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+          {location.description || (
+            <span className="text-slate-300 italic">No description</span>
+          )}
+        </p>
+      </div>
+
+      {/* Footer Metrics */}
+      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+        <div className="flex items-center gap-3">
+          <span className="text-slate-700 font-medium">
+            <strong>{location.binCount ?? 0}</strong> Bins
+          </span>
+          <span className="text-slate-300">•</span>
+          <span className="text-slate-700 font-medium">
+            <strong>{location.itemCount ?? 0}</strong> Items
+          </span>
+        </div>
+        <span className="text-[10px] text-blue-600 font-semibold">Filter →</span>
+      </div>
+    </div>
+  );
+
+  const renderListView = (items: any[], type: "bin" | "location") => {
+    return (
+      <div className="divide-y divide-slate-100 bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+        {items.map((item: any) => (
+          <div
+            key={item.id}
+            className="group flex items-center justify-between px-4 py-2.5 hover:bg-slate-50/80 transition-colors cursor-pointer"
+            onClick={() =>
+              type === "bin"
+                ? navigate(`/bin-details/${item.id}`)
+                : handleLocationFilter(item)
+            }
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
+                  type === "bin"
+                    ? "bg-slate-100 text-slate-700"
+                    : "bg-blue-50 text-blue-600"
+                }`}
+              >
+                {type === "bin" ? (
+                  <Package className="w-3.5 h-3.5" />
+                ) : (
+                  <MapPin className="w-3.5 h-3.5" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-xs">
+                    {item.name}
+                  </span>
+                  {type === "bin" && item.qrcodeId && (
+                    <Badge
+                      variant="secondary"
+                      className="bg-emerald-50 text-emerald-700 border-emerald-200/70 font-mono text-[10px] h-4 px-1"
+                    >
+                      {item.qrcodeId}
+                    </Badge>
+                  )}
+                </div>
+                {item.description && (
+                  <p className="text-[11px] text-slate-400 truncate max-w-sm">
+                    {item.description}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 shrink-0 text-xs">
+              {type === "bin" && item.location?.name && (
+                <span className="text-[11px] text-slate-400 hidden sm:inline truncate max-w-[120px]">
+                  {item.location.name}
+                </span>
+              )}
+              <span className="font-semibold text-slate-700 min-w-[70px] text-right">
+                {type === "bin"
+                  ? `${item?.itemCount ?? 0} items`
+                  : `${item?.binCount ?? 0} bins`}
+              </span>
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 transition-colors" />
+            </div>
+          </div>
+        ))}
       </div>
     );
-  }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100/50 relative">
-      {/* Impersonation Header */}
+    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+      {/* Impersonation Banner */}
       {userImpersonated && (
-        <div className="bg-gray-50 border-b border-gray-200">
-          <div className="container mx-auto px-6 py-2 max-w-7xl flex items-center justify-end space-x-4">
-            <span className="text-sm text-gray-500">
-              {t("dashboard.by")}{" "}
-              <strong>{userImpersonated?.ownerUsername}</strong>
+        <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5">
+          <div className="container mx-auto max-w-7xl flex items-center justify-between text-xs text-amber-900">
+            <span>
+              Impersonating: <strong>{userImpersonated?.ownerUsername}</strong>
             </span>
-            <button
+            <Button
+              size="sm"
+              variant="outline"
               onClick={clearImpersonation}
-              className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-sm hover:bg-red-200 transition-colors duration-200"
+              className="h-6 px-2 bg-white border-amber-300 text-amber-800 text-[11px]"
             >
               {t("dashboard.stopImpersonation")}
-            </button>
+            </Button>
           </div>
         </div>
       )}
-      <div className="container mx-auto px-6 py-8 max-w-7xl">
-        {/* Header con estadísticas */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-8">
-            <div className="space-y-1">
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-                {t("dashboard.title")}
-              </h1>
-              <p className="text-gray-600">{t("dashboard.subtitle")}</p>
+
+      <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
+        {/* Compact Top Bar */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center space-x-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                  {t("dashboard.title")}
+                </h1>
+                {subscription?.plan && subscription.plan !== "Unknown Plan" && (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+                    {subscription.plan}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {t("dashboard.subtitle")}
+              </p>
             </div>
           </div>
 
-          {/* Stats cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
-            <Card className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-emerald-100/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-emerald-600 uppercase tracking-wide">
-                      {t("dashboard.totalBins")}
-                    </p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {stats.totalBins}
-                    </p>
-                  </div>
-                  <div className="w-14 h-14 bg-emerald-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                    <Package className="w-7 h-7 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
+              title="Refresh inventory data"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${
+                  isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"
+                }`}
+              />
+              <span className="ml-1.5 hidden sm:inline">Refresh</span>
+            </Button>
 
-            <Card className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">
-                      {t("dashboard.locations")}
-                    </p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {stats.totalLocations}
-                    </p>
-                  </div>
-                  <div className="w-14 h-14 bg-blue-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                    <MapPin className="w-7 h-7 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="group hover:shadow-lg transition-all duration-300 border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100/50">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-purple-600 uppercase tracking-wide">
-                      {t("dashboard.totalItems")}
-                    </p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {stats.totalItems}
-                    </p>
-                  </div>
-                  <div className="w-14 h-14 bg-purple-500 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
-                    <TrendingUp className="w-7 h-7 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <Button
+              onClick={() => setIsAddBinModalOpen(true)}
+              className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t("dashboard.new")}</span>
+            </Button>
           </div>
         </div>
 
+        {/* Space-Optimized KPI Stat Ribbon (Compact 62px height!) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Card 1: Total Bins */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <Package className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  {t("dashboard.totalBins")}
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {stats.totalBins}
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              In stock
+            </span>
+          </div>
+
+          {/* Card 2: Locations */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <MapPin className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  {t("dashboard.locations")}
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {stats.totalLocations}
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              Warehouses
+            </span>
+          </div>
+
+          {/* Card 3: Total Items */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                <TrendingUp className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  {t("dashboard.totalItems")}
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {stats.totalItems}
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              Cataloged
+            </span>
+          </div>
+        </div>
+
+        {/* Integrated Unified Controls Row (Tabs + Search + Filter + View Toggle) */}
         <Tabs
           value={activeTab}
-          onValueChange={(value) => setActiveTab(value)}
-          className="space-y-8"
+          onValueChange={(val) => setActiveTab(val as "bins" | "locations")}
+          className="space-y-3.5"
         >
-          {/* Tab navigation y controles */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
-            <TabsList className="grid w-96 grid-cols-2 h-12 bg-gray-100 p-1 rounded-xl">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+            {/* Segmented Pill Tabs */}
+            <TabsList className="bg-slate-100 p-0.5 rounded-lg h-8 grid grid-cols-2 w-full sm:w-64 border border-slate-200/70">
               <TabsTrigger
                 value="bins"
-                className="flex items-center gap-3 font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg transition-all duration-200"
+                className="flex items-center justify-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-2xs rounded-md transition-all h-7 px-2"
               >
-                <Package className="w-5 h-5" />
-                {t("dashboard.tabs.bins", { count: stats.totalBins })}
+                <Package className="w-3.5 h-3.5" />
+                <span>
+                  {t("dashboard.tabs.bins", { count: stats.totalBins })}
+                </span>
               </TabsTrigger>
               <TabsTrigger
                 value="locations"
-                className="flex items-center gap-3 font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-lg transition-all duration-200"
+                className="flex items-center justify-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-2xs rounded-md transition-all h-7 px-2"
               >
-                <MapPin className="w-5 h-5" />
-                {t("dashboard.tabs.locations", { count: stats.totalLocations })}
+                <MapPin className="w-3.5 h-3.5" />
+                <span>
+                  {t("dashboard.tabs.locations", {
+                    count: stats.totalLocations,
+                  })}
+                </span>
               </TabsTrigger>
             </TabsList>
 
-            <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setViewMode(viewMode === "grid" ? "list" : "grid")
-                }
-                className="h-10 px-4 hover:bg-gray-50 transition-colors duration-200"
-              >
-                {viewMode === "grid" ? (
-                  <List className="w-4 h-4 mr-2" />
-                ) : (
-                  <Grid className="w-4 h-4 mr-2" />
-                )}
-                {t(`view.${viewMode}`)}
-              </Button>
-            </div>
-          </div>
+            {/* Filter location tag if active */}
+            {filterLocation && (
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900">
+                <Filter className="w-3 h-3 text-blue-600" />
+                <span className="text-[11px] text-slate-500">Location:</span>
+                <span className="font-semibold text-blue-800 text-[11px]">
+                  {filterLocation.name}
+                </span>
+                <button
+                  onClick={clearLocationFilter}
+                  className="ml-1 text-blue-500 hover:text-blue-800"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
 
-          <div style={{ display: "flex", flexDirection: "row" }}>
-            {/* Barra de búsqueda */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                value={currentSearchText}
-                onChange={(e) => setCurrentSearchText(e.target.value)}
-                placeholder={t(`search.${activeTab}Placeholder`)}
-                className="pl-11 pr-12 h-11 bg-white border border-gray-200 focus:border-gray-300 focus:ring-2 focus:ring-gray-100 rounded-lg transition-all duration-200"
-              />
-              {currentSearchText && (
+            {/* Search Box & View Mode Toggle */}
+            <div className="flex items-center gap-2 flex-1 sm:justify-end">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+                <Input
+                  value={currentSearchText}
+                  onChange={(e) => setCurrentSearchText(e.target.value)}
+                  placeholder={t(`search.${activeTab}Placeholder`)}
+                  className="pl-8 pr-7 h-8 bg-slate-50/80 border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:bg-white focus:border-slate-300"
+                />
+                {currentSearchText && (
+                  <button
+                    onClick={() => setCurrentSearchText("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200/80 rounded-lg">
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setCurrentSearchText("")}
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-9 w-9 p-0 hover:bg-gray-100 rounded-md"
+                  onClick={() => setViewMode("grid")}
+                  className={`h-7 w-7 p-0 rounded-md ${
+                    viewMode === "grid"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-400 hover:text-slate-700"
+                  }`}
+                  title="Grid view"
                 >
-                  <X className="w-4 h-4" />
+                  <Grid className="w-3.5 h-3.5" />
                 </Button>
-              )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className={`h-7 w-7 p-0 rounded-md ${
+                    viewMode === "list"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-400 hover:text-slate-700"
+                  }`}
+                  title="List view"
+                >
+                  <List className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
-
-            {activeTab === 'bins' && stats.totalBins <= Number(subscription?.metadata?.locations) && (
-              <button
-                onClick={() => setIsAddBinModalOpen(true)}
-                className="ml-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-              >
-                <Plus size={20} />
-                <span>{t("dashboard.new")}</span>
-              </button>
-            )}
           </div>
 
-          {/* Filtro de ubicación */}
-          {filterLocation && (
-            <Card className="border-l-4 border-l-blue-500 bg-blue-50/50 border-blue-100">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
-                      <Filter className="w-4 h-4 text-white" />
-                    </div>
-                    <div>
-                      <span className="font-semibold text-blue-900">
-                        {t("dashboard.filteringByLocation")}
-                      </span>
-                      <span className="ml-2 text-blue-700 font-medium">
-                        {filterLocation.name}
-                      </span>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={clearLocationFilter}
-                    className="hover:bg-blue-100 text-blue-600"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    {t("actions.clearFilter")}
-                  </Button>
+          {/* Bins Tab Content */}
+          <TabsContent value="bins" className="space-y-3.5 m-0">
+            {loading && filteredBins.length === 0 ? (
+              <div className="py-16 flex flex-col items-center justify-center space-y-2.5">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-300 border-t-slate-800" />
+                <p className="text-xs text-slate-500 font-medium">
+                  {t("dashboard.loading")}
+                </p>
+              </div>
+            ) : filteredBins.length === 0 ? (
+              <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center max-w-md mx-auto">
+                <div className="w-10 h-10 mx-auto mb-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400">
+                  <Package className="w-5 h-5" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Contenido de las tabs */}
-          <TabsContent value="bins" className="space-y-6">
-            {filteredBins.length === 0 ? (
-              <Card className="border-2 border-dashed border-gray-200 bg-gray-50/50">
-                <CardContent className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-2xl flex items-center justify-center">
-                    <Package className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {searchTextBins ? t("bins.emptySearch") : t("bins.empty")}
-                  </h3>
-                  <p className="text-gray-600 mb-6 max-w-sm mx-auto">
-                    {searchTextBins
-                      ? t("bins.emptySearchHint")
-                      : t("bins.emptyHint")}
-                  </p>
-                </CardContent>
-              </Card>
+                <h3 className="text-sm font-bold text-slate-900 mb-1">
+                  {searchTextBins ? t("bins.emptySearch") : t("bins.empty")}
+                </h3>
+                <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                  {searchTextBins
+                    ? t("bins.emptySearchHint")
+                    : t("bins.emptyHint")}
+                </p>
+                {!searchTextBins && (
+                  <Button
+                    onClick={() => setIsAddBinModalOpen(true)}
+                    className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    <span>{t("dashboard.new")}</span>
+                  </Button>
+                )}
+              </div>
             ) : (
               <>
                 {viewMode === "grid" ? (
-                  <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5">
                     {filteredBins.map(renderBinCard)}
                   </div>
                 ) : (
@@ -857,38 +909,44 @@ export default function HomeScreen() {
             )}
           </TabsContent>
 
-          <TabsContent value="locations" className="space-y-6">
-            {filteredLocations.length === 0 ? (
-              <Card className="border-2 border-dashed border-gray-200 bg-gray-50/50">
-                <CardContent className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-2xl flex items-center justify-center">
-                    <MapPin className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {searchTextLocations
-                      ? t("locations.emptySearch")
-                      : t("locations.empty")}
-                  </h3>
-                  <p className="text-gray-600 mb-6 max-w-sm mx-auto">
-                    {searchTextLocations
-                      ? t("locations.emptySearchHint")
-                      : t("locations.hintEmpty")}
-                  </p>
-                  {!searchTextLocations && (
-                    <Button
-                      onClick={() => navigate("/locations")}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      {t("locations.createFirst")}
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
+          {/* Locations Tab Content */}
+          <TabsContent value="locations" className="space-y-3.5 m-0">
+            {loading && filteredLocations.length === 0 ? (
+              <div className="py-16 flex flex-col items-center justify-center space-y-2.5">
+                <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-300 border-t-slate-800" />
+                <p className="text-xs text-slate-500 font-medium">
+                  {t("dashboard.loading")}
+                </p>
+              </div>
+            ) : filteredLocations.length === 0 ? (
+              <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center max-w-md mx-auto">
+                <div className="w-10 h-10 mx-auto mb-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400">
+                  <MapPin className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 mb-1">
+                  {searchTextLocations
+                    ? t("locations.emptySearch")
+                    : t("locations.empty")}
+                </h3>
+                <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+                  {searchTextLocations
+                    ? t("locations.emptySearchHint")
+                    : t("locations.hintEmpty")}
+                </p>
+                {!searchTextLocations && (
+                  <Button
+                    onClick={() => navigate("/locations")}
+                    className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+                  >
+                    <Plus className="w-3.5 h-3.5 mr-1" />
+                    <span>{t("locations.createFirst")}</span>
+                  </Button>
+                )}
+              </div>
             ) : (
               <>
                 {viewMode === "grid" ? (
-                  <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5">
                     {filteredLocations.map(renderLocationCard)}
                   </div>
                 ) : (
@@ -899,33 +957,75 @@ export default function HomeScreen() {
           </TabsContent>
         </Tabs>
 
-        {/* Paginación */}
+        {/* Compact Pagination Bar */}
         {currentData.length > 0 && (
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
-            <p className="text-sm text-gray-600">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-200/70 text-xs text-slate-500">
+            <p className="text-[11px]">
               {t("pagination.showing", {
                 count: currentData.length,
                 type: activeTab,
               })}
             </p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
-                disabled={loading}
-                className="hover:bg-gray-50"
+                disabled={
+                  loading ||
+                  !(activeTab === "bins"
+                    ? binsPagination.hasPreviousPage
+                    : locationsPagination.hasPreviousPage)
+                }
+                onClick={() => {
+                  if (activeTab === "bins") {
+                    fetchBins(
+                      Math.max(1, binsPagination.currentPage - 1),
+                      searchTextBins,
+                      false,
+                      filterLocation
+                    );
+                  } else {
+                    fetchLocations(
+                      Math.max(1, locationsPagination.currentPage - 1),
+                      searchTextLocations,
+                      false
+                    );
+                  }
+                }}
+                className="h-7 px-2.5 bg-white hover:bg-slate-50 border-slate-200 rounded-lg text-[11px]"
               >
-                <ChevronLeft className="w-4 h-4 mr-1" />
-                {t("pagination.previous")}
+                <ChevronLeft className="w-3 h-3 mr-1" />
+                <span>{t("pagination.previous")}</span>
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                disabled={loading}
-                className="hover:bg-gray-50"
+                disabled={
+                  loading ||
+                  !(activeTab === "bins"
+                    ? binsPagination.hasNextPage
+                    : locationsPagination.hasNextPage)
+                }
+                onClick={() => {
+                  if (activeTab === "bins") {
+                    fetchBins(
+                      binsPagination.currentPage + 1,
+                      searchTextBins,
+                      true,
+                      filterLocation
+                    );
+                  } else {
+                    fetchLocations(
+                      locationsPagination.currentPage + 1,
+                      searchTextLocations,
+                      true
+                    );
+                  }
+                }}
+                className="h-7 px-2.5 bg-white hover:bg-slate-50 border-slate-200 rounded-lg text-[11px]"
               >
-                {t("pagination.next")}
-                <ChevronRight className="w-4 h-4 ml-1" />
+                <span>{t("pagination.next")}</span>
+                <ChevronRight className="w-3 h-3 ml-1" />
               </Button>
             </div>
           </div>

@@ -105,7 +105,7 @@ export function Sidebar({ className }: SidebarProps) {
               <h1 className="text-base font-semibold text-slate-900 dark:text-slate-100 leading-tight">
                 {t("sidebar.dashboard")}
               </h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400">v2.0</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">BoxBin LLC</p>
             </div>
           </div>
         )}
