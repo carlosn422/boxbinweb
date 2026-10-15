@@ -27,9 +27,7 @@ import { toast } from "sonner";
 import type { TokenEstimate } from "../dashboard/binDetail";
 import { useAuth } from "@/context/AuthContext";
 import { getStripePlans } from "@/lib/stripe";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { addDoc, collection, doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { Elements } from "@stripe/react-stripe-js";
 import TokenCheckoutForm from "./TokenCheckoutForm";
 import { loadStripe } from "@stripe/stripe-js";
@@ -95,16 +93,23 @@ const EnhancedVideoAIModal = ({
 
   useEffect(() => {
     const checkUserTokens = async () => {
-      if (currentUser) {
-        console.log(currentUser);
-        const docRef = doc(db, "users", currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        console.log();
-        if (docSnap.exists()) {
-          const tokenData = docSnap.data();
-          console.log(tokenData, " kjnj");
-          setUserTokens(tokenData.tokens || 0);
+      if (currentUser?.uid) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("tokens")
+          .eq("id", currentUser.uid)
+          .maybeSingle();
+
+        let tokens = userData?.tokens;
+        if (tokens === undefined || tokens === null) {
+          const { data: userTokensData } = await supabase
+            .from("user_tokens")
+            .select("tokens")
+            .eq("id", currentUser.uid)
+            .maybeSingle();
+          tokens = userTokensData?.tokens;
         }
+        setUserTokens(tokens || 0);
       }
     };
     checkUserTokens();
@@ -218,17 +223,24 @@ const EnhancedVideoAIModal = ({
 
   const handleAddDetectedItem = async (item: any) => {
     try {
-      const functions = getFunctions();
-      const newImageUrl: any = await httpsCallable(
-        functions,
-        "moveImageToFinal"
-      )({
-        imageUrl: item?.image_url,
-        newFolder: "items",
-      });
+      let finalUrl = item?.image_url;
+      try {
+        const { data: moveResult, error: moveError } = await supabase.functions.invoke(
+          "move-image-to-final",
+          {
+            body: {
+              imageUrl: item?.image_url,
+              newFolder: "items",
+            },
+          }
+        );
+        if (!moveError && moveResult?.newUrl) {
+          finalUrl = moveResult.newUrl;
+        }
+      } catch (e) {
+        console.warn("Could not move image, using original url:", e);
+      }
 
-      console.log(newImageUrl, " nueva");
-      // Crear datos para Firestore
       const newItemData = {
         name: item.label,
         description: item.description || "",
@@ -240,17 +252,18 @@ const EnhancedVideoAIModal = ({
         createdAt: new Date().toISOString(),
         binId: itemId,
         userId: currentUser?.uid,
-        imageUrl: newImageUrl?.data.newUrl,
+        imageUrl: finalUrl,
       };
 
-      console.log(newItemData, " jn");
+      const { data: inserted, error: insertError } = await supabase
+        .from("items")
+        .insert(newItemData)
+        .select()
+        .single();
 
-      // Guardar en Firestore
-      const docRef = await addDoc(collection(db, "items"), newItemData);
+      if (insertError) throw insertError;
 
-      setItems((prev: any) => [...prev, { id: docRef.id, ...newItemData }]);
-
-      // Quitar el ítem del arreglo principal
+      setItems((prev: any) => [...prev, inserted || { id: item.id, ...newItemData }]);
       setDetectedItems((prev: any[]) => prev.filter((d) => d.id !== item.id));
 
       toast.success(`Added "${item.label}" to container`);
@@ -304,9 +317,7 @@ const EnhancedVideoAIModal = ({
                 return;
               }
               setIsLoading(true);
-              await updateDoc(doc(db, "users", currentUser?.uid ?? ""), {
-                tokens: 1000,
-              });
+              await supabase.from("users").update({ tokens: 1000 }).eq("id", currentUser?.uid ?? "");
               setIsLoading(false);
               window.location.reload();
             } catch (error) {

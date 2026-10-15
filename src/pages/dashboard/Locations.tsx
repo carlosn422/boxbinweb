@@ -17,22 +17,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  limit,
-  onSnapshot,
-  orderBy,
-  query,
-  serverTimestamp,
-  startAfter,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import {
   Dialog,
   DialogContent,
@@ -104,11 +89,11 @@ export const LocationsManager = () => {
   });
 
   const closeModal = () => {
-    setModalState((prev) => ({ ...prev, isOpen: false }));
+    setModalState((prev: any) => ({ ...prev, isOpen: false }));
   };
   
   // Estados para navegación de páginas
-  const [pageSnapshots, setPageSnapshots] = useState(new Map());
+  // Pagination handled by page offset
   const [hasNextPage, setHasNextPage] = useState(false);
   const [hasPrevPage, setHasPrevPage] = useState(false);
 
@@ -118,15 +103,14 @@ export const LocationsManager = () => {
     if (!currentUser?.uid) return;
 
     try {
-      const q = query(
-        collection(db, "subscriptions"),
-        where("userId", "==", effectiveUserId)
-      );
-      const querySnapshot = await getDocs(q);
+      const { data: subs } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("userId", effectiveUserId)
+        .limit(1);
 
-      if (!querySnapshot.empty) {
-        const sub = querySnapshot.docs[0].data();
-
+      if (subs && subs.length > 0) {
+        const sub = subs[0];
         if (sub.planId) {
           const stripePlan = await getStripePlanById(sub.planId);
 
@@ -142,8 +126,6 @@ export const LocationsManager = () => {
         } else {
           setSubscription(sub);
         }
-      } else {
-        console.log("❌ No se encontró suscripción para el usuario.");
       }
     } catch (error) {
       console.error("🔥 Error al obtener suscripción:", error);
@@ -162,77 +144,50 @@ export const LocationsManager = () => {
     try {
       await fetchSubscription();
 
-      const q = query(
-        collection(db, "locations"),
-        where("userId", "==", effectiveUserId)
-      );
-      const snapshot = await getDocs(q);
-      setTotalLocations(snapshot.size);
+      const { count, error } = await supabase
+        .from("locations")
+        .select("*", { count: "exact", head: true })
+        .eq("userId", effectiveUserId);
+
+      if (!error && count !== null) {
+        setTotalLocations(count);
+      }
     } catch (error) {
       console.error("Error getting total locations:", error);
     }
   };
 
   // Función para cargar ubicaciones con paginación
-  const loadLocations = async (page = 1, isRefresh = false) => {
+  const loadLocations = async (page = 1, _isRefresh = false) => {
     if (!currentUser) return;
 
     setPageLoading(true);
 
     try {
-      const locationsRef = collection(db, "locations");
-      let q;
+      const from = (page - 1) * itemsPerPage;
+      const to = from + itemsPerPage;
 
-      // Construir query base
-      const baseQuery = [
-        where("userId", "==", effectiveUserId),
-        orderBy(sortBy, sortOrder === "asc" ? "asc" : "desc"),
-        limit(itemsPerPage + 1), // +1 para determinar si hay siguiente página
-      ];
+      const { data, error } = await supabase
+        .from("locations")
+        .select("*")
+        .eq("userId", effectiveUserId)
+        .order(sortBy, { ascending: sortOrder === "asc" })
+        .range(from, to);
 
-      if (page === 1 || isRefresh) {
-        // Primera página o refresh
-        q = query(locationsRef, ...baseQuery);
-        setPageSnapshots(new Map());
-      } else {
-        // Páginas siguientes
-        const pageSnapshot = pageSnapshots.get(page - 1);
-        if (pageSnapshot) {
-          q = query(locationsRef, ...baseQuery, startAfter(pageSnapshot));
-        } else {
-          // Si no tenemos el snapshot, volvemos a la primera página
-          q = query(locationsRef, ...baseQuery);
-          setCurrentPage(1);
-        }
-      }
+      if (error) throw error;
 
-      const snapshot = await getDocs(q);
-      const docs = snapshot.docs;
-
-      // Separar los documentos de la página actual y verificar si hay más
+      const docs = data || [];
       const pageData = docs.slice(0, itemsPerPage);
       const hasMore = docs.length > itemsPerPage;
 
-      const locationsData = pageData.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt:
-          doc.data().createdAt?.toDate?.() || new Date(doc.data().createdAt),
+      const locationsData = pageData.map((loc: any) => ({
+        ...loc,
+        createdAt: loc.createdAt ? new Date(loc.createdAt) : new Date(),
       }));
 
       setLocations(locationsData);
       setHasNextPage(hasMore);
       setHasPrevPage(page > 1);
-
-      // Guardar snapshots para navegación
-      if (pageData.length > 0) {
-        const newPageSnapshots = new Map(pageSnapshots);
-        newPageSnapshots.set(page, pageData[pageData.length - 1]);
-        setPageSnapshots(newPageSnapshots);
-
-        //setLastVisible(pageData[pageData.length - 1]);
-        //setFirstVisible(pageData[0]);
-      }
     } catch (error) {
       console.error("Error loading locations:", error);
       setModalState({
@@ -277,11 +232,12 @@ export const LocationsManager = () => {
         name: itemName.trim(),
         address: itemAddress.trim(),
         description: itemDescription.trim(),
-        createdAt: serverTimestamp(),
+        createdAt: new Date().toISOString(),
         userId: effectiveUserId,
       };
 
-      await addDoc(collection(db, "locations"), data);
+      const { error: insErr } = await supabase.from("locations").insert(data);
+      if (insErr) throw insErr;
 
       // Resetear formulario
       setItemName("");
@@ -321,13 +277,16 @@ export const LocationsManager = () => {
 
     setOperationLoading(true);
     try {
-      const locationRef = doc(db, "locations", editingId);
-      await updateDoc(locationRef, {
-        name: itemName.trim(),
-        address: itemAddress.trim(),
-        description: itemDescription.trim(),
-        updatedAt: serverTimestamp(),
-      });
+      const { error: updErr } = await supabase
+        .from("locations")
+        .update({
+          name: itemName.trim(),
+          address: itemAddress.trim(),
+          description: itemDescription.trim(),
+          updatedAt: new Date().toISOString(),
+        })
+        .eq("id", editingId);
+      if (updErr) throw updErr;
 
       // Resetear formulario
       setItemName("");
@@ -365,7 +324,8 @@ export const LocationsManager = () => {
 
     setOperationLoading(true);
     try {
-      await deleteDoc(doc(db, "locations", locationId));
+      const { error: delErr } = await supabase.from("locations").delete().eq("id", locationId);
+      if (delErr) throw delErr;
 
       setSelectedLocation(null);
       setModalState({
@@ -449,19 +409,27 @@ export const LocationsManager = () => {
 
   useEffect(() => {
     if (currentUser) {
-      // Listener en tiempo real para cambios en la colección
-      const q = query(
-        collection(db, "locations"),
-        where("userId", "==", effectiveUserId)
-      );
+      const channel = supabase
+        .channel("locations-changes")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "locations",
+            filter: `userId=eq.${effectiveUserId}`,
+          },
+          () => {
+            getTotalLocations();
+          }
+        )
+        .subscribe();
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        setTotalLocations(snapshot.size);
-      });
-
-      return () => unsubscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
-  }, [currentUser]);
+  }, [currentUser, effectiveUserId]);
 
   if (!currentUser) {
     return (

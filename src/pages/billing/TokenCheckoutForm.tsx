@@ -3,8 +3,7 @@ import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { doc, getDoc, increment, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 
 // ⚡ Usa el SDK de Stripe que ya tengas en lib/stripe
@@ -67,21 +66,24 @@ export default function TokenCheckoutForm({
       }
 
       if (result.paymentIntent?.status === "succeeded") {
-        const userRef = doc(db, "user_tokens", userId);
-        const snap = await getDoc(userRef);
+        const { data: existing } = await supabase
+          .from("user_tokens")
+          .select("tokens")
+          .eq("id", userId)
+          .maybeSingle();
 
-        if (snap.exists()) {
-          await updateDoc(userRef, {
-            tokens: increment(tokens),
-            updatedAt: new Date(),
-          });
-        } else {
-          await setDoc(userRef, {
-            tokens,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          });
-        }
+        const currentTokens = (existing?.tokens as number) || 0;
+        const newTokens = currentTokens + tokens;
+
+        await supabase.from("user_tokens").upsert({
+          id: userId,
+          tokens: newTokens,
+          updatedAt: new Date().toISOString(),
+        });
+
+        await supabase.from("users").update({
+          tokens: newTokens,
+        }).eq("id", userId);
 
         if ((window as any).ReactNativeWebView) {
           (window as any).ReactNativeWebView.postMessage(

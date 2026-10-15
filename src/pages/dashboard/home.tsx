@@ -22,18 +22,8 @@ import {
   QrCode,
   Layers,
 } from "lucide-react";
-import {
-  collection,
-  query,
-  where,
-  orderBy,
-  limit,
-  startAfter,
-  getDocs,
-  addDoc,
-} from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "react-i18next";
 import { AddBinModal, type BinData } from "@/components/layout/AddBin";
@@ -118,15 +108,14 @@ export default function HomeScreen() {
     if (!currentUser?.uid) return;
 
     try {
-      const q = query(
-        collection(db, "subscriptions"),
-        where("userId", "==", effectiveUserId)
-      );
-      const querySnapshot = await getDocs(q);
+      const { data: subs } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("userId", effectiveUserId)
+        .limit(1);
 
-      if (!querySnapshot.empty) {
-        const sub = querySnapshot.docs[0].data();
-
+      if (subs && subs.length > 0) {
+        const sub = subs[0];
         if (sub.planId) {
           const stripePlan = await getStripePlanById(sub.planId);
 
@@ -202,48 +191,43 @@ export default function HomeScreen() {
   const fetchBins = async (
     page: number = 1,
     searchTerm: string = "",
-    isNextPage: boolean = false,
+    __isNextPage: boolean = false,
     selectedLocation: Location | null = null
   ) => {
     if (!effectiveUserId) return;
     setLoading(true);
 
     try {
-      let binsQuery = query(
-        collection(db, "bins"),
-        where("userId", "==", effectiveUserId),
-        orderBy("createdAt", "desc"),
-        limit(ITEMS_PER_PAGE)
-      );
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
 
-      if (isNextPage && binsPagination.lastVisible) {
-        binsQuery = query(binsQuery, startAfter(binsPagination.lastVisible));
+      const { data: rawBins, error } = await supabase
+        .from("bins")
+        .select("*")
+        .eq("userId", effectiveUserId)
+        .order("createdAt", { ascending: false })
+        .range(from, to);
+
+      if (error) throw error;
+
+      const binsData = (rawBins || []) as Bin[];
+
+      const qrGuids = binsData.map((b) => b.qrGuid).filter(Boolean) as string[];
+      let qrMap = new Map<string, string>();
+      if (qrGuids.length > 0) {
+        const { data: qrs } = await supabase
+          .from("qrcodes")
+          .select("guid, qrcodeId")
+          .in("guid", qrGuids);
+        if (qrs) {
+          qrMap = new Map(qrs.map((q: any) => [q.guid, q.qrcodeId]));
+        }
       }
 
-      const snapshot = await getDocs(binsQuery);
-      const binsData = snapshot.docs.map(
-        (doc) =>
-          ({
-            id: doc.id,
-            ...doc.data(),
-          } as Bin)
-      );
-
-      const binsWithQRCodes = await Promise.all(
-        binsData.map(async (bin) => {
-          if (!bin.qrGuid) return bin;
-          try {
-            const qrSnap = await getDocs(
-              query(collection(db, "qrcodes"), where("guid", "==", bin.qrGuid))
-            );
-            return qrSnap.empty
-              ? bin
-              : { ...bin, qrcodeId: qrSnap.docs[0].data().qrcodeId };
-          } catch {
-            return bin;
-          }
-        })
-      );
+      const binsWithQRCodes = binsData.map((bin) => {
+        if (!bin.qrGuid || !qrMap.has(bin.qrGuid)) return bin;
+        return { ...bin, qrcodeId: qrMap.get(bin.qrGuid) };
+      });
 
       const normalizedSearch = normalizeText(searchTerm);
 
@@ -268,10 +252,10 @@ export default function HomeScreen() {
 
       setBinsPagination({
         currentPage: page,
-        hasNextPage: snapshot.docs.length === ITEMS_PER_PAGE,
+        hasNextPage: binsData.length === ITEMS_PER_PAGE,
         hasPreviousPage: page > 1,
-        lastVisible: snapshot.docs[snapshot.docs.length - 1] || null,
-        firstVisible: snapshot.docs[0] || null,
+        lastVisible: null,
+        firstVisible: null,
         totalCount: filtered.length,
       });
     } catch (error) {
@@ -284,27 +268,25 @@ export default function HomeScreen() {
   const fetchLocations = async (
     page: number = 1,
     searchTerm: string = "",
-    isNextPage: boolean = false
+    _isNextPage: boolean = false
   ) => {
     if (!effectiveUserId) return;
     setLoading(true);
 
     try {
-      let locQuery = query(
-        collection(db, "locations"),
-        where("userId", "==", effectiveUserId),
-        orderBy("createdAt", "desc"),
-        limit(ITEMS_PER_PAGE)
-      );
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
 
-      if (isNextPage && locationsPagination.lastVisible) {
-        locQuery = query(locQuery, startAfter(locationsPagination.lastVisible));
-      }
+      const { data: rawLocs, error } = await supabase
+        .from("locations")
+        .select("*")
+        .eq("userId", effectiveUserId)
+        .order("createdAt", { ascending: false })
+        .range(from, to);
 
-      const snapshot = await getDocs(locQuery);
-      const locData = snapshot.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() } as Location)
-      );
+      if (error) throw error;
+
+      const locData = (rawLocs || []) as Location[];
 
       const filtered = searchTerm
         ? locData.filter((loc) =>
@@ -315,10 +297,10 @@ export default function HomeScreen() {
 
       setLocationsPagination({
         currentPage: page,
-        hasNextPage: snapshot.docs.length === ITEMS_PER_PAGE,
+        hasNextPage: locData.length === ITEMS_PER_PAGE,
         hasPreviousPage: page > 1,
-        lastVisible: snapshot.docs[snapshot.docs.length - 1] || null,
-        firstVisible: snapshot.docs[0] || null,
+        lastVisible: null,
+        firstVisible: null,
         totalCount: filtered.length,
       });
     } catch (error) {
@@ -333,25 +315,16 @@ export default function HomeScreen() {
 
     try {
       await fetchSubscription();
-      const [binsSnap, itemsSnap, locSnap] = await Promise.all([
-        getDocs(
-          query(collection(db, "bins"), where("userId", "==", effectiveUserId))
-        ),
-        getDocs(
-          query(collection(db, "items"), where("userId", "==", effectiveUserId))
-        ),
-        getDocs(
-          query(
-            collection(db, "locations"),
-            where("userId", "==", effectiveUserId)
-          )
-        ),
+      const [binsCount, itemsCount, locCount] = await Promise.all([
+        supabase.from("bins").select("*", { count: "exact", head: true }).eq("userId", effectiveUserId),
+        supabase.from("items").select("*", { count: "exact", head: true }).eq("userId", effectiveUserId),
+        supabase.from("locations").select("*", { count: "exact", head: true }).eq("userId", effectiveUserId),
       ]);
 
       setStats({
-        totalBins: binsSnap.size,
-        totalItems: itemsSnap.size,
-        totalLocations: locSnap.size,
+        totalBins: binsCount.count ?? 0,
+        totalItems: itemsCount.count ?? 0,
+        totalLocations: locCount.count ?? 0,
         recentActivity: 0,
       });
     } catch (error) {
@@ -433,11 +406,17 @@ export default function HomeScreen() {
         ...binData,
         createdAt: new Date().toISOString(),
         userId: effectiveUserId,
-        location: binData?.location ?? "",
+        location: binData?.location ?? null,
       };
 
-      const docRef = await addDoc(collection(db, "bins"), newBin);
-      console.log("Bin created with ID:", docRef.id);
+      const { data: inserted, error: insErr } = await supabase
+        .from("bins")
+        .insert(newBin)
+        .select()
+        .single();
+
+      if (insErr) throw insErr;
+      console.log("Bin created with ID:", inserted?.id);
 
       openModal("success", "Container created successfully!", "");
 

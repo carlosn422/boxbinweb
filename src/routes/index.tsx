@@ -11,8 +11,7 @@ import {
   useLocation,
 } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { SmartLabelsPage } from "@/pages/smart-labels";
 import BinDetailsPage from "@/pages/dashboard/binDetail";
 import { LocationsManager } from "@/pages/dashboard/Locations";
@@ -33,13 +32,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const checkSubscription = async () => {
       if (currentUser) {
-        const subscriptionsRef = collection(db, "subscriptions");
-        const q = query(
-          subscriptionsRef,
-          where("userId", "==", currentUser.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        setHasSubscription(!querySnapshot.empty);
+        const { data } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("userId", currentUser.uid)
+          .limit(1);
+        setHasSubscription(Boolean(data && data.length > 0));
       }
       setSubscriptionLoading(false);
     };
@@ -74,13 +72,12 @@ const ProtectedRouteLayout = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const checkSubscription = async () => {
       if (currentUser) {
-        const subscriptionsRef = collection(db, "subscriptions");
-        const q = query(
-          subscriptionsRef,
-          where("userId", "==", currentUser.uid)
-        );
-        const querySnapshot = await getDocs(q);
-        setHasSubscription(!querySnapshot.empty);
+        const { data } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("userId", currentUser.uid)
+          .limit(1);
+        setHasSubscription(Boolean(data && data.length > 0));
       }
       setSubscriptionLoading(false);
     };

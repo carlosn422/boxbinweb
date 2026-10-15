@@ -1,6 +1,6 @@
 import { loadStripe, type StripeConstructor } from "@stripe/stripe-js";
 import Stripe from "stripe";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { supabase } from "@/lib/supabase";
 
 declare global {
   interface Window {
@@ -340,11 +340,11 @@ export const cancelUserSubscription = async (
   subscriptionId: string,
   userId: string
 ) => {
-  const functions = getFunctions();
-  const cancelSub = httpsCallable(functions, "cancelSubscription");
-
-  const result = await cancelSub({ subscriptionId, userId });
-  return result.data;
+  const { data, error } = await supabase.functions.invoke("cancel-subscription", {
+    body: { subscriptionId, userId },
+  });
+  if (error) throw error;
+  return data;
 };
 
 export const upgradeSubscription = async ({
@@ -356,10 +356,11 @@ export const upgradeSubscription = async ({
   newPriceId: string;
   userId: string;
 }) => {
-  const functions = getFunctions();
-  const fn = httpsCallable(functions, "upgradeSubscription");
-  const result = await fn({ subscriptionId, newPriceId, userId });
-  return result.data;
+  const { data, error } = await supabase.functions.invoke("upgrade-subscription", {
+    body: { subscriptionId, newPriceId, userId },
+  });
+  if (error) throw error;
+  return data;
 };
 
 export async function createStripePaymentIntent(

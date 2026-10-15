@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../../context/AuthContext';
-import { db } from '../../../lib/firebase';
+import { supabase } from '../../../lib/supabase';
 
 interface Step1Props {
   qrCount: number;
@@ -37,18 +36,18 @@ export const Step1 = ({ qrCount, setQrCount, onGenerate }: Step1Props) => {
     }, 300);
 
     try {
-      // Store QR codes in Firestore
-      const smartLabelsCollection = collection(db, 'qrcodes');
+      const labelsToInsert = [];
       for (let i = 0; i < qrCount; i++) {
-        await addDoc(smartLabelsCollection, {
-          dateCreated: serverTimestamp(),
+        labelsToInsert.push({
+          dateCreated: new Date().toISOString(),
           guid: uuidv4(),
           isUsed: false,
           userId: currentUser?.uid,
           requestId: requestGuid
         });
-        console.log(`Successfully created QR code ${i+1}/${qrCount}`);
       }
+      const { error: insertErr } = await supabase.from("qrcodes").insert(labelsToInsert);
+      if (insertErr) throw insertErr;
     } catch (error) {
       console.error('Error creating smartlabels:', error);
       clearInterval(timer);

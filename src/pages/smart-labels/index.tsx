@@ -16,15 +16,7 @@ import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { db } from "../../lib/firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  writeBatch,
-  doc,
-} from "firebase/firestore";
+import { supabase } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
 import { useTranslation } from "react-i18next";
 
@@ -123,21 +115,21 @@ export const SmartLabelsPage = () => {
       if (!currentUser) return;
       setIsLoading(true);
 
-      const labelsRef = collection(db, "qrcodes");
-      const q = query(labelsRef, where("userId", "==", currentUser.uid));
-      const querySnapshot = await getDocs(q);
+      const { data, error } = await supabase
+        .from("qrcodes")
+        .select("*")
+        .eq("userId", currentUser.uid);
 
-      const labelsData = querySnapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          dateCreated: data.dateCreated,
-          guid: data.guid || doc.id,
-          isUsed: data.isUsed,
-          order_key: data.order_key,
-          qrcodeId: data.qrcodeId,
-          userId: data.userId,
-        } as LabelType;
-      });
+      if (error) throw error;
+
+      const labelsData = (data || []).map((row: any) => ({
+        dateCreated: row.dateCreated,
+        guid: row.guid || row.id,
+        isUsed: row.isUsed,
+        order_key: row.order_key,
+        qrcodeId: row.qrcodeId,
+        userId: row.userId,
+      } as LabelType));
 
       setAllLabels(labelsData);
     } catch (error) {
@@ -160,7 +152,7 @@ export const SmartLabelsPage = () => {
       if (!currentUser) return;
       setIsLoading(true);
 
-      const batch = writeBatch(db);
+      const newLabels = [];
       const now = new Date().toISOString();
 
       for (let i = 0; i < quantity; i++) {
@@ -169,7 +161,7 @@ export const SmartLabelsPage = () => {
           Math.random().toString(36).substring(2) + Date.now().toString(36);
         const qrcodeId = generateQrCodeId();
 
-        const labelData = {
+        newLabels.push({
           dateCreated: now,
           field: `${label.field} ${quantity > 1 ? `(${i + 1})` : ""}`.trim(),
           guid,
@@ -177,13 +169,11 @@ export const SmartLabelsPage = () => {
           order_key: "",
           qrcodeId,
           userId: currentUser.uid,
-        };
-
-        const docRef = doc(collection(db, "qrcodes"));
-        batch.set(docRef, labelData);
+        });
       }
 
-      await batch.commit();
+      const { error } = await supabase.from("qrcodes").insert(newLabels);
+      if (error) throw error;
       fetchLabels();
     } catch (error) {
       console.error("Error creating labels:", error);

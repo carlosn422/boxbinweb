@@ -5,17 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  onSnapshot,
-  query,
-  where,
-} from "firebase/firestore";
+import { supabase } from "@/lib/supabase";
 import {
   ChevronRight,
   Loader2,
@@ -54,83 +44,85 @@ export default function SocialScreen() {
     setModalState((prev) => ({ ...prev, isOpen: false }));
   };
 
-  const [sharedAccounts, setSharedAccounts] = useState<any>([]);
-  const [sharedByMeAccounts, setSharedByMeAccounts] = useState([]);
+  const [sharedAccounts, setSharedAccounts] = useState<any[]>([]);
+  const [sharedByMeAccounts, setSharedByMeAccounts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [username, setUsername] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  useEffect(() => {
+  const fetchSharedData = async () => {
     if (!currentUser) return;
+    try {
+      setLoading(true);
 
-    // Listen for accounts shared with me
-    const sharedWithMeQuery = query(
-      collection(db, "shared_access"),
-      where("grantedUserId", "==", currentUser.uid)
-    );
+      // Shared with me
+      const { data: sharedWithMe } = await supabase
+        .from("shared_access")
+        .select("*")
+        .eq("grantedUserId", currentUser.uid);
 
-    // Listen for accounts I've shared with others
-    const sharedByMeQuery = query(
-      collection(db, "shared_access"),
-      where("ownerUserId", "==", currentUser.uid)
-    );
+      if (sharedWithMe && sharedWithMe.length > 0) {
+        const ownerIds = sharedWithMe.map((s) => s.ownerUserId).filter(Boolean);
+        const { data: ownerUsers } = await supabase
+          .from("users")
+          .select("uid, username, displayName")
+          .in("uid", ownerIds);
 
-    const unsubscribeSharedWithMe = onSnapshot(
-      sharedWithMeQuery,
-      async (snapshot) => {
-        const sharedData = [];
-        for (const doc of snapshot.docs) {
-          const data = doc.data();
-          const userDoc = await getDocs(
-            query(collection(db, "users"), where("uid", "==", data.ownerUserId))
-          );
-          if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
-            sharedData.push({
-              id: doc.id,
-              ...data,
-              ownerUsername: userData.username,
-              ownerDisplayName: userData.displayName || userData.username,
-            });
-          }
-        }
-        setSharedAccounts(sharedData);
+        const ownerMap = new Map((ownerUsers || []).map((u) => [u.uid, u]));
+
+        const withMeData = sharedWithMe.map((item) => {
+          const owner = ownerMap.get(item.ownerUserId);
+          return {
+            id: item.id,
+            ...item,
+            ownerUsername: owner?.username || "Unknown",
+            ownerDisplayName: owner?.displayName || owner?.username || "Unknown",
+          };
+        });
+        setSharedAccounts(withMeData);
+      } else {
+        setSharedAccounts([]);
       }
-    );
 
-    const unsubscribeSharedByMe = onSnapshot(
-      sharedByMeQuery,
-      async (snapshot) => {
-        const sharedData: any = [];
-        for (const doc of snapshot.docs) {
-          const data = doc.data();
-          const userDoc = await getDocs(
-            query(
-              collection(db, "users"),
-              where("uid", "==", data.grantedUserId)
-            )
-          );
-          if (!userDoc.empty) {
-            const userData = userDoc.docs[0].data();
-            sharedData.push({
-              id: doc.id,
-              ...data,
-              grantedUsername: userData.username,
-              grantedDisplayName: userData.displayName || userData.username,
-            });
-          }
-        }
-        setSharedByMeAccounts(sharedData);
-        setLoading(false);
+      // Shared by me
+      const { data: sharedByMe } = await supabase
+        .from("shared_access")
+        .select("*")
+        .eq("ownerUserId", currentUser.uid);
+
+      if (sharedByMe && sharedByMe.length > 0) {
+        const grantedIds = sharedByMe.map((s) => s.grantedUserId).filter(Boolean);
+        const { data: grantedUsers } = await supabase
+          .from("users")
+          .select("uid, username, displayName")
+          .in("uid", grantedIds);
+
+        const grantedMap = new Map((grantedUsers || []).map((u) => [u.uid, u]));
+
+        const byMeData = sharedByMe.map((item) => {
+          const granted = grantedMap.get(item.grantedUserId);
+          return {
+            id: item.id,
+            ...item,
+            grantedUsername: granted?.username || "Unknown",
+            grantedDisplayName: granted?.displayName || granted?.username || "Unknown",
+          };
+        });
+        setSharedByMeAccounts(byMeData);
+      } else {
+        setSharedByMeAccounts([]);
       }
-    );
+    } catch (err) {
+      console.error("Error fetching shared access:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return () => {
-      unsubscribeSharedWithMe();
-      unsubscribeSharedByMe();
-    };
-  }, []);
+  useEffect(() => {
+    fetchSharedData();
+  }, [currentUser]);
 
   const handleShare = async () => {
     if (!username.trim()) {
@@ -146,39 +138,32 @@ export default function SocialScreen() {
     try {
       if (!currentUser) return;
 
-      // Find user by username
-      const usersRef = collection(db, "users");
-      const userQuery = query(
-        usersRef,
-        where("username", "==", username.trim())
-      );
-      const userSnapshot = await getDocs(userQuery);
+      const { data: targetUser, error: userErr } = await supabase
+        .from("users")
+        .select("*")
+        .eq("username", username.trim())
+        .maybeSingle();
 
-      if (userSnapshot.empty) {
+      if (userErr || !targetUser) {
         setModalState({
           isOpen: true,
           type: "error",
           message: t("social.errors.userNotFound"),
         });
-
         setIsProcessing(false);
         setUsername("");
         setIsModalVisible(false);
         return;
       }
 
-      const targetUser = userSnapshot.docs[0].data();
+      const { data: existingAccess } = await supabase
+        .from("shared_access")
+        .select("id")
+        .eq("ownerUserId", currentUser.uid)
+        .eq("grantedUserId", targetUser.uid)
+        .maybeSingle();
 
-      // Check if access has already been granted
-      const existingAccess = await getDocs(
-        query(
-          collection(db, "shared_access"),
-          where("ownerUserId", "==", currentUser.uid),
-          where("grantedUserId", "==", targetUser.uid)
-        )
-      );
-
-      if (!existingAccess.empty) {
+      if (existingAccess) {
         setModalState({
           isOpen: true,
           type: "error",
@@ -188,8 +173,7 @@ export default function SocialScreen() {
         return;
       }
 
-      // Grant access
-      await addDoc(collection(db, "shared_access"), {
+      await supabase.from("shared_access").insert({
         ownerUserId: currentUser.uid,
         grantedUserId: targetUser.uid,
         createdAt: new Date().toISOString(),
@@ -202,6 +186,7 @@ export default function SocialScreen() {
         type: "success",
         message: t("social.success.message"),
       });
+      await fetchSharedData();
     } catch (error) {
       console.error("Error granting access:", error);
       setModalState({
@@ -228,7 +213,8 @@ export default function SocialScreen() {
 
     if (confirmRevoke) {
       try {
-        await deleteDoc(doc(db, "shared_access", accountId));
+        await supabase.from("shared_access").delete().eq("id", accountId);
+        await fetchSharedData();
       } catch (error) {
         console.error("Error revoking access:", error);
         setModalState({

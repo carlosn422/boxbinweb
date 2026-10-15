@@ -1,15 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { useCallback, useEffect, useState } from "react";
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import {
   Loader2,
@@ -92,19 +84,11 @@ export default function ActiveSubscriptionPage() {
     setUpgradingToPlan(null);
     if (!subscription?.stripeSubscriptionId || !subscription?.userId) {
       if (subscription.plan === "Trial" && subscription.status === "active") {
-        const q = query(
-          collection(db, "subscriptions"),
-          where("userId", "==", currentUser?.uid)
-        );
-
-        const querySnapshot = await getDocs(q);
-
-        if (!querySnapshot.empty) {
-          // Obtener el ID del documento
-          const docId = querySnapshot.docs[0].id;
-          await deleteDoc(doc(db, "subscriptions", docId));
-          navigate("/billing");
-        }
+        await supabase
+          .from("subscriptions")
+          .delete()
+          .eq("userId", currentUser?.uid);
+        navigate("/billing");
         return;
       }
       return;
@@ -213,15 +197,13 @@ export default function ActiveSubscriptionPage() {
       if (!currentUser?.uid) return;
 
       try {
-        const q = query(
-          collection(db, "subscriptions"),
-          where("userId", "==", currentUser.uid)
-        );
-        const querySnapshot = await getDocs(q);
+        const { data: sub } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("userId", currentUser.uid)
+          .maybeSingle();
 
-        if (!querySnapshot.empty) {
-          const sub = querySnapshot.docs[0].data();
-
+        if (sub) {
           console.log(sub, " sun");
           if (sub.planId) {
             const stripePlan = await getStripePlanById(sub.planId);
@@ -239,8 +221,6 @@ export default function ActiveSubscriptionPage() {
             };
 
             setSubscription(fullSubscription);
-          } else {
-            //setSubscription(sub);
           }
         } else {
           console.log("❌ No se encontró suscripción para el usuario.");

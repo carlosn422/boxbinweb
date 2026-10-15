@@ -3,13 +3,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  doc,
-  getDoc,
-  addDoc,
-  collection,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { getStripePlans } from "../../lib/stripe";
 import { STRIPE_PUBLISHABLE_KEY } from "../../config/stripe";
@@ -54,16 +48,23 @@ export default function TokensPurchasePage() {
 
   useEffect(() => {
     const checkUserTokens = async () => {
-      if (currentUser) {
-        console.log(currentUser);
-        const docRef = doc(db, "users", currentUser.uid);
-        const docSnap = await getDoc(docRef);
-        console.log();
-        if (docSnap.exists()) {
-          const tokenData = docSnap.data();
-          console.log(tokenData, " kjnj");
-          setUserTokens(tokenData.tokens || 0);
+      if (currentUser?.uid) {
+        const { data: userData } = await supabase
+          .from("users")
+          .select("tokens")
+          .eq("id", currentUser.uid)
+          .maybeSingle();
+
+        let tokens = userData?.tokens;
+        if (tokens === undefined || tokens === null) {
+          const { data: userTokensData } = await supabase
+            .from("user_tokens")
+            .select("tokens")
+            .eq("id", currentUser.uid)
+            .maybeSingle();
+          tokens = userTokensData?.tokens;
         }
+        setUserTokens(tokens || 0);
         setLoading(false);
       }
     };
@@ -516,7 +517,7 @@ export default function TokensPurchasePage() {
                             selectedPkg?.metadata?.tokens || "0"
                           );
 
-                          await addDoc(collection(db, "token_purchases"), {
+                          await supabase.from("token_purchases").insert({
                             userId: currentUser?.uid,
                             packageId: selectedPackage,
                             tokenAmount: tokenAmount,

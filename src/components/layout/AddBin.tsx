@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { X, Plus, MapPin, Loader2 } from "lucide-react";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase } from "@/lib/supabase";
 
 // Types
 export interface LocationTest {
@@ -101,18 +100,13 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
   const fetchLocations = async () => {
     setIsLoadingLocations(true);
     try {
-      const q = query(
-        collection(db, "locations"), // colección
-        where("userId", "==", userId) // condición
-      );
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name, address")
+        .eq("userId", userId);
 
-      const snapshot = await getDocs(q);
-      const locationsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...(doc.data() as Omit<LocationTest, "id">),
-      }));
-
-      setLocationOptions(locationsData);
+      if (error) throw error;
+      setLocationOptions(data || []);
     } catch (error) {
       console.error("Error fetching locations:", error);
     } finally {

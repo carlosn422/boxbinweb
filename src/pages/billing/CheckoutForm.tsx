@@ -4,8 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { supabase } from '@/lib/supabase';
 import { createStripeSubscriptionCupons } from '@/lib/stripe';
 
 type CheckoutFormProps = {
@@ -83,24 +82,23 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
     setCouponError(null);
 
     try {
-      // Import and use Firebase Functions
-      const { getFunctions, httpsCallable } = await import('firebase/functions');
-      const functions = getFunctions();
-      const validateCouponFunction = httpsCallable(functions, 'validateCoupon');
-
-      const result = await validateCouponFunction({ 
-        couponCode: couponCode.trim(),
-        planId,
-        userId 
+      const { data, error: fnError } = await supabase.functions.invoke('validate-coupon', {
+        body: {
+          couponCode: couponCode.trim(),
+          planId,
+          userId,
+        },
       });
 
-      const data = result.data as CouponValidation;
+      if (fnError) throw fnError;
 
-      if (data.valid && data.coupon) {
-        setAppliedCoupon(data);
+      const couponRes = data as CouponValidation;
+
+      if (couponRes?.valid && couponRes?.coupon) {
+        setAppliedCoupon(couponRes);
         setCouponError(null);
       } else {
-        setCouponError(data.error || 'Invalid coupon code');
+        setCouponError(couponRes?.error || 'Invalid coupon code');
         setAppliedCoupon(null);
       }
     } catch (err: any) {
@@ -175,16 +173,9 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         }
       );
 
-      const subscriptionsRef = collection(db, "subscriptions");
-      const q = query(subscriptionsRef, where("userId", "==", userId));
-      const existingSubs = await getDocs(q);
+      await supabase.from("subscriptions").delete().eq("userId", userId);
 
-      for (const docSnap of existingSubs.docs) {
-        await deleteDoc(doc(db, "subscriptions", docSnap.id));
-      }
-
-      // Save subscription details to Firestore
-      await addDoc(collection(db, 'subscriptions'), {
+      await supabase.from("subscriptions").insert({
         userId,
         planId,
         status: 'active',
@@ -204,8 +195,8 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
           zipCode,
           nameOnCard
         },
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       });
 
       if ((window as any).ReactNativeWebView) {

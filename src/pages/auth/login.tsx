@@ -3,12 +3,6 @@ import { Button } from "@/components/ui/button";
 import { loginWithGoogle, loginWithApple, loginWithYahoo } from "@/lib/supabase";
 import YahooIcon from "@/assets/yahoo.svg";
 import LogoIcon from "@/assets/logo.png";
-import {
-   // loginWithGoogle,
-   // loginWithApple,
-   // loginWithYahoo,
-  } from "@/lib/firebase";
-
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";

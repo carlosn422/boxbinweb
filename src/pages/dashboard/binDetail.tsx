@@ -58,27 +58,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL,
-  deleteObject,
-} from "firebase/storage";
+import { supabase } from "@/lib/supabase";
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import EnhancedVideoAIModal from "../billing/EnhancedVideoAIModal";
@@ -99,10 +81,16 @@ export interface TokenEstimate {
 }
 
 export const uploadImage = async (file: File): Promise<string> => {
-  const storage = getStorage();
-  const storageRef = ref(storage, `items/${Date.now()}-${file.name}`);
-  const snapshot = await uploadBytes(storageRef, file);
-  return await getDownloadURL(snapshot.ref);
+  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const filename = `items/${Date.now()}-${cleanName}`;
+  const { error } = await supabase.storage
+    .from("binventory-storage")
+    .upload(filename, file, { upsert: true });
+  if (error) throw error;
+  const { data: { publicUrl } } = supabase.storage
+    .from("binventory-storage")
+    .getPublicUrl(filename);
+  return publicUrl;
 };
 
 const extractStoragePath = (url: string | null): string | null => {
@@ -110,6 +98,11 @@ const extractStoragePath = (url: string | null): string | null => {
 
   if (!url.includes("http") && !url.startsWith("gs://")) {
     return url;
+  }
+
+  if (url.includes("/binventory-storage/")) {
+    const parts = url.split("/binventory-storage/");
+    return parts[1]?.split("?")[0] || null;
   }
 
   if (url.includes("firebasestorage.googleapis.com")) {
@@ -245,14 +238,14 @@ const BinDetailsScreen: React.FC = () => {
   const fetchSubscription = async () => {
     if (!currentUser?.uid) return;
     try {
-      const q = query(
-        collection(db, "subscriptions"),
-        where("userId", "==", currentUser.uid)
-      );
-      const querySnapshot = await getDocs(q);
+      const { data: subs } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("userId", currentUser.uid)
+        .limit(1);
 
-      if (!querySnapshot.empty) {
-        const sub = querySnapshot.docs[0].data();
+      if (subs && subs.length > 0) {
+        const sub = subs[0];
         if (sub.planId) {
           const stripePlan = await getStripePlanById(sub.planId);
           const fullSubscription = {
@@ -279,30 +272,29 @@ const BinDetailsScreen: React.FC = () => {
       if (showLoading) setLoading(true);
       await fetchSubscription();
 
-      const binDocRef = doc(db, "bins", id);
-      const binSnap = await getDoc(binDocRef);
+      const { data: binData, error: binErr } = await supabase
+        .from("bins")
+        .select("*")
+        .eq("id", id)
+        .maybeSingle();
 
-      if (!binSnap.exists()) {
+      if (binErr || !binData) {
         setBin(null);
         setLoading(false);
         return;
       }
 
-      const binData = binSnap.data() as Omit<BinDetails, "id">;
-      setBin({ id: binSnap.id, ...binData });
+      setBin(binData as BinDetails);
 
-      const itemsQuery = query(
-        collection(db, "items"),
-        where("binId", "==", id)
-      );
-      const itemsSnap = await getDocs(itemsQuery);
+      const { data: itemsData, error: itemsErr } = await supabase
+        .from("items")
+        .select("*")
+        .eq("binId", id)
+        .order("createdAt", { ascending: false });
 
-      const itemsData = itemsSnap.docs.map((itemDoc) => ({
-        id: itemDoc.id,
-        ...itemDoc.data(),
-      })) as Item[];
+      if (itemsErr) throw itemsErr;
 
-      setItems(itemsData);
+      setItems((itemsData || []) as Item[]);
     } catch (err) {
       console.error("Error fetching bin data:", err);
       toast.error("Failed to load container data");
@@ -335,16 +327,23 @@ const BinDetailsScreen: React.FC = () => {
     setIsBulkUploading(true);
     setBulkProgress({ done: 0, total: files.length });
 
-    const storage = getStorage();
     const newItems: Item[] = [];
 
     for (let i = 0; i < files.length; i++) {
       try {
         const file = files[i];
-        const filename = `bins/${id}/${Date.now()}_${file.name}`;
-        const storageRef = ref(storage, filename);
-        await uploadBytes(storageRef, file);
-        const url = await getDownloadURL(storageRef);
+        const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const filename = `bins/${id}/${Date.now()}_${cleanName}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from("binventory-storage")
+          .upload(filename, file, { upsert: true });
+
+        if (uploadErr) throw uploadErr;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from("binventory-storage")
+          .getPublicUrl(filename);
 
         const generatedName = `${bin?.name || "Item"} #${String(items.length + i + 1).padStart(2, "0")}`;
         const itemData = {
@@ -356,11 +355,17 @@ const BinDetailsScreen: React.FC = () => {
           createdAt: new Date().toISOString(),
           binId: id!,
           userId: currentUser?.uid,
-          imageUrl: url,
+          imageUrl: publicUrl,
         };
 
-        const docRef = await addDoc(collection(db, "items"), itemData);
-        newItems.push({ id: docRef.id, ...itemData });
+        const { data: inserted, error: insertErr } = await supabase
+          .from("items")
+          .insert(itemData)
+          .select()
+          .single();
+
+        if (insertErr) throw insertErr;
+        newItems.push(inserted as Item);
       } catch (err) {
         console.error("Error uploading file index", i, err);
       } finally {
@@ -468,8 +473,14 @@ const BinDetailsScreen: React.FC = () => {
         ...(imageUrl && { imageUrl }),
       };
 
-      const docRef = await addDoc(collection(db, "items"), itemData);
-      const newItem = { id: docRef.id, ...itemData };
+      const { data: inserted, error: insertErr } = await supabase
+        .from("items")
+        .insert(itemData)
+        .select()
+        .single();
+
+      if (insertErr) throw insertErr;
+      const newItem = inserted as Item;
 
       setItems((prev) => [newItem, ...prev]);
       setIsAddItemOpen(false);
@@ -494,7 +505,6 @@ const BinDetailsScreen: React.FC = () => {
 
     try {
       setIsSavingItem(true);
-      const itemRef = doc(db, "items", currentItem.id);
 
       const updateData: Partial<Item> = {
         name: itemName.trim(),
@@ -509,8 +519,7 @@ const BinDetailsScreen: React.FC = () => {
           try {
             const oldImagePath = extractStoragePath(currentItem.imageUrl);
             if (oldImagePath) {
-              const storage = getStorage();
-              await deleteObject(ref(storage, oldImagePath));
+              await supabase.storage.from("binventory-storage").remove([oldImagePath]);
             }
           } catch (e) {
             console.warn("Could not delete old image:", e);
@@ -521,7 +530,12 @@ const BinDetailsScreen: React.FC = () => {
         updateData.imageUrl = newImageUrl;
       }
 
-      await updateDoc(itemRef, updateData);
+      const { error: updateErr } = await supabase
+        .from("items")
+        .update(updateData)
+        .eq("id", currentItem.id);
+
+      if (updateErr) throw updateErr;
 
       setItems((prev) =>
         prev.map((item) =>
@@ -543,14 +557,14 @@ const BinDetailsScreen: React.FC = () => {
   // Delete item
   const deleteItem = async (itemId: string, imageUrl: string | undefined) => {
     try {
-      await deleteDoc(doc(db, "items", itemId));
+      const { error: delErr } = await supabase.from("items").delete().eq("id", itemId);
+      if (delErr) throw delErr;
 
       if (imageUrl) {
         try {
           const path = extractStoragePath(imageUrl);
           if (path) {
-            const storage = getStorage();
-            await deleteObject(ref(storage, path));
+            await supabase.storage.from("binventory-storage").remove([path]);
           }
         } catch (e) {
           console.warn("Could not delete item image:", e);
@@ -594,7 +608,12 @@ const BinDetailsScreen: React.FC = () => {
       };
 
       if (!id) return;
-      await updateDoc(doc(db, "bins", id), updatePayload);
+      const { error: binUpdateErr } = await supabase
+        .from("bins")
+        .update(updatePayload)
+        .eq("id", id);
+
+      if (binUpdateErr) throw binUpdateErr;
 
       setBin((prev) =>
         prev
@@ -627,13 +646,11 @@ const BinDetailsScreen: React.FC = () => {
       setIsDeletingBin(true);
 
       for (const item of items) {
-        await deleteDoc(doc(db, "items", item.id));
         if (item.imageUrl) {
           const path = extractStoragePath(item.imageUrl);
           if (path) {
             try {
-              const storage = getStorage();
-              await deleteObject(ref(storage, path));
+              await supabase.storage.from("binventory-storage").remove([path]);
             } catch (e) {
               console.warn("Storage deletion ignored:", e);
             }
@@ -641,7 +658,9 @@ const BinDetailsScreen: React.FC = () => {
         }
       }
 
-      await deleteDoc(doc(db, "bins", id));
+      await supabase.from("items").delete().eq("binId", id);
+      await supabase.from("bins").delete().eq("id", id);
+
       toast.success("Container deleted successfully");
       navigate("/home");
     } catch (err) {

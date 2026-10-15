@@ -2,10 +2,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
-import { auth } from "@/lib/firebase";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { doc, getDoc, addDoc, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { supabase, logoutUser } from "@/lib/supabase";
 import CheckoutForm from "./CheckoutForm.tsx";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -46,7 +44,7 @@ export default function BillingPage() {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await logoutUser();
       window.location.href = "/login";
     } catch (error) {
       console.error("Error signing out:", error);
@@ -55,12 +53,15 @@ export default function BillingPage() {
 
   useEffect(() => {
     const checkSubscription = async () => {
-      if (currentUser) {
-        const docRef = doc(db, "subscriptions", currentUser.uid);
-        const docSnap = await getDoc(docRef);
+      if (currentUser?.uid) {
+        const { data: subData } = await supabase
+          .from("subscriptions")
+          .select("*")
+          .eq("userId", currentUser.uid)
+          .eq("status", "active")
+          .maybeSingle();
 
-        if (docSnap.exists()) {
-          const subData = docSnap.data();
+        if (subData) {
           setSubscription(subData);
           // Filter plans to only show higher tiers
           const currentPlanIndex = plans.findIndex(
@@ -418,7 +419,7 @@ export default function BillingPage() {
                     <Button
                       onClick={async () => {
                         try {
-                          await addDoc(collection(db, "subscriptions"), {
+                          await supabase.from("subscriptions").insert({
                             userId: currentUser?.uid,
                             planId: selectedPlan,
                             status: "active",
