@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo } from "react";
-//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
 import { useParams, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,

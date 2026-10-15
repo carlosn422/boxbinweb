@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
-import { logoutUser } from "@/lib/firebase";
+import { logoutUser } from "@/lib/supabase";
 
 export function Header() {
   const { currentUser } = useAuth();

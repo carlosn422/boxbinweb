@@ -1,29 +1,18 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { loginWithGoogle, loginWithApple, loginWithYahoo } from "@/lib/supabase";
 import YahooIcon from "@/assets/yahoo.svg";
 import LogoIcon from "@/assets/logo.png";
 import {
-  loginWithGoogle,
-  loginWithApple,
-  loginWithYahoo,
-  auth,
-  db,
-} from "@/lib/firebase";
-import { getRedirectResult } from "firebase/auth";
+   // loginWithGoogle,
+   // loginWithApple,
+   // loginWithYahoo,
+  } from "@/lib/firebase";
+
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import {
-  collection,
-  doc,
-  getDoc,
-  getDocs,
-  query,
-  serverTimestamp,
-  setDoc,
-  updateDoc,
-  where,
-} from "firebase/firestore";
+
 import { LanguageSelector } from "@/components/layout/LanguageSelector";
 import {
   QrCode,
@@ -64,9 +53,7 @@ const LoginPage = () => {
         return;
       }
 
-      if (response?.user) {
-        await saveUserToFirestore(response.user);
-      }
+      // Session is handled by Supabase OAuth redirect & AuthContext
     } catch (error: any) {
       console.error(`Unexpected login error with ${provider}:`, error);
       toast.error(error.message || `Login error with ${provider}`);
@@ -75,80 +62,7 @@ const LoginPage = () => {
     }
   };
 
-  const generateUniqueUsername = async (email: string) => {
-    try {
-      if (!email) return "";
-      const baseUsername = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "");
-
-      while (true) {
-        const randomNum = Math.floor(1000 + Math.random() * 9000);
-        const username = `${baseUsername}${randomNum}`;
-
-        const q = query(
-          collection(db, "users"),
-          where("username", "==", username)
-        );
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-          return username;
-        }
-      }
-    } catch (error) {
-      console.log(error);
-      return email.split("@")[0] || "user";
-    }
-  };
-
-  const saveUserToFirestore = async (user: any) => {
-    try {
-      if (!user) return;
-
-      const userRef = doc(db, "users", user.uid);
-      const userSnapshot = await getDoc(userRef);
-
-      if (!userSnapshot.exists()) {
-        const username = await generateUniqueUsername(user.email);
-        await setDoc(userRef, {
-          uid: user.uid,
-          email: user.email || "",
-          username: username,
-          displayName: user.displayName || "",
-          photoURL: user.photoURL || "",
-          createdAt: serverTimestamp(),
-        });
-      } else {
-        const userData = userSnapshot.data();
-        let updateData: any = {
-          email: user.email || userData?.email || "",
-          displayName: user.displayName || userData?.displayName || "",
-          photoURL: user.photoURL || userData?.photoURL || "",
-          lastLogin: serverTimestamp(),
-        };
-
-        if (!userData?.username) {
-          updateData.username = await generateUniqueUsername(user.email);
-        }
-
-        await updateDoc(userRef, updateData);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
-
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          saveUserToFirestore(result.user);
-        }
-      })
-      .catch((error) => {
-        console.error("Redirect error:", error);
-      });
-  }, []);
-
+  
   // Real features extracted directly from https://boxbin.io/
   const realFeatures = [
     {

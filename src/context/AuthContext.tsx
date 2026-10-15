@@ -1,9 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { auth } from '@/lib/firebase';
-import type { User } from 'firebase/auth';
+import { supabase, formatSupabaseUser, syncUserProfile, type AppUser } from '@/lib/supabase';
 
 interface AuthContextType {
-  currentUser: User | null;
+  currentUser: AppUser | null;
   loading: boolean;
 }
 
@@ -16,23 +15,40 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Escuchar cambios en el estado de autenticación
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    // 1. Obtener la sesión activa inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = formatSupabaseUser(session?.user ?? null);
       setCurrentUser(user);
+      if (user) {
+        syncUserProfile(user);
+      }
       setLoading(false);
     });
 
-    // Limpiar suscripción al desmontar
-    return unsubscribe;
+    // 2. Escuchar cambios de estado en Supabase Auth
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const user = formatSupabaseUser(session?.user ?? null);
+      setCurrentUser(user);
+      if (user) {
+        syncUserProfile(user);
+      }
+      setLoading(false);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const value = {
     currentUser,
-    loading
+    loading,
   };
 
   return (

@@ -20,7 +20,7 @@ import {
   Bot,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { logoutUser } from "@/lib/firebase";
+import { logoutUser } from "@/lib/supabase";
 import LogoIcon from "@/assets/logo.png";
 import { LanguageSelector } from "./LanguageSelector";
 
