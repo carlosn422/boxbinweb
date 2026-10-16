@@ -1,6 +1,27 @@
-import React, { useState } from "react";
-import { X, Plus, MapPin, Loader2 } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import {
+  X,
+  Plus,
+  MapPin,
+  Loader2,
+  Package,
+  ArrowLeft,
+  Building2,
+  Search,
+  Check,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useTranslation } from "react-i18next";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 
 // Types
 export interface LocationTest {
@@ -26,35 +47,51 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  userId
+  userId,
 }) => {
+  const { t } = useTranslation();
+
   const [binName, setBinName] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [selectedLocation, setSelectedLocation] = useState<LocationTest | null>(
-    null
-  );
+  const [selectedLocation, setSelectedLocation] = useState<LocationTest | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [showLocationSelector, setShowLocationSelector] =
-    useState<boolean>(false);
+  const [showLocationSelector, setShowLocationSelector] = useState<boolean>(false);
+  const [locationSearch, setLocationSearch] = useState<string>("");
 
-  // Mock translation function - replace with your i18n solution
-  const t = (key: string): string => {
-    const translations: Record<string, string> = {
-      "addBin.nameLabel": "Container Name",
-      "addBin.namePlaceholder": "Enter Container name",
-      "addBin.descriptionLabel": "Description",
-      "addBin.descriptionPlaceholder": "Enter description",
-      "addBin.addLocation": "Add Location",
-      "addBin.optional": "optional",
-      "addBin.locationLabel": "Location",
-      "addBin.creating": "Creating...",
-      "addBin.create": "Create Container",
-    };
-    return translations[key] || key;
+  const [locationOptions, setLocationOptions] = useState<LocationTest[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState<boolean>(false);
+
+  const fetchLocations = async () => {
+    if (!userId) return;
+    setIsLoadingLocations(true);
+    try {
+      const { data, error } = await supabase
+        .from("locations")
+        .select("id, name, address")
+        .eq("userId", userId)
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      setLocationOptions(data || []);
+    } catch (error) {
+      console.error("Error fetching locations:", error);
+    } finally {
+      setIsLoadingLocations(false);
+    }
   };
 
+  const filteredLocations = useMemo(() => {
+    if (!locationSearch.trim()) return locationOptions;
+    const query = locationSearch.toLowerCase();
+    return locationOptions.filter(
+      (loc) =>
+        loc.name?.toLowerCase().includes(query) ||
+        loc.address?.toLowerCase().includes(query)
+    );
+  }, [locationOptions, locationSearch]);
+
   const handleSubmit = async (): Promise<void> => {
-    if (!binName.trim() || !description.trim()) return;
+    if (!binName.trim()) return;
 
     setIsSubmitting(true);
     try {
@@ -78,11 +115,13 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
     setDescription("");
     setSelectedLocation(null);
     setShowLocationSelector(false);
+    setLocationSearch("");
   };
 
   const handleLocationSelect = (location: LocationTest): void => {
     setSelectedLocation(location);
     setShowLocationSelector(false);
+    setLocationSearch("");
   };
 
   const handleClose = (): void => {
@@ -90,174 +129,274 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
     onClose();
   };
 
-  const isFormValid = (): boolean => {
-    return binName.trim().length > 0 && description.trim().length > 0;
-  };
-
-  const [locationOptions, setLocationOptions] = useState<LocationTest[]>([]);
-  const [isLoadingLocations, setIsLoadingLocations] = useState<boolean>(false);
-
-  const fetchLocations = async () => {
-    setIsLoadingLocations(true);
-    try {
-      const { data, error } = await supabase
-        .from("locations")
-        .select("id, name, address")
-        .eq("userId", userId);
-
-      if (error) throw error;
-      setLocationOptions(data || []);
-    } catch (error) {
-      console.error("Error fetching locations:", error);
-    } finally {
-      setIsLoadingLocations(false);
-    }
-  };
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">
-            {showLocationSelector ? "Select Location" : "Add New Container"}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X size={24} />
-          </button>
-        </div>
-
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
-          {showLocationSelector ? (
-            /* Location Selector View */
-            <div className="space-y-3">
-              <button
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+      <DialogContent
+        className="max-w-md w-full p-0 gap-0 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden font-sans"
+        showCloseButton={false}
+      >
+        {/* Modal Header */}
+        <DialogHeader className="px-5 py-4 border-b border-slate-100 flex flex-row items-center justify-between space-y-0">
+          <div className="flex items-center space-x-3 min-w-0">
+            {showLocationSelector ? (
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowLocationSelector(false)}
-                className="flex items-center text-blue-600 hover:text-blue-700 text-sm mb-4"
+                className="h-8 w-8 p-0 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 shrink-0"
+                title="Volver"
               >
-                ← Back to form
-              </button>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-800 shrink-0 shadow-2xs">
+                <Package className="w-4.5 h-4.5" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <DialogTitle className="text-sm font-bold text-slate-900 leading-tight truncate">
+                {showLocationSelector
+                  ? t("addBin.selectLocation", { defaultValue: "Seleccionar Ubicación" })
+                  : t("addBin.title", { defaultValue: "Nuevo Contenedor" })}
+              </DialogTitle>
+              <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                {showLocationSelector
+                  ? t("addBin.selectLocationDesc", {
+                      defaultValue: "Asigna un lugar físico a este contenedor",
+                    })
+                  : t("addBin.subtitle", {
+                      defaultValue: "Crea y organiza tu nuevo contenedor en el inventario",
+                    })}
+              </p>
+            </div>
+          </div>
 
-              {isLoadingLocations ? (
-                <div className="text-center py-8 text-gray-500">
-                  Loading locations...
-                </div>
-              ) : locationOptions.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
-                  No locations available
-                </p>
-              ) : (
-                locationOptions.map((location) => (
-                  <div
-                    key={location.id}
-                    onClick={() => handleLocationSelect(location)}
-                    className="flex items-center justify-between p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-colors"
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleClose}
+            className="h-8 w-8 p-0 text-slate-400 hover:text-slate-700 rounded-lg shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </DialogHeader>
+
+        {/* Modal Body */}
+        <div className="p-5 overflow-y-auto max-h-[70vh]">
+          {showLocationSelector ? (
+            /* =========================================================
+                1. SUB-VIEW: LOCATION SELECTOR
+               ========================================================= */
+            <div className="space-y-3">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Input
+                  value={locationSearch}
+                  onChange={(e) => setLocationSearch(e.target.value)}
+                  placeholder={t("addBin.searchLocations", {
+                    defaultValue: "Buscar ubicación por nombre o dirección...",
+                  })}
+                  className="pl-8 pr-7 h-8 text-xs rounded-xl border-slate-200 bg-slate-50/60 focus:bg-white"
+                />
+                {locationSearch && (
+                  <button
+                    onClick={() => setLocationSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
                   >
-                    <div>
-                      <h3 className="font-medium text-gray-900">
-                        {location.name}
-                      </h3>
-                      {location.address && (
-                        <p className="text-sm text-gray-500">
-                          {location.address}
-                        </p>
-                      )}
-                    </div>
-                    <MapPin size={20} className="text-gray-400" />
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Locations List */}
+              {isLoadingLocations ? (
+                <div className="py-10 flex flex-col items-center justify-center space-y-2 text-slate-400">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-600" />
+                  <p className="text-xs">Cargando ubicaciones...</p>
+                </div>
+              ) : filteredLocations.length === 0 ? (
+                <div className="py-8 text-center px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-2">
+                    <MapPin className="w-4 h-4" />
                   </div>
-                ))
+                  <p className="text-xs font-semibold text-slate-700">
+                    {locationSearch
+                      ? "No se encontraron ubicaciones con ese término"
+                      : "No tienes ubicaciones registradas aún"}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {locationSearch
+                      ? "Prueba buscando con otro término"
+                      : "Puedes crear ubicaciones desde la sección de Ubicaciones en el menú"}
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-0.5">
+                  {filteredLocations.map((location) => {
+                    const isSelected = selectedLocation?.id === location.id;
+                    return (
+                      <div
+                        key={location.id}
+                        onClick={() => handleLocationSelect(location)}
+                        className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
+                          isSelected
+                            ? "bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs"
+                            : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80 text-slate-900"
+                        }`}
+                      >
+                        <div className="flex items-center space-x-3 min-w-0">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              isSelected
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
+                            }`}
+                          >
+                            <Building2 className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-xs truncate leading-tight">
+                              {location.name}
+                            </h4>
+                            {location.address && (
+                              <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                                {location.address}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                            <Check className="w-3 h-3" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           ) : (
-            /* Main Form */
-            <div className="space-y-6">
-              {/* Bin Name Input */}
-              <div>
-                <label
-                  htmlFor="binName"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  {t("addBin.nameLabel")}
-                </label>
-                <input
-                  id="binName"
-                  type="text"
+            /* =========================================================
+                2. MAIN FORM: ADD CONTAINER
+               ========================================================= */
+            <div className="space-y-4">
+              {/* Bin Name */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label
+                    htmlFor="binNameInput"
+                    className="text-xs font-semibold text-slate-800"
+                  >
+                    {t("addBin.nameLabel", { defaultValue: "Nombre del Contenedor" })} *
+                  </Label>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {binName.length}/35
+                  </span>
+                </div>
+                <Input
+                  id="binNameInput"
                   value={binName}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                    setBinName(e.target.value)
-                  }
-                  placeholder={t("addBin.namePlaceholder")}
+                  onChange={(e) => setBinName(e.target.value)}
+                  placeholder={t("addBin.namePlaceholder", {
+                    defaultValue: "Ej. Caja #1 - Ropa de Invierno, Herramientas...",
+                  })}
                   maxLength={35}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400"
+                  className="h-9 text-xs rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white placeholder:text-slate-400"
+                  autoFocus
                 />
               </div>
 
-              {/* Description Input */}
-              <div>
-                <label
-                  htmlFor="description"
-                  className="block text-sm font-medium text-gray-700 mb-2"
+              {/* Description */}
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor="binDescInput"
+                  className="text-xs font-semibold text-slate-800"
                 >
-                  {t("addBin.descriptionLabel")}
-                </label>
-                <textarea
-                  id="description"
+                  {t("addBin.descriptionLabel", { defaultValue: "Descripción o Notas" })}
+                </Label>
+                <Textarea
+                  id="binDescInput"
                   value={description}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setDescription(e.target.value)
-                  }
-                  placeholder={t("addBin.descriptionPlaceholder")}
-                  rows={4}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-400 resize-none"
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder={t("addBin.descriptionPlaceholder", {
+                    defaultValue: "Escribe detalles sobre lo que guardarás, categoría, etc.",
+                  })}
+                  rows={3}
+                  className="text-xs rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white placeholder:text-slate-400 resize-none leading-relaxed"
                 />
               </div>
 
-              {/* Location Selection */}
-              <div>
+              {/* Location Picker */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center justify-between">
+                  <span>{t("addBin.locationLabel", { defaultValue: "Ubicación" })}</span>
+                  <span className="text-[10px] text-slate-400 font-normal">
+                    ({t("addBin.optional", { defaultValue: "Opcional" })})
+                  </span>
+                </Label>
+
                 {!selectedLocation ? (
-                  <div className="flex items-center space-x-3">
-                    <button
-                      onClick={() => {
-                        setShowLocationSelector(true);
-                        if (locationOptions.length === 0) {
-                          fetchLocations();
-                        }
-                      }}
-                      className="flex items-center justify-center w-8 h-8 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-                    >
-                      <Plus size={16} />
-                    </button>
-                    <span className="text-sm text-gray-700">
-                      {t("addBin.addLocation")}{" "}
-                      <span className="text-gray-500">
-                        ({t("addBin.optional")})
-                      </span>
-                    </span>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t("addBin.locationLabel")}
-                    </label>
-                    <div className="flex items-center space-x-2">
-                      <div
-                        onClick={() => setShowLocationSelector(true)}
-                        className="flex-1 flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors"
-                      >
-                        <span className="text-blue-800 font-medium">
-                          {selectedLocation.name}
-                        </span>
-                        <MapPin size={16} className="text-blue-600" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLocationSelector(true);
+                      if (locationOptions.length === 0) {
+                        fetchLocations();
+                      }
+                    }}
+                    className="w-full flex items-center justify-between p-2.5 rounded-xl border border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 transition-all text-left group"
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50 transition-colors">
+                        <Plus className="w-3.5 h-3.5" />
                       </div>
+                      <div>
+                        <p className="text-xs font-medium text-slate-700 group-hover:text-slate-900">
+                          {t("addBin.addLocation", { defaultValue: "Asignar ubicación" })}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          Estante, bodega, cuarto o dirección
+                        </p>
+                      </div>
+                    </div>
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors mr-1" />
+                  </button>
+                ) : (
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 shadow-2xs">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100/90 flex items-center justify-center text-blue-700 shrink-0">
+                        <MapPin className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-blue-900 truncate">
+                          {selectedLocation.name}
+                        </p>
+                        {selectedLocation.address && (
+                          <p className="text-[10px] text-blue-700/80 truncate">
+                            {selectedLocation.address}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-1 shrink-0">
                       <button
-                        onClick={() => setSelectedLocation(null)}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
+                        type="button"
+                        onClick={() => setShowLocationSelector(true)}
+                        className="px-2 py-1 text-blue-700 hover:text-blue-900 text-[11px] font-semibold hover:underline"
                       >
-                        <X size={20} />
+                        Cambiar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLocation(null)}
+                        className="p-1 text-slate-400 hover:text-red-500 rounded"
+                        title="Quitar ubicación"
+                      >
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -267,30 +406,38 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
           )}
         </div>
 
-        {/* Footer - Only show on main form */}
+        {/* Modal Footer */}
         {!showLocationSelector && (
-          <div className="p-6 bg-gray-50 border-t">
-            <button
+          <div className="px-5 py-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end space-x-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="h-8 rounded-lg text-xs border-slate-200 text-slate-700 hover:bg-white"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
               onClick={handleSubmit}
-              disabled={!isFormValid() || isSubmitting}
-              className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg font-medium transition-colors ${
-                !isFormValid() || isSubmitting
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
+              disabled={!binName.trim() || isSubmitting}
+              size="sm"
+              className="h-8 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-2xs inline-flex items-center space-x-1.5"
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 size={20} className="animate-spin" />
-                  <span>{t("addBin.creating")}</span>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
+                  <span>{t("addBin.creating", { defaultValue: "Creando..." })}</span>
                 </>
               ) : (
-                <span>{t("addBin.create")}</span>
+                <span>{t("addBin.create", { defaultValue: "Crear Contenedor" })}</span>
               )}
-            </button>
+            </Button>
           </div>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

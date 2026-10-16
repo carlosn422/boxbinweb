@@ -6,14 +6,14 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
-    <div className="flex h-screen overflow-hidden safe-top safe-bottom">
-      {/* Sidebar */}
+    <div className="flex flex-col md:flex-row h-screen overflow-hidden safe-top safe-bottom bg-slate-50/50 font-sans">
+      {/* Sidebar (Desktop navigation + Mobile top bar & slide-over drawer) */}
       <Sidebar />
       
       {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-muted/50">
+        <main className="flex-1 overflow-auto bg-slate-50/50">
           <div className="mx-auto max-w-7xl">
             {children}
           </div>

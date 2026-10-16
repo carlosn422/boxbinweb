@@ -27,6 +27,7 @@ import {
   ArrowUpDown,
   Check,
   RefreshCw,
+  ShieldAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -126,6 +127,7 @@ export interface BinDetails {
   description: string;
   address: string;
   createdAt: string;
+  userId?: string;
   location?: {
     name: string;
     coordinates: {
@@ -142,6 +144,7 @@ export interface Item {
   tags: string[];
   createdAt: string;
   binId: string;
+  userId?: string;
   imageUrl?: string;
   cuantity: string;
   value: string;
@@ -152,7 +155,19 @@ const BinDetailsScreen: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth();
+
+  const [userImpersonated, setUserImpersonated] = useState<any>(() =>
+    JSON.parse(localStorage.getItem("impersonatedUser") || "null")
+  );
+  const effectiveUserId = userImpersonated?.ownerUserId || currentUser?.uid;
+  const [isUnauthorized, setIsUnauthorized] = useState(false);
+
+  const handleStopImpersonating = () => {
+    localStorage.removeItem("impersonatedUser");
+    setUserImpersonated(null);
+    navigate("/home");
+  };
 
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
@@ -236,12 +251,12 @@ const BinDetailsScreen: React.FC = () => {
 
   // Fetch subscription
   const fetchSubscription = async () => {
-    if (!currentUser?.uid) return;
+    if (!effectiveUserId) return;
     try {
       const { data: subs } = await supabase
         .from("subscriptions")
         .select("*")
-        .eq("userId", currentUser.uid)
+        .eq("userId", effectiveUserId)
         .limit(1);
 
       if (subs && subs.length > 0) {
@@ -265,31 +280,65 @@ const BinDetailsScreen: React.FC = () => {
     }
   };
 
-  // Fetch bin and items
+  // Fetch bin and items with strict user ownership validation
   const loadData = async (showLoading = true) => {
-    if (!id) return;
+    if (!id || !effectiveUserId) {
+      if (!effectiveUserId && !authLoading) {
+        setBin(null);
+        setItems([]);
+        if (showLoading) setLoading(false);
+      }
+      return;
+    }
     try {
       if (showLoading) setLoading(true);
       await fetchSubscription();
 
+      // Query bin strictly for the current effective user
       const { data: binData, error: binErr } = await supabase
         .from("bins")
         .select("*")
         .eq("id", id)
+        .eq("userId", effectiveUserId)
         .maybeSingle();
 
-      if (binErr || !binData) {
+      if (binErr) {
+        console.error("Error querying bin data:", binErr);
+      }
+
+      if (!binData) {
+        // Double check if container belongs to another user
+        const { data: foreignBin } = await supabase
+          .from("bins")
+          .select("id")
+          .eq("id", id)
+          .maybeSingle();
+
+        setIsUnauthorized(Boolean(foreignBin));
         setBin(null);
-        setLoading(false);
+        setItems([]);
+        if (showLoading) setLoading(false);
         return;
       }
 
+      // Explicit verification: ensure container belongs to this user
+      if (binData.userId && binData.userId !== effectiveUserId) {
+        setIsUnauthorized(true);
+        setBin(null);
+        setItems([]);
+        if (showLoading) setLoading(false);
+        return;
+      }
+
+      setIsUnauthorized(false);
       setBin(binData as BinDetails);
 
+      // Fetch items strictly belonging to this container and user
       const { data: itemsData, error: itemsErr } = await supabase
         .from("items")
         .select("*")
         .eq("binId", id)
+        .eq("userId", effectiveUserId)
         .order("createdAt", { ascending: false });
 
       if (itemsErr) throw itemsErr;
@@ -305,8 +354,14 @@ const BinDetailsScreen: React.FC = () => {
   };
 
   useEffect(() => {
+    if (authLoading) return;
+    if (!effectiveUserId) {
+      setLoading(false);
+      setBin(null);
+      return;
+    }
     loadData(true);
-  }, [id]);
+  }, [id, effectiveUserId, authLoading]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -316,7 +371,12 @@ const BinDetailsScreen: React.FC = () => {
 
   // Bulk Upload
   const handleBulkUpload = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0 || !bin || !effectiveUserId) return;
+
+    if (bin.userId && bin.userId !== effectiveUserId) {
+      toast.error("You don't have permission to modify this container");
+      return;
+    }
 
     const limit = Number(subscription?.metadata?.items) || 100;
     if (items.length + files.length > limit) {
@@ -354,7 +414,7 @@ const BinDetailsScreen: React.FC = () => {
           tags: [],
           createdAt: new Date().toISOString(),
           binId: id!,
-          userId: currentUser?.uid,
+          userId: effectiveUserId,
           imageUrl: publicUrl,
         };
 
@@ -431,6 +491,11 @@ const BinDetailsScreen: React.FC = () => {
 
   // Create new item
   const handleSubmitItem = async () => {
+    if (!bin || (bin.userId && bin.userId !== effectiveUserId)) {
+      toast.error("You don't have permission to modify this container");
+      return;
+    }
+
     const limit = Number(subscription?.metadata?.items) || 100;
     if (items.length >= limit) {
       toast.error(`Plan limit of ${limit} items reached.`);
@@ -469,7 +534,7 @@ const BinDetailsScreen: React.FC = () => {
         tags: itemTags,
         createdAt: new Date().toISOString(),
         binId: id!,
-        userId: currentUser?.uid,
+        userId: effectiveUserId,
         ...(imageUrl && { imageUrl }),
       };
 
@@ -533,7 +598,8 @@ const BinDetailsScreen: React.FC = () => {
       const { error: updateErr } = await supabase
         .from("items")
         .update(updateData)
-        .eq("id", currentItem.id);
+        .eq("id", currentItem.id)
+        .eq("userId", effectiveUserId);
 
       if (updateErr) throw updateErr;
 
@@ -557,7 +623,11 @@ const BinDetailsScreen: React.FC = () => {
   // Delete item
   const deleteItem = async (itemId: string, imageUrl: string | undefined) => {
     try {
-      const { error: delErr } = await supabase.from("items").delete().eq("id", itemId);
+      const { error: delErr } = await supabase
+        .from("items")
+        .delete()
+        .eq("id", itemId)
+        .eq("userId", effectiveUserId);
       if (delErr) throw delErr;
 
       if (imageUrl) {
@@ -607,11 +677,12 @@ const BinDetailsScreen: React.FC = () => {
         location: selectedLocation ?? bin?.location,
       };
 
-      if (!id) return;
+      if (!id || !effectiveUserId) return;
       const { error: binUpdateErr } = await supabase
         .from("bins")
         .update(updatePayload)
-        .eq("id", id);
+        .eq("id", id)
+        .eq("userId", effectiveUserId);
 
       if (binUpdateErr) throw binUpdateErr;
 
@@ -641,7 +712,7 @@ const BinDetailsScreen: React.FC = () => {
 
   // Delete container entirely
   const handleDeleteBin = async () => {
-    if (!id) return;
+    if (!id || !effectiveUserId) return;
     try {
       setIsDeletingBin(true);
 
@@ -658,8 +729,8 @@ const BinDetailsScreen: React.FC = () => {
         }
       }
 
-      await supabase.from("items").delete().eq("binId", id);
-      await supabase.from("bins").delete().eq("id", id);
+      await supabase.from("items").delete().eq("binId", id).eq("userId", effectiveUserId);
+      await supabase.from("bins").delete().eq("id", id).eq("userId", effectiveUserId);
 
       toast.success("Container deleted successfully");
       navigate("/home");
@@ -730,11 +801,11 @@ const BinDetailsScreen: React.FC = () => {
       });
   }, [items, searchQuery, selectedTag, sortBy]);
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
-      <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-4 font-sans">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-slate-800 mb-3" />
-        <p className="text-xs text-slate-500 font-medium">Loading container details...</p>
+        <p className="text-xs text-slate-500 font-medium">Cargando detalles del contenedor...</p>
       </div>
     );
   }
@@ -743,19 +814,33 @@ const BinDetailsScreen: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4 font-sans">
         <div className="bg-white rounded-xl border border-slate-200/80 p-8 max-w-md w-full text-center shadow-xs">
-          <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto text-slate-400 mb-3">
-            <Package className="w-6 h-6" />
-          </div>
-          <h2 className="text-base font-bold text-slate-900">Container not found</h2>
-          <p className="text-xs text-slate-500 mt-1 mb-5">
-            The requested container could not be found or may have been deleted.
-          </p>
+          {isUnauthorized ? (
+            <>
+              <div className="w-12 h-12 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center mx-auto text-red-600 mb-3">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <h2 className="text-base font-bold text-slate-900">Acceso no autorizado</h2>
+              <p className="text-xs text-slate-500 mt-1 mb-5 leading-relaxed">
+                Este contenedor no pertenece a tu cuenta o no cuentas con los permisos necesarios para visualizar su información.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto text-slate-400 mb-3">
+                <Package className="w-6 h-6" />
+              </div>
+              <h2 className="text-base font-bold text-slate-900">Contenedor no encontrado</h2>
+              <p className="text-xs text-slate-500 mt-1 mb-5 leading-relaxed">
+                El contenedor solicitado no existe, fue eliminado o el identificador es incorrecto.
+              </p>
+            </>
+          )}
           <Button
             onClick={() => navigate("/home")}
-            className="h-8 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+            className="h-8 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center"
           >
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            Back to Dashboard
+            Volver a Mis Contenedores
           </Button>
         </div>
       </div>
@@ -765,6 +850,26 @@ const BinDetailsScreen: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
       <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
+        {/* Impersonation Banner if viewing shared account */}
+        {userImpersonated && (
+          <div className="bg-amber-50 border border-amber-200/80 px-4 py-2 rounded-xl flex items-center justify-between text-xs text-amber-800 shadow-2xs">
+            <div className="flex items-center space-x-2">
+              <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                Visualizando cuenta compartida: <strong>{userImpersonated?.ownerUsername}</strong> ({userImpersonated?.ownerUserId})
+              </span>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleStopImpersonating}
+              className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100 rounded font-medium"
+            >
+              Salir de cuenta compartida
+            </Button>
+          </div>
+        )}
+
         {/* Compact Top Bar matching home.tsx */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {/* Left: Identity */}
@@ -2081,6 +2186,7 @@ const BinDetailsScreen: React.FC = () => {
         isVideoUploadOpen={isImagesUploadOpen}
         itemId={id}
         setItems={setItems}
+        userId={effectiveUserId}
       />
 
       <EnhancedVideoAIModal
@@ -2088,6 +2194,7 @@ const BinDetailsScreen: React.FC = () => {
         isVideoUploadOpen={isVideoUploadOpen}
         itemId={id}
         setItems={setItems}
+        userId={effectiveUserId}
       />
 
       {/* Feedback Modal */}

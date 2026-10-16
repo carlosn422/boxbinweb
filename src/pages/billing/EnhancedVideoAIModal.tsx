@@ -32,6 +32,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import TokenCheckoutForm from "./TokenCheckoutForm";
 import { loadStripe } from "@stripe/stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
+import { API_BASE_URL } from "@/config/api";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 const planIcons = [Coins, Zap, Star, Crown];
 
@@ -40,9 +41,11 @@ const EnhancedVideoAIModal = ({
   setIsVideoUploadOpen,
   itemId,
   setItems,
+  userId,
 }: any) => {
 
   const { currentUser } = useAuth();
+  const effectiveUserId = userId || currentUser?.uid;
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
   const [videoPreview, setVideoPreview] = useState<any>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -160,8 +163,7 @@ const EnhancedVideoAIModal = ({
 
     try {
       const estimateResponse = await fetch(
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/estimate-tokens",
-        //"http://localhost:3000/api/v1/gemini-video/process-video/estimate-tokens",
+        `${API_BASE_URL}/api/v1/gemini-video/process-video/estimate-tokens`,
         {
           method: "POST",
           body: formData,
@@ -200,8 +202,7 @@ const EnhancedVideoAIModal = ({
     setEstimateData(null);
 
     const processResponse = await fetch(
-      "https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video",
-      //"http://localhost:3000/api/v1/gemini-video/process-video",
+      `${API_BASE_URL}/api/v1/gemini-video/process-video`,
       {
         method: "POST",
         body: formData,
@@ -251,7 +252,7 @@ const EnhancedVideoAIModal = ({
         timestamp: item.timestamp_seconds,
         createdAt: new Date().toISOString(),
         binId: itemId,
-        userId: currentUser?.uid,
+        userId: effectiveUserId,
         imageUrl: finalUrl,
       };
 
@@ -978,7 +979,7 @@ const EnhancedVideoAIModal = ({
             token = await currentUser.getIdToken();
           }
           const res = await fetch(
-            `https://boxbinapi-iv6wi.ondigitalocean.app/api/v1/gemini-video/process-video/status/${processingId}`,
+            `${API_BASE_URL}/api/v1/gemini-video/process-video/status/${processingId}`,
             {
               headers: {
                 Authorization: `Bearer ${token}`,

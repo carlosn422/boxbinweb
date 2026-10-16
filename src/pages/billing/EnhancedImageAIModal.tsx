@@ -33,6 +33,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import TokenCheckoutForm from "./TokenCheckoutForm";
 import { loadStripe } from "@stripe/stripe-js";
 import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
+import { API_BASE_URL } from "@/config/api";
 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 const planIcons = [Coins, Zap, Star, Crown];
@@ -42,8 +43,10 @@ const EnhancedImagesAIModal = ({
   setIsVideoUploadOpen,
   itemId,
   setItems,
+  userId,
 }: any) => {
   const { currentUser } = useAuth();
+  const effectiveUserId = userId || currentUser?.uid;
   const [isUploading, setIsUploading] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [detectedItems, setDetectedItems] = useState<any>([]);
@@ -217,7 +220,7 @@ const EnhancedImagesAIModal = ({
 
       // Llamada a la API
       const response = await fetch(
-        "https://boxbinapi-iv6wi.ondigitalocean.app/api/process-images/estimate-tokens",
+        `${API_BASE_URL}/api/process-images/estimate-tokens`,
         {
           method: "POST",
           body: formData,
@@ -262,8 +265,7 @@ const EnhancedImagesAIModal = ({
     setEstimateData(null);
 
     const response = await fetch(
-      "https://boxbinapi-iv6wi.ondigitalocean.app/api/process-images",
-      //"http://localhost:3000/api/process-images",
+      `${API_BASE_URL}/api/process-images`,
       {
         method: "POST",
         body: formData,
@@ -314,7 +316,7 @@ const EnhancedImagesAIModal = ({
         confidence: item.confidence,
         createdAt: new Date().toISOString(),
         binId: itemId,
-        userId: currentUser?.uid,
+        userId: effectiveUserId,
         imageUrl: finalUrl,
       };
 

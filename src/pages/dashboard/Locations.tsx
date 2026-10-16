@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Search,
   Plus,
@@ -12,10 +12,11 @@ import {
   Calendar,
   X,
   Loader2,
-  AlertCircle,
   RefreshCw,
+  Layers,
+  ArrowUpRight,
+  ShieldAlert,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import {
@@ -28,7 +29,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,34 +49,42 @@ import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 
 export const LocationsManager = () => {
   const { t } = useTranslation();
-  // Estados principales
-  const [locations, setLocations] = useState<any>([]);
+
+  // Core state
+  const [locations, setLocations] = useState<any[]>([]);
   const [searchText, setSearchText] = useState("");
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isEditModalVisible, setIsEditModalVisible] = useState(false);
   const [pageLoading, setPageLoading] = useState(true);
   const [operationLoading, setOperationLoading] = useState(false);
+
+  // Form state
   const [itemName, setItemName] = useState("");
   const [itemAddress, setItemAddress] = useState("");
   const [itemDescription, setItemDescription] = useState("");
-
   const [editingId, setEditingId] = useState<any>(null);
 
-  // Estados de paginación
+  // Pagination & Sorting state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [itemsPerPage, setItemsPerPage] = useState(8);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState("desc");
   const [totalLocations, setTotalLocations] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [hasPrevPage, setHasPrevPage] = useState(false);
 
-  // Auth & impersonation
+  // Auth & Impersonation
   const { currentUser } = useAuth();
   const [userImpersonated, setUserImpersonated] = useState<any>(() =>
     JSON.parse(localStorage.getItem("impersonatedUser") || "null")
   );
   const effectiveUserId = userImpersonated?.ownerUserId || currentUser?.uid;
 
+  // Subscription
+  const [subscription, setSubscription] = useState<any | null>(null);
+
+  // Feedback modal
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     type: ModalType;
@@ -89,19 +97,11 @@ export const LocationsManager = () => {
   });
 
   const closeModal = () => {
-    setModalState((prev: any) => ({ ...prev, isOpen: false }));
+    setModalState((prev) => ({ ...prev, isOpen: false }));
   };
-
-  // Estados para navegación de páginas
-  // Pagination handled by page offset
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [hasPrevPage, setHasPrevPage] = useState(false);
-
-  const [subscription, setSubscription] = useState<any | null>(null);
 
   const fetchSubscription = async () => {
     if (!currentUser?.uid) return;
-
     try {
       const { data: subs } = await supabase
         .from("subscriptions")
@@ -113,22 +113,19 @@ export const LocationsManager = () => {
         const sub = subs[0];
         if (sub.planId) {
           const stripePlan = await getStripePlanById(sub.planId);
-
-          const fullSubscription = {
+          setSubscription({
             ...sub,
             plan: stripePlan?.product?.name ?? "Unknown Plan",
             price: (stripePlan?.unit_amount ?? 0) / 100,
             interval: stripePlan?.recurring?.interval ?? "month",
             metadata: stripePlan?.metadata ?? {},
-          };
-
-          setSubscription(fullSubscription);
+          });
         } else {
           setSubscription(sub);
         }
       }
     } catch (error) {
-      console.error("🔥 Error al obtener suscripción:", error);
+      console.error("Error fetching subscription:", error);
     }
   };
 
@@ -137,13 +134,10 @@ export const LocationsManager = () => {
     setUserImpersonated(null);
   };
 
-  // Función para obtener el total de ubicaciones
   const getTotalLocations = async () => {
     if (!currentUser) return;
-
     try {
       await fetchSubscription();
-
       const { count, error } = await supabase
         .from("locations")
         .select("*", { count: "exact", head: true })
@@ -157,10 +151,8 @@ export const LocationsManager = () => {
     }
   };
 
-  // Función para cargar ubicaciones con paginación
-  const loadLocations = async (page = 1, _isRefresh = false) => {
+  const loadLocations = async (page = 1) => {
     if (!currentUser) return;
-
     setPageLoading(true);
 
     try {
@@ -193,87 +185,73 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: "Error loading the locations",
+        message: "Error loading locations",
       });
     } finally {
       setPageLoading(false);
     }
   };
 
-  // Función para filtrar ubicaciones localmente
-  const getFilteredLocations = () => {
+  const filteredLocations = useMemo(() => {
     if (!searchText.trim()) return locations;
-
-    const searchTerm = searchText.toLowerCase();
+    const term = searchText.toLowerCase().trim();
     return locations.filter(
-      (location: any) =>
-        location.name.toLowerCase().includes(searchTerm) ||
-        location.address?.toLowerCase().includes(searchTerm) ||
-        location.description?.toLowerCase().includes(searchTerm)
+      (loc: any) =>
+        loc.name?.toLowerCase().includes(term) ||
+        loc.address?.toLowerCase().includes(term) ||
+        loc.description?.toLowerCase().includes(term)
     );
-  };
+  }, [locations, searchText]);
 
-  // Función para crear ubicación
   const handleSubmit = async () => {
     if (!itemName.trim() || !currentUser) return;
-    // Verificar si ya alcanzó el límite
-    if (totalLocations >= Number(subscription?.metadata?.locations)) {
+
+    const limit = Number(subscription?.metadata?.locations);
+    if (limit > 0 && totalLocations >= limit) {
       setModalState({
         isOpen: true,
         type: "error",
-        message: `You have reached the limit of ${subscription?.metadata?.locations} locations for your plan.`,
+        message: `You have reached your limit of ${limit} locations for your current plan.`,
       });
       return;
     }
 
     setOperationLoading(true);
     try {
-      const data = {
+      const { error: insErr } = await supabase.from("locations").insert({
         name: itemName.trim(),
         address: itemAddress.trim(),
         description: itemDescription.trim(),
         createdAt: new Date().toISOString(),
         userId: effectiveUserId,
-      };
+      });
 
-      const { error: insErr } = await supabase.from("locations").insert(data);
       if (insErr) throw insErr;
 
-      // Resetear formulario
-      setItemName("");
-      setItemAddress("");
-      setItemDescription("");
+      resetForm();
       setIsModalVisible(false);
-
       setModalState({
         isOpen: true,
         type: "success",
-        message: "Location created successfully",
+        message: "Location registered successfully",
       });
 
-      // Recargar datos
-      await loadLocations(1, true);
+      await loadLocations(1);
       await getTotalLocations();
     } catch (error) {
       console.error("Error creating location:", error);
       setModalState({
         isOpen: true,
         type: "error",
-        message: "Error creating the location",
+        message: "Failed to create location",
       });
     } finally {
       setOperationLoading(false);
     }
   };
 
-  // Función para actualizar ubicación
   const handleUpdateSubmit = async () => {
-    if (!itemName.trim() || !editingId || !currentUser) {
-      console.log(itemName);
-      console.log(editingId);
-      console.log(currentUser);
-      return;
-    }
+    if (!itemName.trim() || !editingId || !currentUser) return;
 
     setOperationLoading(true);
     try {
@@ -286,12 +264,10 @@ export const LocationsManager = () => {
           updatedAt: new Date().toISOString(),
         })
         .eq("id", editingId);
+
       if (updErr) throw updErr;
 
-      // Resetear formulario
-      setItemName("");
-      setItemAddress("");
-      setItemDescription("");
+      resetForm();
       setIsEditModalVisible(false);
       setEditingId(null);
       setSelectedLocation(null);
@@ -302,29 +278,31 @@ export const LocationsManager = () => {
         message: "Location updated successfully",
       });
 
-      // Recargar datos
       await loadLocations(currentPage);
     } catch (error) {
       console.error("Error updating location:", error);
       setModalState({
         isOpen: true,
         type: "error",
-        message: "Error updating the location",
+        message: "Failed to update location",
       });
     } finally {
       setOperationLoading(false);
     }
   };
 
-  // Función para eliminar ubicación
   const confirmDeleteLocation = async (locationId: string) => {
-    if (!window.confirm(t("locations.confirmDelete"))) {
+    if (!window.confirm(t("locations.confirmDelete") || "Are you sure you want to delete this location?")) {
       return;
     }
 
     setOperationLoading(true);
     try {
-      const { error: delErr } = await supabase.from("locations").delete().eq("id", locationId);
+      const { error: delErr } = await supabase
+        .from("locations")
+        .delete()
+        .eq("id", locationId);
+
       if (delErr) throw delErr;
 
       setSelectedLocation(null);
@@ -333,7 +311,7 @@ export const LocationsManager = () => {
         type: "success",
         message: "Location deleted successfully",
       });
-      // Recargar datos
+
       await loadLocations(currentPage);
       await getTotalLocations();
     } catch (error) {
@@ -341,31 +319,21 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: "Error deleting the location",
+        message: "Failed to delete location",
       });
     } finally {
       setOperationLoading(false);
     }
   };
 
-  // Función para manejar selección de ubicación
-  const handleLocationSelect = (location: any) => {
-    setSelectedLocation(selectedLocation?.id === location.id ? null : location);
+  const handleEditLocation = (loc: any) => {
+    setEditingId(loc.id);
+    setItemName(loc.name || "");
+    setItemAddress(loc.address || "");
+    setItemDescription(loc.description || "");
+    setIsEditModalVisible(true);
   };
 
-  // Función para manejar edición
-  const handleEditLocation = (locationId: string) => {
-    const location = locations.find((l: any) => l.id === locationId);
-    if (location) {
-      setEditingId(locationId);
-      setItemName(location.name);
-      setItemAddress(location.address || "");
-      setItemDescription(location.description || "");
-      setIsEditModalVisible(true);
-    }
-  };
-
-  // Función para resetear formulario
   const resetForm = () => {
     setItemName("");
     setItemAddress("");
@@ -373,36 +341,25 @@ export const LocationsManager = () => {
     setEditingId(null);
   };
 
-  // Función para formatear fecha
   const formatDate = (date: any) => {
     if (!date) return "";
     const dateObj = date instanceof Date ? date : new Date(date);
-    return dateObj.toLocaleDateString("es-ES", {
+    return dateObj.toLocaleDateString("en-US", {
       year: "numeric",
       month: "short",
       day: "numeric",
     });
   };
 
-  // Función para navegar páginas
-  const handlePageChange = (newPage: any) => {
-    if (newPage !== currentPage && newPage > 0) {
-      setCurrentPage(newPage);
-      loadLocations(newPage);
-    }
-  };
-
-  // Función para refrescar datos
   const handleRefresh = () => {
     setCurrentPage(1);
-    loadLocations(1, true);
+    loadLocations(1);
     getTotalLocations();
   };
 
-  // Efectos
   useEffect(() => {
     if (currentUser) {
-      loadLocations(1, true);
+      loadLocations(1);
       getTotalLocations();
     }
   }, [currentUser, itemsPerPage, sortBy, sortOrder]);
@@ -435,349 +392,407 @@ export const LocationsManager = () => {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Alert className="max-w-md">
-          <AlertCircle className="h-4 w-4" />
-          {t("locations.mustSignIn")}
+          <ShieldAlert className="h-4 w-4" />
+          <span>{t("locations.mustSignIn")}</span>
         </Alert>
       </div>
     );
   }
 
-  const filteredLocations = getFilteredLocations();
+  const maxLocations = Number(subscription?.metadata?.locations) || 0;
+  const isLimitReached = maxLocations > 0 && totalLocations >= maxLocations;
   const totalPages = Math.ceil(totalLocations / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
-
+    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+      {/* Impersonation Banner */}
       {userImpersonated && (
-        <div className="bg-gradient-to-r from-orange-50 to-red-50 border-b border-orange-200/50 backdrop-blur-sm">
-          <div className="container mx-auto px-6 py-3 max-w-7xl flex items-center justify-end space-x-4">
-            <span className="text-sm text-orange-700 font-medium">
-              {t("dashboard.by")}{" "}
-              <strong className="text-orange-800">{userImpersonated?.ownerUsername}</strong>
+        <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5">
+          <div className="container mx-auto max-w-7xl flex items-center justify-between text-xs text-amber-900">
+            <span>
+              Impersonating: <strong>{userImpersonated?.ownerUsername}</strong>
             </span>
-            <button
+            <Button
+              size="sm"
+              variant="outline"
               onClick={clearImpersonation}
-              className="px-4 py-1.5 bg-gradient-to-r from-red-100 to-red-200 text-red-700 rounded-full text-sm font-medium hover:from-red-200 hover:to-red-300 transition-all duration-200 shadow-sm border border-red-200"
+              className="h-6 px-2 bg-white border-amber-300 text-amber-800 text-[11px]"
             >
               {t("dashboard.stopImpersonation")}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
-          <div className="flex items-center gap-5 mb-4 sm:mb-0">
-            <div className="relative group">
-              <div className="absolute inset-0 bg-blue-400 rounded-2xl blur-lg opacity-30 group-hover:opacity-50 transition-opacity"></div>
-              <div className="relative p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl">
-                <Building className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+      <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
+        {/* Compact Top Bar */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 {t("locations.title")}
               </h1>
-              <p className="text-gray-600 mt-2 text-lg font-medium">{t("locations.subtitle")}</p>
+              {subscription?.plan && (
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+                  {subscription.plan}
+                </span>
+              )}
             </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t("locations.subtitle")}
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-2">
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefresh}
               disabled={pageLoading}
-              className="border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all duration-200"
+              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
             >
               <RefreshCw
-                className={`h-4 w-4 mr-2 ${pageLoading ? "animate-spin" : ""}`}
+                className={`w-3.5 h-3.5 ${pageLoading ? "animate-spin text-blue-600" : "text-slate-500"
+                  }`}
               />
-              {t("locations.refresh")}
+              <span className="ml-1.5 hidden sm:inline">{t("locations.refresh")}</span>
             </Button>
-            <Badge
-              variant="outline"
-              className="px-3 py-1.5 bg-gradient-to-r from-slate-50 to-slate-100 border-slate-200 text-slate-700 font-medium"
-            >
-              {totalLocations} {t("locations.count")}
-            </Badge>
-            {totalLocations <= Number(subscription?.metadata?.locations) && (
+
+            {!isLimitReached && (
               <Button
                 onClick={() => {
                   resetForm();
                   setIsModalVisible(true);
                 }}
-                className="bg-gradient-to-r from-blue-600 via-blue-600 to-blue-700 hover:from-blue-700 hover:via-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 border-0"
+                className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                {t("locations.new")}
+                <Plus className="w-3.5 h-3.5" />
+                <span>{t("locations.new")}</span>
               </Button>
             )}
           </div>
         </div>
 
-        {/* Filters and search */}
-        <Card className="mb-6 shadow-sm border-0 bg-white">
-          <CardContent className="p-0">
-            <div className="flex items-center bg-gray-50 rounded-t-lg p-3 border-b">
-              <Search className="h-4 w-4 text-gray-500 mr-2" />
-              <Input
-                placeholder={t("locations.searchPlaceholder")}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                className="border-0 bg-transparent focus:ring-0 h-8 text-sm flex-1"
-              />
-              {searchText && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-gray-200 rounded"
-                  onClick={() => setSearchText("")}
-                >
-                  <X className="h-3 w-3" />
-                </Button>
-              )}
-            </div>
-            <div className="p-4 flex gap-3">
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-40 h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">
-                    {t("locations.sort.name")}
-                  </SelectItem>
-                  <SelectItem value="createdAt">
-                    {t("locations.sort.date")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={sortOrder} onValueChange={setSortOrder}>
-                <SelectTrigger className="w-32 h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="asc">
-                    {t("locations.sort.asc")}
-                  </SelectItem>
-                  <SelectItem value="desc">
-                    {t("locations.sort.desc")}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select
-                value={itemsPerPage.toString()}
-                onValueChange={(v) => setItemsPerPage(parseInt(v))}
-              >
-                <SelectTrigger className="w-20 h-9 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="6">6</SelectItem>
-                  <SelectItem value="12">12</SelectItem>
-                  <SelectItem value="24">24</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Loading state */}
-        {pageLoading && (
-          <div className="flex items-center justify-center py-24">
-            <div className="text-center space-y-4">
-              <Loader2 className="h-10 w-10 animate-spin text-blue-600 mx-auto" />
-              <p className="text-gray-500 text-sm">{t("common.loading")}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        {!pageLoading && filteredLocations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="relative mb-8">
-              <div className="w-32 h-32 bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 rounded-3xl flex items-center justify-center shadow-lg">
-                <Building className="w-16 h-16 text-blue-600" />
+        {/* Space-Optimized KPI Stat Ribbon */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Total Locations */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <Building className="w-4.5 h-4.5" />
               </div>
-              <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full shadow-md"></div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Registered Facilities
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {totalLocations}
+                </h3>
+              </div>
             </div>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              Active
+            </span>
+          </div>
+
+          {/* Plan Quota */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <Layers className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Plan Quota
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {maxLocations > 0 ? `${totalLocations} / ${maxLocations}` : `${totalLocations} (Unlimited)`}
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-emerald-600/70 hidden xl:inline font-medium">
+              {maxLocations > 0 && maxLocations - totalLocations > 0
+                ? `${maxLocations - totalLocations} slots left`
+                : "Active status"}
+            </span>
+          </div>
+
+          {/* Search match stats */}
+          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+            <div className="flex items-center space-x-3">
+              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                <MapPin className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Visible Locations
+                </p>
+                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                  {filteredLocations.length}
+                </h3>
+              </div>
+            </div>
+            <span className="text-[11px] text-slate-400 hidden xl:inline">
+              In view
+            </span>
+          </div>
+        </div>
+
+        {/* Integrated Unified Controls Row */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+          {/* Search Box */}
+          <div className="relative flex-1 sm:max-w-md">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+            <Input
+              placeholder={t("locations.searchPlaceholder")}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="h-8 pl-8 pr-7 text-xs bg-slate-50 border-slate-200 rounded-lg focus-visible:ring-1 focus-visible:ring-slate-900"
+            />
+            {searchText && (
+              <button
+                onClick={() => setSearchText("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Sort & Pagination Filters */}
+          <div className="flex items-center gap-2 justify-between sm:justify-end">
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-32 h-8 text-xs bg-slate-50 border-slate-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">{t("locations.sort.name")}</SelectItem>
+                <SelectItem value="createdAt">{t("locations.sort.date")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={sortOrder} onValueChange={setSortOrder}>
+              <SelectTrigger className="w-28 h-8 text-xs bg-slate-50 border-slate-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="asc">{t("locations.sort.asc")}</SelectItem>
+                <SelectItem value="desc">{t("locations.sort.desc")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={itemsPerPage.toString()}
+              onValueChange={(v) => setItemsPerPage(parseInt(v, 10))}
+            >
+              <SelectTrigger className="w-20 h-8 text-xs bg-slate-50 border-slate-200">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="8">8 / p</SelectItem>
+                <SelectItem value="16">16 / p</SelectItem>
+                <SelectItem value="24">24 / p</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Content Area */}
+        {pageLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="h-36 bg-white rounded-xl border border-slate-200/80 p-4 animate-pulse flex flex-col justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 bg-slate-100 rounded-lg"></div>
+                  <div className="w-28 h-4 bg-slate-100 rounded"></div>
+                </div>
+                <div className="w-full h-3 bg-slate-100 rounded"></div>
+                <div className="w-20 h-3 bg-slate-100 rounded"></div>
+              </div>
+            ))}
+          </div>
+        ) : filteredLocations.length === 0 ? (
+          <div className="bg-white rounded-xl border border-slate-200/80 p-12 text-center shadow-2xs">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-3">
+              <Building className="w-6 h-6" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900 mb-1">
               {searchText.trim()
                 ? t("locations.emptySearch")
                 : t("locations.empty")}
-            </h2>
-            <p className="text-gray-600 mb-8 text-center max-w-md leading-relaxed">
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
               {searchText.trim()
                 ? t("locations.hintSearch")
                 : t("locations.hintEmpty")}
             </p>
-            {!searchText.trim() && (
+            {!searchText.trim() && !isLimitReached && (
               <Button
+                size="sm"
                 onClick={() => {
                   resetForm();
                   setIsModalVisible(true);
                 }}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300"
+                className="h-8 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                {t("locations.createFirst")}
+                <Plus className="w-3.5 h-3.5 mr-1.5" />
+                <span>{t("locations.createFirst")}</span>
               </Button>
             )}
           </div>
         ) : (
-          <>
-            {/* Locations grid */}
-            <div className="space-y-4 mb-8">
-              {filteredLocations.map((location: any) => (
-                <Card
-                  key={location.id}
-                  className={`group cursor-pointer transition-all duration-200 hover:shadow-md border ${selectedLocation?.id === location.id
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200 hover:border-gray-300"
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            {filteredLocations.map((loc: any) => {
+              const isSelected = selectedLocation?.id === loc.id;
+
+              return (
+                <div
+                  key={loc.id}
+                  onClick={() =>
+                    setSelectedLocation(isSelected ? null : loc)
+                  }
+                  className={`group relative bg-white rounded-xl border p-3.5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[152px] ${isSelected
+                      ? "border-blue-500 ring-2 ring-blue-500/15 bg-blue-50/15"
+                      : "border-slate-200/90 hover:border-slate-300"
                     }`}
-                  onClick={() => handleLocationSelect(location)}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${selectedLocation?.id === location.id ? 'bg-blue-100' : 'bg-gray-100'
-                          }`}>
-                          <MapPin className={`h-5 w-5 ${selectedLocation?.id === location.id ? 'text-blue-600' : 'text-gray-600'
-                            }`} />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3 mb-1">
-                            <h3 className="text-lg font-semibold text-gray-900 truncate">
-                              {location.name}
-                            </h3>
-                            <Badge
-                              variant="secondary"
-                              className="text-xs px-2 py-0.5"
-                            >
-                              {t("locations.badge")}
-                            </Badge>
-                            {selectedLocation?.id === location.id && (
-                              <Badge className="bg-blue-600 text-white text-xs px-2 py-0.5">
-                                {t("locations.selected")}
-                              </Badge>
-                            )}
-                          </div>
-
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              <span>{formatDate(location.createdAt)}</span>
-                            </div>
-                            {location.address && (
-                              <span className="truncate flex-1">
-                                {location.address}
-                              </span>
-                            )}
-                          </div>
-
-                          {location.description && (
-                            <p className="text-sm text-gray-700 mt-2 line-clamp-2">
-                              {location.description}
-                            </p>
-                          )}
-                        </div>
+                  {/* Top Row: Icon, Name & Actions Dropdown */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0">
+                        <MapPin className="w-4 h-4" />
                       </div>
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 w-8 p-0"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditLocation(location.id);
-                            }}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            {t("actions.edit")}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              confirmDeleteLocation(location.id);
-                            }}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            {t("actions.delete")}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight">
+                          {loc.name}
+                        </h3>
+                        {loc.address && (
+                          <span className="text-[11px] text-slate-400 truncate block mt-0.5">
+                            {loc.address}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
 
-            {/* Pagination */}
-            {!searchText && totalPages > 1 && (
-              <div className="flex items-center justify-between bg-white/70 backdrop-blur-sm rounded-xl p-4 border border-gray-100">
-                <div className="text-sm text-gray-600 font-medium">
-                  {t("locations.pagination.pageInfo", {
-                    current: currentPage,
-                    total: totalPages,
-                    count: totalLocations,
-                  })}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-slate-400 hover:text-slate-600 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="text-xs">
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditLocation(loc);
+                          }}
+                        >
+                          <Edit className="w-3.5 h-3.5 mr-2 text-slate-500" />
+                          <span>{t("actions.edit")}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            confirmDeleteLocation(loc.id);
+                          }}
+                          className="text-red-600 focus:text-red-600"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-2" />
+                          <span>{t("actions.delete")}</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  {/* Middle: Description */}
+                  <div className="my-auto py-1">
+                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                      {loc.description || "No description provided for this storage facility."}
+                    </p>
+                  </div>
+
+                  {/* Bottom Footer: Date & Select Indicator */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1.5 border-t border-slate-100">
+                    <span className="inline-flex items-center gap-1">
+                      <Calendar className="w-3 h-3 text-slate-300" />
+                      <span>{formatDate(loc.createdAt)}</span>
+                    </span>
+
+                    <span className="text-[10px] font-medium text-slate-300 group-hover:text-blue-600 transition-colors flex items-center">
+                      <span>{isSelected ? "Selected" : "Details"}</span>
+                      <ArrowUpRight className="w-3 h-3 ml-0.5" />
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={!hasPrevPage || pageLoading}
-                    className="border-gray-200 hover:border-blue-300 hover:bg-blue-50"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    {t("pagination.previous")}
-                  </Button>
-                  <span className="text-sm text-gray-600 px-4 py-2 bg-gray-50 rounded-lg font-medium">
-                    {currentPage} / {totalPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={!hasNextPage || pageLoading}
-                    className="border-gray-200 hover:border-blue-300 hover:bg-blue-50"
-                  >
-                    {t("pagination.next")}
-                    <ChevronRight className="h-4 w-4 ml-1" />
-                  </Button>
-                </div>
-              </div>
-            )}
-          </>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Space-Optimized Pagination */}
+        {!searchText && totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white rounded-xl p-3 border border-slate-200/80 shadow-2xs">
+            <span className="text-xs text-slate-500">
+              Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> ({totalLocations} total)
+            </span>
+
+            <div className="flex items-center space-x-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (hasPrevPage) {
+                    setCurrentPage((p) => p - 1);
+                    loadLocations(currentPage - 1);
+                  }
+                }}
+                disabled={!hasPrevPage || pageLoading}
+                className="h-7 px-2 text-xs border-slate-200"
+              >
+                <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                <span>Prev</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (hasNextPage) {
+                    setCurrentPage((p) => p + 1);
+                    loadLocations(currentPage + 1);
+                  }
+                }}
+                disabled={!hasNextPage || pageLoading}
+                className="h-7 px-2 text-xs border-slate-200"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Modal for adding location */}
+      {/* CREATE LOCATION MODAL */}
       <Dialog open={isModalVisible} onOpenChange={setIsModalVisible}>
-        <DialogContent className="sm:max-w-[500px] bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-5">
           <DialogHeader className="pb-2">
-            <DialogTitle className="text-xl font-semibold text-gray-900">
-              {t("locations.modal.newTitle")}
+            <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Building className="w-4 h-4 text-blue-600" />
+              <span>{t("locations.modal.newTitle")}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium text-gray-700">
+
+          <div className="space-y-3.5 pt-1">
+            <div className="space-y-1">
+              <Label htmlFor="name" className="text-xs font-semibold text-slate-700">
                 {t("form.name")} <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -785,64 +800,60 @@ export const LocationsManager = () => {
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
                 placeholder={t("form.namePlaceholder")}
-                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
+                className="h-8.5 text-xs bg-slate-50 border-slate-200"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="address" className="text-sm font-medium text-gray-700">
-                {t("form.address")}{" "}
-                <span className="text-gray-400 font-normal text-xs">
-                  ({t("form.optional")})
-                </span>
+
+            <div className="space-y-1">
+              <Label htmlFor="address" className="text-xs font-semibold text-slate-700">
+                {t("form.address")} <span className="text-slate-400 font-normal">({t("form.optional")})</span>
               </Label>
               <Input
                 id="address"
                 value={itemAddress}
                 onChange={(e) => setItemAddress(e.target.value)}
                 placeholder={t("form.addressPlaceholder")}
-                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
+                className="h-8.5 text-xs bg-slate-50 border-slate-200"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-                {t("form.description")}{" "}
-                <span className="text-gray-400 font-normal text-xs">
-                  ({t("form.optional")})
-                </span>
+
+            <div className="space-y-1">
+              <Label htmlFor="description" className="text-xs font-semibold text-slate-700">
+                {t("form.description")} <span className="text-slate-400 font-normal">({t("form.optional")})</span>
               </Label>
               <Textarea
                 id="description"
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
                 placeholder={t("form.descriptionPlaceholder")}
-                rows={4}
-                className="resize-none border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
+                rows={3}
+                className="text-xs resize-none bg-slate-50 border-slate-200"
               />
             </div>
-            <div className="flex gap-3 pt-6">
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setIsModalVisible(false)}
-                className="flex-1 border-gray-200 hover:bg-gray-50"
+                className="flex-1 h-8 text-xs border-slate-200"
                 disabled={operationLoading}
               >
                 {t("actions.cancel")}
               </Button>
               <Button
+                size="sm"
                 onClick={handleSubmit}
                 disabled={!itemName.trim() || operationLoading}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300"
+                className="flex-1 h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-2xs"
               >
                 {operationLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t("form.creating")}
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    <span>{t("form.creating")}</span>
                   </>
                 ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    {t("form.create")}
-                  </>
+                  <span>{t("form.create")}</span>
                 )}
               </Button>
             </div>
@@ -850,17 +861,19 @@ export const LocationsManager = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Location Modal */}
+      {/* EDIT LOCATION MODAL */}
       <Dialog open={isEditModalVisible} onOpenChange={setIsEditModalVisible}>
-        <DialogContent className="sm:max-w-[500px] bg-white/95 backdrop-blur-sm border-0 shadow-2xl">
+        <DialogContent className="sm:max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-5">
           <DialogHeader className="pb-2">
-            <DialogTitle className="text-xl font-semibold text-gray-900">
-              {t("locations.modal.editTitle")}
+            <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Edit className="w-4 h-4 text-blue-600" />
+              <span>{t("locations.modal.editTitle")}</span>
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name" className="text-sm font-medium text-gray-700">
+
+          <div className="space-y-3.5 pt-1">
+            <div className="space-y-1">
+              <Label htmlFor="edit-name" className="text-xs font-semibold text-slate-700">
                 {t("form.name")} <span className="text-red-500">*</span>
               </Label>
               <Input
@@ -868,64 +881,60 @@ export const LocationsManager = () => {
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
                 placeholder={t("form.namePlaceholder")}
-                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
+                className="h-8.5 text-xs bg-slate-50 border-slate-200"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-address" className="text-sm font-medium text-gray-700">
-                {t("form.address")}{" "}
-                <span className="text-gray-400 font-normal text-xs">
-                  ({t("form.optional")})
-                </span>
+
+            <div className="space-y-1">
+              <Label htmlFor="edit-address" className="text-xs font-semibold text-slate-700">
+                {t("form.address")} <span className="text-slate-400 font-normal">({t("form.optional")})</span>
               </Label>
               <Input
                 id="edit-address"
                 value={itemAddress}
                 onChange={(e) => setItemAddress(e.target.value)}
                 placeholder={t("form.addressPlaceholder")}
-                className="h-11 border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
+                className="h-8.5 text-xs bg-slate-50 border-slate-200"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-description" className="text-sm font-medium text-gray-700">
-                {t("form.description")}{" "}
-                <span className="text-gray-400 font-normal text-xs">
-                  ({t("form.optional")})
-                </span>
+
+            <div className="space-y-1">
+              <Label htmlFor="edit-description" className="text-xs font-semibold text-slate-700">
+                {t("form.description")} <span className="text-slate-400 font-normal">({t("form.optional")})</span>
               </Label>
               <Textarea
                 id="edit-description"
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
                 placeholder={t("form.descriptionPlaceholder")}
-                rows={4}
-                className="resize-none border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
+                rows={3}
+                className="text-xs resize-none bg-slate-50 border-slate-200"
               />
             </div>
-            <div className="flex gap-3 pt-6">
+
+            <div className="flex gap-2 pt-2 border-t border-slate-100">
               <Button
                 variant="outline"
+                size="sm"
                 onClick={() => setIsEditModalVisible(false)}
-                className="flex-1 border-gray-200 hover:bg-gray-50"
+                className="flex-1 h-8 text-xs border-slate-200"
                 disabled={operationLoading}
               >
                 {t("actions.cancel")}
               </Button>
               <Button
+                size="sm"
                 onClick={handleUpdateSubmit}
                 disabled={!itemName.trim() || operationLoading}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300"
+                className="flex-1 h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white font-semibold shadow-2xs"
               >
                 {operationLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {t("form.updating")}
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                    <span>{t("form.updating")}</span>
                   </>
                 ) : (
-                  <>
-                    <Edit className="mr-2 h-4 w-4" />
-                    {t("form.update")}
-                  </>
+                  <span>{t("form.update")}</span>
                 )}
               </Button>
             </div>
