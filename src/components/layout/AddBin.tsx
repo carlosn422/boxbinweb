@@ -144,7 +144,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                 size="sm"
                 onClick={() => setShowLocationSelector(false)}
                 className="h-8 w-8 p-0 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 shrink-0"
-                title="Volver"
+                title={t("addBin.back", { defaultValue: "Back" })}
               >
                 <ArrowLeft className="w-4 h-4" />
               </Button>
@@ -156,17 +156,17 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
             <div className="min-w-0">
               <DialogTitle className="text-sm font-bold text-slate-900 leading-tight truncate">
                 {showLocationSelector
-                  ? t("addBin.selectLocation", { defaultValue: "Seleccionar Ubicación" })
-                  : t("addBin.title", { defaultValue: "Nuevo Contenedor" })}
+                  ? t("addBin.selectLocation", { defaultValue: "Select Location" })
+                  : t("addBin.title", { defaultValue: "New Container" })}
               </DialogTitle>
               <p className="text-[11px] text-slate-400 mt-0.5 truncate">
                 {showLocationSelector
                   ? t("addBin.selectLocationDesc", {
-                      defaultValue: "Asigna un lugar físico a este contenedor",
-                    })
+                    defaultValue: "Assign a physical place to this container",
+                  })
                   : t("addBin.subtitle", {
-                      defaultValue: "Crea y organiza tu nuevo contenedor en el inventario",
-                    })}
+                    defaultValue: "Create and organize your new container in inventory",
+                  })}
               </p>
             </div>
           </div>
@@ -195,7 +195,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                   value={locationSearch}
                   onChange={(e) => setLocationSearch(e.target.value)}
                   placeholder={t("addBin.searchLocations", {
-                    defaultValue: "Buscar ubicación por nombre o dirección...",
+                    defaultValue: "Search location by name or address...",
                   })}
                   className="pl-8 pr-7 h-8 text-xs rounded-xl border-slate-200 bg-slate-50/60 focus:bg-white"
                 />
@@ -213,7 +213,9 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
               {isLoadingLocations ? (
                 <div className="py-10 flex flex-col items-center justify-center space-y-2 text-slate-400">
                   <Loader2 className="w-5 h-5 animate-spin text-slate-600" />
-                  <p className="text-xs">Cargando ubicaciones...</p>
+                  <p className="text-xs">
+                    {t("addBin.loadingLocations", { defaultValue: "Loading locations..." })}
+                  </p>
                 </div>
               ) : filteredLocations.length === 0 ? (
                 <div className="py-8 text-center px-4 rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
@@ -222,13 +224,22 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                   </div>
                   <p className="text-xs font-semibold text-slate-700">
                     {locationSearch
-                      ? "No se encontraron ubicaciones con ese término"
-                      : "No tienes ubicaciones registradas aún"}
+                      ? t("addBin.noLocationsFound", {
+                        defaultValue: "No locations found matching this term",
+                      })
+                      : t("addBin.noLocationsRegistered", {
+                        defaultValue: "You don't have registered locations yet",
+                      })}
                   </p>
                   <p className="text-[11px] text-slate-400 mt-0.5">
                     {locationSearch
-                      ? "Prueba buscando con otro término"
-                      : "Puedes crear ubicaciones desde la sección de Ubicaciones en el menú"}
+                      ? t("addBin.tryAnotherTerm", {
+                        defaultValue: "Try searching with another term",
+                      })
+                      : t("addBin.createLocationsHint", {
+                        defaultValue:
+                          "You can create locations from the Locations section in the menu",
+                      })}
                   </p>
                 </div>
               ) : (
@@ -239,19 +250,17 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                       <div
                         key={location.id}
                         onClick={() => handleLocationSelect(location)}
-                        className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${
-                          isSelected
-                            ? "bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs"
-                            : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80 text-slate-900"
-                        }`}
+                        className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${isSelected
+                          ? "bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs"
+                          : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80 text-slate-900"
+                          }`}
                       >
                         <div className="flex items-center space-x-3 min-w-0">
                           <div
-                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                              isSelected
-                                ? "bg-blue-600 text-white"
-                                : "bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
-                            }`}
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isSelected
+                              ? "bg-blue-600 text-white"
+                              : "bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
+                              }`}
                           >
                             <Building2 className="w-3.5 h-3.5" />
                           </div>
@@ -290,7 +299,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                     htmlFor="binNameInput"
                     className="text-xs font-semibold text-slate-800"
                   >
-                    {t("addBin.nameLabel", { defaultValue: "Nombre del Contenedor" })} *
+                    {t("addBin.nameLabel", { defaultValue: "Container Name" })} *
                   </Label>
                   <span className="text-[10px] text-slate-400 font-mono">
                     {binName.length}/35
@@ -301,7 +310,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                   value={binName}
                   onChange={(e) => setBinName(e.target.value)}
                   placeholder={t("addBin.namePlaceholder", {
-                    defaultValue: "Ej. Caja #1 - Ropa de Invierno, Herramientas...",
+                    defaultValue: "e.g. Box #1 - Winter Clothes, Tools...",
                   })}
                   maxLength={35}
                   className="h-9 text-xs rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white placeholder:text-slate-400"
@@ -315,14 +324,14 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                   htmlFor="binDescInput"
                   className="text-xs font-semibold text-slate-800"
                 >
-                  {t("addBin.descriptionLabel", { defaultValue: "Descripción o Notas" })}
+                  {t("addBin.descriptionLabel", { defaultValue: "Description or Notes" })}
                 </Label>
                 <Textarea
                   id="binDescInput"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder={t("addBin.descriptionPlaceholder", {
-                    defaultValue: "Escribe detalles sobre lo que guardarás, categoría, etc.",
+                    defaultValue: "Write details about what you'll store, category, etc.",
                   })}
                   rows={3}
                   className="text-xs rounded-xl border-slate-200 bg-slate-50/50 focus:bg-white placeholder:text-slate-400 resize-none leading-relaxed"
@@ -332,9 +341,9 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
               {/* Location Picker */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-800 flex items-center justify-between">
-                  <span>{t("addBin.locationLabel", { defaultValue: "Ubicación" })}</span>
+                  <span>{t("addBin.locationLabel", { defaultValue: "Location" })}</span>
                   <span className="text-[10px] text-slate-400 font-normal">
-                    ({t("addBin.optional", { defaultValue: "Opcional" })})
+                    ({t("addBin.optional", { defaultValue: "Optional" })})
                   </span>
                 </Label>
 
@@ -355,10 +364,12 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                       </div>
                       <div>
                         <p className="text-xs font-medium text-slate-700 group-hover:text-slate-900">
-                          {t("addBin.addLocation", { defaultValue: "Asignar ubicación" })}
+                          {t("addBin.addLocation", { defaultValue: "Assign location" })}
                         </p>
                         <p className="text-[10px] text-slate-400">
-                          Estante, bodega, cuarto o dirección
+                          {t("addBin.locationHint", {
+                            defaultValue: "Shelf, warehouse, room or address",
+                          })}
                         </p>
                       </div>
                     </div>
@@ -388,13 +399,13 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                         onClick={() => setShowLocationSelector(true)}
                         className="px-2 py-1 text-blue-700 hover:text-blue-900 text-[11px] font-semibold hover:underline"
                       >
-                        Cambiar
+                        {t("addBin.change", { defaultValue: "Change" })}
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectedLocation(null)}
                         className="p-1 text-slate-400 hover:text-red-500 rounded"
-                        title="Quitar ubicación"
+                        title={t("addBin.removeLocation", { defaultValue: "Remove location" })}
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -417,7 +428,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
               disabled={isSubmitting}
               className="h-8 rounded-lg text-xs border-slate-200 text-slate-700 hover:bg-white"
             >
-              Cancelar
+              {t("actions.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button
               type="button"
@@ -429,10 +440,10 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-                  <span>{t("addBin.creating", { defaultValue: "Creando..." })}</span>
+                  <span>{t("addBin.creating", { defaultValue: "Creating..." })}</span>
                 </>
               ) : (
-                <span>{t("addBin.create", { defaultValue: "Crear Contenedor" })}</span>
+                <span>{t("addBin.create", { defaultValue: "Create Container" })}</span>
               )}
             </Button>
           </div>

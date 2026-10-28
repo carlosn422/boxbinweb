@@ -1,6 +1,6 @@
 import { createClient, type User as SupabaseUser } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xfqmknrtozlxoscotcqa.supabase.co';
+export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xfqmknrtozlxoscotcqa.supabase.co';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -13,7 +13,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 export interface AppUser {
   id: string; // Supabase UUID
-  uid: string; // Firebase UID for 100% backward compatibility with database queries
+  uid: string; // Inventory owner ID managed by Supabase Auth app_metadata (UUID by default)
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
@@ -24,7 +24,7 @@ export interface AppUser {
 export function formatSupabaseUser(user: SupabaseUser | null): AppUser | null {
   if (!user) return null;
 
-  const firebaseUid = (user.user_metadata?.firebase_uid as string) || user.id;
+  const inventoryUserId = (user.app_metadata?.inventory_user_id as string) || user.id;
   const displayName =
     (user.user_metadata?.displayName as string) ||
     (user.user_metadata?.full_name as string) ||
@@ -38,7 +38,7 @@ export function formatSupabaseUser(user: SupabaseUser | null): AppUser | null {
 
   return {
     id: user.id,
-    uid: firebaseUid,
+    uid: inventoryUserId,
     email: user.email ?? null,
     displayName,
     photoURL,

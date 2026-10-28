@@ -166,10 +166,13 @@ export default function ExportInventory() {
         <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5">
           <div className="container mx-auto max-w-5xl flex items-center justify-between text-xs text-amber-900">
             <span>
-              Exporting inventory for account: <strong>{effectiveDisplayName}</strong>
+              {t("export.impersonatingAccount", {
+                name: effectiveDisplayName,
+                defaultValue: "Exporting inventory for account: {{name}}",
+              })}
             </span>
             <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full">
-              Shared Access
+              {t("export.sharedAccess", { defaultValue: "Shared Access" })}
             </span>
           </div>
         </div>
@@ -181,18 +184,20 @@ export default function ExportInventory() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                {t("export.title") || "Export Inventory"}
+                {t("export.title", { defaultValue: "Export Inventory" })}
               </h1>
               <Badge
                 variant="outline"
                 className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border-blue-200"
               >
-                PDF Suite
+                {t("export.pdfSuite", { defaultValue: "PDF Suite" })}
               </Badge>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              {t("export.description") ||
-                "Download print-ready certified PDF reports and photographic catalogs of your inventory."}
+              {t("export.description", {
+                defaultValue:
+                  "Download print-ready certified PDF reports and photographic catalogs of your inventory.",
+              })}
             </p>
           </div>
 
@@ -209,7 +214,12 @@ export default function ExportInventory() {
                 className="h-8 px-2.5 text-[11px] font-normal text-slate-500 bg-white border-slate-200 shadow-2xs hidden sm:flex items-center gap-1.5"
               >
                 <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                <span>Last: {formatDate(lastExport)}</span>
+                <span>
+                  {t("export.last", {
+                    date: formatDate(lastExport),
+                    defaultValue: "Last: {{date}}",
+                  })}
+                </span>
               </Badge>
             )}
           </div>
@@ -223,10 +233,10 @@ export default function ExportInventory() {
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Format
+                {t("export.kpiFormat", { defaultValue: "Format" })}
               </div>
               <div className="text-sm font-bold text-slate-900 truncate">
-                PDF/A Vector
+                {t("export.kpiPdfVector", { defaultValue: "PDF/A Vector" })}
               </div>
             </div>
           </div>
@@ -237,10 +247,10 @@ export default function ExportInventory() {
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Layout
+                {t("export.kpiLayout", { defaultValue: "Layout" })}
               </div>
               <div className="text-sm font-bold text-slate-900 truncate">
-                A4 Print Ready
+                {t("export.kpiA4PrintReady", { defaultValue: "A4 Print Ready" })}
               </div>
             </div>
           </div>
@@ -251,10 +261,10 @@ export default function ExportInventory() {
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Photo Asset Grid
+                {t("export.kpiPhotoGrid", { defaultValue: "Photo Asset Grid" })}
               </div>
               <div className="text-sm font-bold text-slate-900 truncate">
-                Included
+                {t("export.kpiIncluded", { defaultValue: "Included" })}
               </div>
             </div>
           </div>
@@ -265,10 +275,10 @@ export default function ExportInventory() {
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Verification
+                {t("export.kpiVerification", { defaultValue: "Verification" })}
               </div>
               <div className="text-sm font-bold text-slate-900 truncate">
-                Encrypted Token
+                {t("export.kpiEncryptedToken", { defaultValue: "Encrypted Token" })}
               </div>
             </div>
           </div>
@@ -279,7 +289,11 @@ export default function ExportInventory() {
           <Alert className="border-emerald-200 bg-emerald-50/70 text-emerald-900 rounded-xl p-3 flex items-center gap-2">
             <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
             <AlertDescription className="text-xs font-medium">
-              Report exported and downloaded successfully on {formatDate(lastExport)}.
+              {t("export.successMessage", {
+                date: formatDate(lastExport),
+                defaultValue:
+                  "Report exported and downloaded successfully on {{date}}.",
+              })}
             </AlertDescription>
           </Alert>
         )}
@@ -288,7 +302,11 @@ export default function ExportInventory() {
           <Alert className="border-red-200 bg-red-50/70 text-red-900 rounded-xl p-3 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
             <AlertDescription className="text-xs font-medium">
-              {errorMessage || "Export generation failed. Please verify server connection and try again."}
+              {errorMessage ||
+                t("export.errorMessage", {
+                  defaultValue:
+                    "Export generation failed. Please verify server connection and try again.",
+                })}
             </AlertDescription>
           </Alert>
         )}
@@ -297,7 +315,10 @@ export default function ExportInventory() {
           <Alert className="border-amber-200 bg-amber-50/70 text-amber-900 rounded-xl p-3 flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
             <AlertDescription className="text-xs font-medium">
-              {t("export.mustBeLoggedIn") || "You must be signed in to generate authenticated exports."}
+              {t("export.mustBeLoggedIn", {
+                defaultValue:
+                  "You must be signed in to generate authenticated exports.",
+              })}
             </AlertDescription>
           </Alert>
         )}
@@ -314,41 +335,65 @@ export default function ExportInventory() {
                   </div>
                   <div>
                     <CardTitle className="text-sm font-bold text-slate-900">
-                      Executive Inventory Register
+                      {t("export.executiveTitle", {
+                        defaultValue: "Executive Inventory Register",
+                      })}
                     </CardTitle>
                     <span className="text-[11px] text-slate-500">
-                      Tabular format with valuations
+                      {t("export.executiveSubtitle", {
+                        defaultValue: "Tabular format with valuations",
+                      })}
                     </span>
                   </div>
                 </div>
               </div>
               <Badge variant="outline" className="text-[10px] font-semibold bg-blue-50 text-blue-700 border-blue-200">
-                Recommended
+                {t("export.recommended", { defaultValue: "Recommended" })}
               </Badge>
             </CardHeader>
 
             <CardContent className="p-4 space-y-4 flex-1 flex flex-col justify-between">
               <div className="space-y-3">
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Generates an audit-ready multi-page document organizing bins by physical location, complete with item quantities, descriptions, and valuation totals.
+                  {t("export.executiveDesc", {
+                    defaultValue:
+                      "Generates an audit-ready multi-page document organizing bins by physical location, complete with item quantities, descriptions, and valuation totals.",
+                  })}
                 </p>
 
                 <div className="rounded-lg bg-slate-50/70 border border-slate-200/70 p-3 space-y-2 text-xs text-slate-600">
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    <span>Location-by-location bin breakdown</span>
+                    <span>
+                      {t("export.featureLocationBreakdown", {
+                        defaultValue: "Location-by-location bin breakdown",
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    <span>Barcode & Smart Label tracking codes</span>
+                    <span>
+                      {t("export.featureBarcodeTracking", {
+                        defaultValue: "Barcode & Smart Label tracking codes",
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    <span>Item categories, unit values & quantities</span>
+                    <span>
+                      {t("export.featureCategoriesValuation", {
+                        defaultValue: "Item categories, unit values & quantities",
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                    <span>Certified export timestamp & user attribution</span>
+                    <span>
+                      {t("export.featureCertifiedTimestamp", {
+                        defaultValue:
+                          "Certified export timestamp & user attribution",
+                      })}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -362,12 +407,16 @@ export default function ExportInventory() {
                   {isExportingTabular ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>{t("export.exporting") || "Compiling PDF..."}</span>
+                      <span>{t("export.exporting", { defaultValue: "Compiling PDF..." })}</span>
                     </>
                   ) : (
                     <>
                       <Download className="w-3.5 h-3.5" />
-                      <span>{t("export.exportButton") || "Download Executive PDF"}</span>
+                      <span>
+                        {t("export.downloadExecutivePdf", {
+                          defaultValue: "Download Executive PDF",
+                        })}
+                      </span>
                     </>
                   )}
                 </Button>
@@ -385,41 +434,66 @@ export default function ExportInventory() {
                   </div>
                   <div>
                     <CardTitle className="text-sm font-bold text-slate-900">
-                      Photographic Visual Catalog
+                      {t("export.visualTitle", {
+                        defaultValue: "Photographic Visual Catalog",
+                      })}
                     </CardTitle>
                     <span className="text-[11px] text-slate-500">
-                      Visual grid with high-res photos
+                      {t("export.visualSubtitle", {
+                        defaultValue: "Visual grid with high-res photos",
+                      })}
                     </span>
                   </div>
                 </div>
               </div>
               <Badge variant="outline" className="text-[10px] font-semibold bg-purple-50 text-purple-700 border-purple-200">
-                Visual Binder
+                {t("export.visualBinder", { defaultValue: "Visual Binder" })}
               </Badge>
             </CardHeader>
 
             <CardContent className="p-4 space-y-4 flex-1 flex flex-col justify-between">
               <div className="space-y-3">
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Creates an illustrated catalog displaying photo cards of each item inside its container. Ideal for physical warehouse binders, moving trucks, and insurance claims.
+                  {t("export.visualDesc", {
+                    defaultValue:
+                      "Creates an illustrated catalog displaying photo cards of each item inside its container. Ideal for physical warehouse binders, moving trucks, and insurance claims.",
+                  })}
                 </p>
 
                 <div className="rounded-lg bg-slate-50/70 border border-slate-200/70 p-3 space-y-2 text-xs text-slate-600">
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                    <span>High-resolution item photo cards</span>
+                    <span>
+                      {t("export.featureHighResPhotos", {
+                        defaultValue: "High-resolution item photo cards",
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                    <span>Visual bin tags & storage location chips</span>
+                    <span>
+                      {t("export.featureVisualBinTags", {
+                        defaultValue: "Visual bin tags & storage location chips",
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                    <span>Optimized 3x2 grid layout for binder printing</span>
+                    <span>
+                      {t("export.featureOptimized3x2", {
+                        defaultValue:
+                          "Optimized 3x2 grid layout for binder printing",
+                      })}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
-                    <span>QR verification tags embedded on every page</span>
+                    <span>
+                      {t("export.featureQrVerificationTags", {
+                        defaultValue:
+                          "QR verification tags embedded on every page",
+                      })}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -433,12 +507,20 @@ export default function ExportInventory() {
                   {isExportingVisual ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                      <span>Generating Visual Catalog...</span>
+                      <span>
+                        {t("export.generatingVisualCatalog", {
+                          defaultValue: "Generating Visual Catalog...",
+                        })}
+                      </span>
                     </>
                   ) : (
                     <>
                       <Download className="w-3.5 h-3.5 text-purple-600" />
-                      <span>Download Visual Catalog PDF</span>
+                      <span>
+                        {t("export.downloadVisualPdf", {
+                          defaultValue: "Download Visual Catalog PDF",
+                        })}
+                      </span>
                     </>
                   )}
                 </Button>

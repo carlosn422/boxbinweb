@@ -58,7 +58,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
 
   if (!hasSubscription) {
-    return <Navigate to="/billing" replace />;
+    //return <Navigate to="/billing" replace />;
   }
 
   return <DashboardLayout>{children}</DashboardLayout>;
@@ -139,7 +139,7 @@ const RedirectIfAuthenticated = ({
     );
   }
 
-   if (currentUser) {
+  if (currentUser) {
     if (location.pathname === "/login-by-token") {
       return <>{children}</>;
     }

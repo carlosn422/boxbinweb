@@ -1,0 +1,4 @@
+# Browser WebSockets use a bearer subprotocol. The function verifies it with
+# Supabase Auth before accepting a connection; this does not disable app auth.
+[functions.boxbin-copilot-voice]
+verify_jwt = false

@@ -1,3 +1,4 @@
+import { copilotText as ct } from '@/lib/copilotI18n';
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -19,15 +20,17 @@ import {
   DollarSign,
   TrendingUp,
   Layers,
-  Tag,
   ZoomIn,
   ZoomOut,
   RotateCcw,
   Video,
   ArrowUpDown,
-  Check,
   RefreshCw,
   ShieldAlert,
+  ChevronDown,
+  ScanLine,
+  Box,
+  Calendar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +70,7 @@ import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import EnhancedVideoAIModal from "../billing/EnhancedVideoAIModal";
 import EnhancedImagesAIModal from "../billing/EnhancedImageAIModal";
 import { useTranslation } from "react-i18next";
+import { openBinCopilot } from "@/services/boxbinCopilotService";
 
 export interface TokenEstimate {
   success: boolean;
@@ -75,7 +79,6 @@ export interface TokenEstimate {
   user_tokens: number;
   tokens_needed?: number;
   message?: string;
-
   available_tokens?: number;
   tokens_remaining_after?: number;
   required_tokens?: number;
@@ -97,24 +100,13 @@ export const uploadImage = async (file: File): Promise<string> => {
 const extractStoragePath = (url: string | null): string | null => {
   if (!url) return null;
 
-  if (!url.includes("http") && !url.startsWith("gs://")) {
+  if (!url.includes("://")) {
     return url;
   }
 
   if (url.includes("/binventory-storage/")) {
     const parts = url.split("/binventory-storage/");
     return parts[1]?.split("?")[0] || null;
-  }
-
-  if (url.includes("firebasestorage.googleapis.com")) {
-    const match = decodeURIComponent(url).match(/\/o\/(.*?)\?/);
-    return match?.[1] || null;
-  }
-
-  if (url.startsWith("gs://")) {
-    const parts = url.replace("gs://", "").split("/");
-    parts.shift();
-    return parts.join("/");
   }
 
   return null;
@@ -148,7 +140,7 @@ export interface Item {
   imageUrl?: string;
   cuantity: string;
   value: string;
-  quantity?: string;
+  quantity?: string | number;
 }
 
 const BinDetailsScreen: React.FC = () => {
@@ -294,7 +286,6 @@ const BinDetailsScreen: React.FC = () => {
       if (showLoading) setLoading(true);
       await fetchSubscription();
 
-      // Query bin strictly for the current effective user
       const { data: binData, error: binErr } = await supabase
         .from("bins")
         .select("*")
@@ -307,7 +298,6 @@ const BinDetailsScreen: React.FC = () => {
       }
 
       if (!binData) {
-        // Double check if container belongs to another user
         const { data: foreignBin } = await supabase
           .from("bins")
           .select("id")
@@ -321,7 +311,6 @@ const BinDetailsScreen: React.FC = () => {
         return;
       }
 
-      // Explicit verification: ensure container belongs to this user
       if (binData.userId && binData.userId !== effectiveUserId) {
         setIsUnauthorized(true);
         setBin(null);
@@ -333,7 +322,6 @@ const BinDetailsScreen: React.FC = () => {
       setIsUnauthorized(false);
       setBin(binData as BinDetails);
 
-      // Fetch items strictly belonging to this container and user
       const { data: itemsData, error: itemsErr } = await supabase
         .from("items")
         .select("*")
@@ -346,7 +334,7 @@ const BinDetailsScreen: React.FC = () => {
       setItems((itemsData || []) as Item[]);
     } catch (err) {
       console.error("Error fetching bin data:", err);
-      toast.error("Failed to load container data");
+      toast.error(t("containers.loadErrorToast", { defaultValue: "Failed to load container data" }));
     } finally {
       if (showLoading) setLoading(false);
       setIsRefreshing(false);
@@ -363,10 +351,16 @@ const BinDetailsScreen: React.FC = () => {
     loadData(true);
   }, [id, effectiveUserId, authLoading]);
 
+  useEffect(() => {
+    const refresh = () => { void loadData(false); };
+    window.addEventListener("boxbin-inventory-changed", refresh);
+    return () => window.removeEventListener("boxbin-inventory-changed", refresh);
+  }, [id, effectiveUserId]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadData(false);
-    toast.success("Inventory updated");
+    toast.success(t("containers.inventoryUpdatedToast", { defaultValue: "Inventory updated" }));
   };
 
   // Bulk Upload
@@ -374,13 +368,13 @@ const BinDetailsScreen: React.FC = () => {
     if (!files || files.length === 0 || !bin || !effectiveUserId) return;
 
     if (bin.userId && bin.userId !== effectiveUserId) {
-      toast.error("You don't have permission to modify this container");
+      toast.error(t("containers.noPermissionToast", { defaultValue: "You don't have permission to modify this container" }));
       return;
     }
 
     const limit = Number(subscription?.metadata?.items) || 100;
     if (items.length + files.length > limit) {
-      toast.error(`Your plan allows up to ${limit} items.`);
+      toast.error(t("containers.planLimitToast", { limit, defaultValue: `Your plan allows up to ${limit} items.` }));
       return;
     }
 
@@ -436,7 +430,7 @@ const BinDetailsScreen: React.FC = () => {
     setItems((prev) => [...prev, ...newItems]);
     setIsBulkUploading(false);
     setIsBulkUploadOpen(false);
-    toast.success(`Successfully uploaded ${newItems.length} items`);
+    toast.success(t("containers.bulkSuccessToast", { count: newItems.length, defaultValue: `Successfully uploaded ${newItems.length} items` }));
   };
 
   // Tags management
@@ -492,18 +486,18 @@ const BinDetailsScreen: React.FC = () => {
   // Create new item
   const handleSubmitItem = async () => {
     if (!bin || (bin.userId && bin.userId !== effectiveUserId)) {
-      toast.error("You don't have permission to modify this container");
+      toast.error(t("containers.noPermissionToast", { defaultValue: "You don't have permission to modify this container" }));
       return;
     }
 
     const limit = Number(subscription?.metadata?.items) || 100;
     if (items.length >= limit) {
-      toast.error(`Plan limit of ${limit} items reached.`);
+      toast.error(t("containers.planLimitToast", { limit, defaultValue: `Plan limit of ${limit} items reached.` }));
       return;
     }
 
     if (!itemName.trim()) {
-      toast.error("Please enter an item name");
+      toast.error(t("containers.nameRequiredToast", { defaultValue: "Please enter an item name" }));
       return;
     }
 
@@ -517,7 +511,7 @@ const BinDetailsScreen: React.FC = () => {
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
           const proceed = window.confirm(
-            "Image upload failed. Do you want to continue without an image?"
+            t("containers.imageUploadConfirm", { defaultValue: "Image upload failed. Do you want to continue without an image?" })
           );
           if (!proceed) {
             setIsSavingItem(false);
@@ -530,6 +524,7 @@ const BinDetailsScreen: React.FC = () => {
         name: itemName.trim(),
         description: itemDescription.trim(),
         cuantity: itemCuantity.toString(),
+        quantity: itemCuantity,
         value: itemValue ? itemValue.toString().trim() : "0",
         tags: itemTags,
         createdAt: new Date().toISOString(),
@@ -550,10 +545,10 @@ const BinDetailsScreen: React.FC = () => {
       setItems((prev) => [newItem, ...prev]);
       setIsAddItemOpen(false);
       resetItemForm();
-      toast.success("Item added successfully");
+      toast.success(t("containers.itemAddedToast", { defaultValue: "Item added successfully" }));
     } catch (error) {
       console.error("Error adding item:", error);
-      toast.error("Failed to add item");
+      toast.error(t("containers.itemAddErrorToast", { defaultValue: "Failed to add item" }));
     } finally {
       setIsSavingItem(false);
     }
@@ -562,7 +557,7 @@ const BinDetailsScreen: React.FC = () => {
   // Update existing item
   const handleUpdateItem = async () => {
     if (!itemName.trim()) {
-      toast.error("Please enter an item name");
+      toast.error(t("containers.nameRequiredToast", { defaultValue: "Please enter an item name" }));
       return;
     }
 
@@ -571,12 +566,13 @@ const BinDetailsScreen: React.FC = () => {
     try {
       setIsSavingItem(true);
 
-      const updateData: Partial<Item> = {
+      const updateData: Partial<Item> & { quantity?: string | number } = {
         name: itemName.trim(),
         description: itemDescription.trim(),
         tags: itemTags,
         value: itemValue ? itemValue.toString().trim() : "0",
         cuantity: itemCuantity.toString(),
+        quantity: itemCuantity.toString(),
       };
 
       if (selectedFile && selectedImage !== currentItem.imageUrl) {
@@ -605,16 +601,23 @@ const BinDetailsScreen: React.FC = () => {
 
       setItems((prev) =>
         prev.map((item) =>
-          item.id === currentItem.id ? { ...item, ...updateData } : item
+          item.id === currentItem.id
+            ? {
+                ...item,
+                ...updateData,
+                cuantity: itemCuantity.toString(),
+                quantity: itemCuantity.toString(),
+              }
+            : item
         )
       );
 
       resetItemForm();
       setIsEditItemOpen(false);
-      toast.success("Item updated successfully");
+      toast.success(t("containers.itemUpdatedToast", { defaultValue: "Item updated successfully" }));
     } catch (error) {
       console.error("Error updating item:", error);
-      toast.error("Failed to update item");
+      toast.error(t("containers.itemUpdateErrorToast", { defaultValue: "Failed to update item" }));
     } finally {
       setIsSavingItem(false);
     }
@@ -642,10 +645,10 @@ const BinDetailsScreen: React.FC = () => {
       }
 
       setItems((prev) => prev.filter((item) => item.id !== itemId));
-      toast.success("Item deleted");
+      toast.success(t("containers.itemDeletedToast", { defaultValue: "Item deleted" }));
     } catch (error) {
       console.error("Error deleting item:", error);
-      toast.error("Failed to delete item");
+      toast.error(t("containers.itemDeleteErrorToast", { defaultValue: "Failed to delete item" }));
     }
   };
 
@@ -664,7 +667,7 @@ const BinDetailsScreen: React.FC = () => {
   const handleUpdateBin = async () => {
     try {
       if (!binName.trim()) {
-        toast.error("Container name is required");
+        toast.error(t("containers.binNameRequiredToast", { defaultValue: "Container name is required" }));
         return;
       }
 
@@ -699,12 +702,12 @@ const BinDetailsScreen: React.FC = () => {
       );
 
       setIsEditBinOpen(false);
-      toast.success("Container updated successfully");
-      openModal("success", "Container updated successfully!");
+      toast.success(t("containers.binUpdatedToast", { defaultValue: "Container updated successfully" }));
+      openModal("success", t("containers.binUpdatedToast", { defaultValue: "Container updated successfully!" }));
     } catch (error: any) {
       console.error("Error updating bin:", error);
-      toast.error("Failed to update container");
-      openModal("error", error?.message || "Failed to update container");
+      toast.error(t("containers.binUpdateErrorToast", { defaultValue: "Failed to update container" }));
+      openModal("error", error?.message || t("containers.binUpdateErrorToast", { defaultValue: "Failed to update container" }));
     } finally {
       setIsUpdatingBin(false);
     }
@@ -732,11 +735,11 @@ const BinDetailsScreen: React.FC = () => {
       await supabase.from("items").delete().eq("binId", id).eq("userId", effectiveUserId);
       await supabase.from("bins").delete().eq("id", id).eq("userId", effectiveUserId);
 
-      toast.success("Container deleted successfully");
+      toast.success(t("containers.binDeletedToast", { defaultValue: "Container deleted successfully" }));
       navigate("/home");
     } catch (err) {
       console.error("Error deleting bin:", err);
-      toast.error("Failed to delete container");
+      toast.error(t("containers.binDeleteErrorToast", { defaultValue: "Failed to delete container" }));
     } finally {
       setIsDeletingBin(false);
     }
@@ -804,8 +807,10 @@ const BinDetailsScreen: React.FC = () => {
   if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-slate-50/50 flex flex-col items-center justify-center p-4 font-sans">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-slate-300 border-t-slate-800 mb-3" />
-        <p className="text-xs text-slate-500 font-medium">Cargando detalles del contenedor...</p>
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 animate-spin text-slate-700 mx-auto" />
+          <p className="text-xs text-slate-500 font-medium">{t("containers.loading", { defaultValue: "Loading container details..." })}</p>
+        </div>
       </div>
     );
   }
@@ -813,15 +818,15 @@ const BinDetailsScreen: React.FC = () => {
   if (!bin) {
     return (
       <div className="min-h-screen bg-slate-50/50 flex items-center justify-center p-4 font-sans">
-        <div className="bg-white rounded-xl border border-slate-200/80 p-8 max-w-md w-full text-center shadow-xs">
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-8 max-w-md w-full text-center shadow-xs">
           {isUnauthorized ? (
             <>
               <div className="w-12 h-12 bg-red-50 border border-red-100 rounded-xl flex items-center justify-center mx-auto text-red-600 mb-3">
                 <ShieldAlert className="w-6 h-6" />
               </div>
-              <h2 className="text-base font-bold text-slate-900">Acceso no autorizado</h2>
+              <h2 className="text-base font-bold text-slate-900">{t("containers.unauthorizedTitle", { defaultValue: "Unauthorized Access" })}</h2>
               <p className="text-xs text-slate-500 mt-1 mb-5 leading-relaxed">
-                Este contenedor no pertenece a tu cuenta o no cuentas con los permisos necesarios para visualizar su información.
+                {t("containers.unauthorizedDesc", { defaultValue: "This container does not belong to your account or you do not have permission to view its information." })}
               </p>
             </>
           ) : (
@@ -829,18 +834,18 @@ const BinDetailsScreen: React.FC = () => {
               <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mx-auto text-slate-400 mb-3">
                 <Package className="w-6 h-6" />
               </div>
-              <h2 className="text-base font-bold text-slate-900">Contenedor no encontrado</h2>
+              <h2 className="text-base font-bold text-slate-900">{t("containers.notFoundTitle", { defaultValue: "Container Not Found" })}</h2>
               <p className="text-xs text-slate-500 mt-1 mb-5 leading-relaxed">
-                El contenedor solicitado no existe, fue eliminado o el identificador es incorrecto.
+                {t("containers.notFoundDesc", { defaultValue: "The requested container does not exist, was deleted, or the identifier is incorrect." })}
               </p>
             </>
           )}
           <Button
             onClick={() => navigate("/home")}
-            className="h-8 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center"
+            className="h-8.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold inline-flex items-center"
           >
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            Volver a Mis Contenedores
+            {t("containers.backToContainers", { defaultValue: "Back to My Containers" })}
           </Button>
         </div>
       </div>
@@ -848,370 +853,378 @@ const BinDetailsScreen: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-16 font-sans">
       <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
-        {/* Impersonation Banner if viewing shared account */}
+        {/* Impersonation Banner */}
         {userImpersonated && (
-          <div className="bg-amber-50 border border-amber-200/80 px-4 py-2 rounded-xl flex items-center justify-between text-xs text-amber-800 shadow-2xs">
+          <div className="bg-amber-50 border border-amber-200/80 px-4 py-2.5 rounded-xl flex items-center justify-between text-xs text-amber-800 shadow-2xs">
             <div className="flex items-center space-x-2">
               <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
-                Visualizando cuenta compartida: <strong>{userImpersonated?.ownerUsername}</strong> ({userImpersonated?.ownerUserId})
+                {t("containers.viewingShared", {
+                  username: userImpersonated?.ownerUsername,
+                  userId: userImpersonated?.ownerUserId,
+                  defaultValue: `Viewing shared account: ${userImpersonated?.ownerUsername} (${userImpersonated?.ownerUserId})`
+                })}
               </span>
             </div>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleStopImpersonating}
-              className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100 rounded font-medium"
+              className="h-6 px-2.5 text-[11px] text-amber-800 hover:bg-amber-100 rounded-lg font-medium"
             >
-              Salir de cuenta compartida
+              {t("containers.stopImpersonating", { defaultValue: "Exit shared account" })}
             </Button>
           </div>
         )}
 
-        {/* Compact Top Bar matching home.tsx */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Left: Identity */}
-          <div className="flex items-center space-x-3 min-w-0">
+        {/* Top Hero Bar */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          {/* Left: Container Brand & Info */}
+          <div className="flex items-start gap-3.5 min-w-0">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate("/home")}
-              className="h-8 w-8 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg shrink-0 shadow-2xs"
-              title="Back to Dashboard"
+              className="h-9 w-9 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl shrink-0 shadow-2xs mt-0.5"
+              title={t("containers.backToDashboard", { defaultValue: "Back to Dashboard" })}
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight truncate">
+
+            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+              <Box className="w-5 h-5 text-blue-400" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight truncate">
                   {bin.name}
                 </h1>
                 {bin.location?.name && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 inline-flex items-center gap-1 shrink-0">
-                    <MapPin className="w-2.5 h-2.5" />
+                  <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 inline-flex items-center gap-1 shrink-0">
+                    <MapPin className="w-3 h-3 text-blue-500" />
                     <span>{bin.location.name}</span>
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xl">
-                {bin.description || bin.address || (
-                  <span className="text-slate-400">Created {new Date(bin.createdAt).toLocaleDateString()}</span>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-slate-500">
+                {bin.description && (
+                  <span className="truncate max-w-md">{bin.description}</span>
                 )}
-              </p>
+                {bin.address && (
+                  <span className="flex items-center gap-1 text-slate-400 truncate max-w-sm">
+                    <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span>{bin.address}</span>
+                  </span>
+                )}
+                <span className="flex items-center gap-1 text-slate-400 shrink-0">
+                  <Calendar className="w-3 h-3 text-slate-400" />
+                  <span>{new Date(bin.createdAt).toLocaleDateString()}</span>
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Right: Actions */}
-          <div className="flex items-center space-x-2 shrink-0">
+          {/* Right: Actions Suite */}
+          <div className="flex items-center flex-wrap gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+            {/* Copilot IA */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openBinCopilot(bin.id, bin.name)}
+              className="h-8.5 px-3 bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border-blue-200/80 text-blue-800 hover:from-blue-500/20 hover:to-indigo-500/20 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5 transition-all"
+              title={ct('askBinCopilot')}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+              <span>{ct('aiCopilot')}</span>
+            </Button>
+
+            {/* AI Tools Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8.5 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
+                >
+                  <ScanLine className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>{t("containers.aiTools", { defaultValue: "AI Tools" })}</span>
+                  <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 text-xs rounded-xl shadow-lg border-slate-200 p-1.5">
+                <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                  {t("containers.aiRecognition", { defaultValue: "AI Recognition" })}
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => setIsImagesUploadOpen(true)}
+                  className="cursor-pointer rounded-lg px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                    <ImageIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-slate-900">{t("containers.scanPhotos", { defaultValue: "Scan from Photos" })}</div>
+                    <div className="text-[10px] text-slate-400">{t("containers.scanPhotosDesc", { defaultValue: "Detect items automatically" })}</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setIsVideoUploadOpen(true)}
+                  className="cursor-pointer rounded-lg px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                    <Video className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-slate-900">{t("containers.scanVideo", { defaultValue: "Scan from Video" })}</div>
+                    <div className="text-[10px] text-slate-400">{t("containers.scanVideoDesc", { defaultValue: "Process video walk-through" })}</div>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="my-1" />
+                <DropdownMenuItem
+                  onClick={() => setIsBulkUploadOpen(true)}
+                  className="cursor-pointer rounded-lg px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                    <UploadCloud className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-slate-900">{t("containers.bulkUpload", { defaultValue: "Bulk Upload" })}</div>
+                    <div className="text-[10px] text-slate-400">{t("containers.bulkUploadHint", { defaultValue: "Each photo will create an item in this container" })}</div>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Refresh */}
             <Button
               variant="outline"
               size="sm"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
-              title="Refresh container"
+              className="h-8.5 w-8.5 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl shadow-2xs"
+              title={t("containers.refreshTooltip", { defaultValue: "Refresh container" })}
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"
-                  }`}
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"}`}
               />
-              <span className="ml-1.5 hidden sm:inline">Refresh</span>
             </Button>
 
+            {/* Edit Container */}
             <Button
               variant="outline"
               size="sm"
               onClick={handleEditBin}
-              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
+              className="h-8.5 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-medium shadow-2xs flex items-center gap-1.5"
             >
-              <Edit3 className="w-3.5 h-3.5 mr-1 text-slate-500" />
-              <span>{t("containers.edit", { defaultValue: "Edit" })}</span>
+              <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+              <span>{t("actions.edit", { defaultValue: "Edit" })}</span>
             </Button>
 
+            {/* Delete Container */}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2.5 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 border-slate-200 text-slate-500 rounded-lg text-xs shadow-2xs"
-                  title="Delete Container"
+                  className="h-8.5 w-8.5 p-0 bg-white hover:bg-red-50 hover:text-red-600 hover:border-red-200 border-slate-200 text-slate-500 rounded-xl shadow-2xs"
+                  title={t("containers.delete", { defaultValue: "Delete" })}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl bg-white max-w-md">
+              <AlertDialogContent className="rounded-2xl border border-slate-200 shadow-xl bg-white max-w-md p-5">
                 <AlertDialogHeader>
                   <AlertDialogTitle className="text-base font-bold text-slate-900">
-                    Delete "{bin.name}"?
+                    {t("containers.deleteConfirmTitle", { name: bin.name, defaultValue: `Delete "${bin.name}"?` })}
                   </AlertDialogTitle>
                   <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
-                    This will permanently delete this container and all{" "}
-                    <strong>{items.length} items</strong> stored inside it.
+                    {t("containers.deleteConfirmDesc", {
+                      count: items.length,
+                      defaultValue: `This will permanently delete this container and all ${items.length} items stored inside it.`
+                    })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
-                <AlertDialogFooter className="pt-2">
-                  <AlertDialogCancel className="rounded-lg border-slate-200 text-xs h-8">
-                    Cancel
+                <AlertDialogFooter className="pt-3">
+                  <AlertDialogCancel className="rounded-xl border-slate-200 text-xs h-8.5 font-medium">
+                    {t("actions.cancel", { defaultValue: "Cancel" })}
                   </AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleDeleteBin}
                     disabled={isDeletingBin}
-                    className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-medium"
+                    className="rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs h-8.5 font-semibold"
                   >
-                    {isDeletingBin ? "Deleting..." : "Delete Container"}
+                    {isDeletingBin ? t("containers.deleting", { defaultValue: "Deleting..." }) : t("containers.deleteConfirmBtn", { defaultValue: "Delete Container" })}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
 
+            {/* Primary Add Item */}
             <Button
               onClick={() => {
                 resetItemForm();
                 setIsAddItemOpen(true);
               }}
-              className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
+              className="h-8.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs hover:shadow flex items-center gap-1.5 transition-all"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-4 h-4 text-blue-400" />
               <span>{t("containers.addItem", { defaultValue: "Add Item" })}</span>
             </Button>
           </div>
         </div>
 
-        {/* Space-Optimized KPI Stat Ribbon (Exactly 62px height, 3 cards matching home.tsx) */}
+        {/* Dashboard KPI Stats Ribbon (3 Cards) */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Card 1: Total Items */}
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                <Package className="w-4.5 h-4.5" />
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 sm:p-4 shadow-2xs flex items-center justify-between hover:border-slate-300 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                <Package className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Total Items
-                </p>
-                <h3 className="text-lg font-black text-slate-900 leading-tight">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {t("containers.kpiTotalItems", { defaultValue: "Total Items" })}
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
                   {totalItemsCount}
-                </h3>
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  {t("containers.kpiInContainer", { defaultValue: "In this container" })}
+                </span>
               </div>
             </div>
-            <span className="text-[11px] text-slate-400 hidden xl:inline">
-              In this container
-            </span>
           </div>
 
           {/* Card 2: Total Units */}
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                <Layers className="w-4.5 h-4.5" />
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 sm:p-4 shadow-2xs flex items-center justify-between hover:border-slate-300 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                <Layers className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Total Units
-                </p>
-                <h3 className="text-lg font-black text-slate-900 leading-tight">
-                  {totalUnitsCount}
-                </h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {t("containers.kpiTotalUnits", { defaultValue: "Total Units" })}
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 leading-none">
+                  {totalUnitsCount} <span className="text-xs font-normal text-slate-500">{t("containers.units", { defaultValue: "units" })}</span>
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  {t("containers.kpiQuantitySum", { defaultValue: "Quantity sum" })}
+                </span>
               </div>
             </div>
-            <span className="text-[11px] text-slate-400 hidden xl:inline">
-              Quantity sum
-            </span>
           </div>
 
           {/* Card 3: Total Valuation */}
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                <TrendingUp className="w-4.5 h-4.5" />
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-3.5 sm:p-4 shadow-2xs flex items-center justify-between hover:border-slate-300 transition-colors">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+                <TrendingUp className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Estimated Value
-                </p>
-                <h3 className="text-lg font-black text-slate-900 leading-tight">
-                  ${totalValuation.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}
-                </h3>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {t("containers.kpiEstimatedValue", { defaultValue: "Estimated Value" })}
+                </span>
+                <span className="text-xl sm:text-2xl font-black text-slate-900 leading-none font-mono">
+                  ${totalValuation.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  {t("containers.kpiValuation", { defaultValue: "Valuation" })}
+                </span>
               </div>
             </div>
-            <span className="text-[11px] text-slate-400 hidden xl:inline">
-              Valuation
-            </span>
           </div>
         </div>
 
-        {/* Integrated Unified Controls Row matching home.tsx */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+        {/* Integrated Unified Controls Bar */}
+        <div className="bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search items by name, tag, or description..."
-              className="pl-8 pr-7 h-8 bg-slate-50/80 border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:bg-white focus:border-slate-300"
+              placeholder={t("containers.searchPlaceholder", { defaultValue: "Search items by name, tag, or description..." })}
+              className="pl-9 pr-8 h-8.5 bg-slate-50/80 border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:bg-white focus:border-slate-300"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
           {/* Filter, Sort, Tools & View Mode Toggle */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
-            {/* Tag Filter Dropdown */}
-            {allTags.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={`h-8 px-2.5 rounded-lg border-slate-200 text-xs font-medium ${selectedTag ? "bg-blue-50 text-blue-700 border-blue-200" : "text-slate-600 bg-white"
-                      }`}
-                  >
-                    <Tag className="w-3 h-3 mr-1 text-slate-400" />
-                    <span>{selectedTag ? `#${selectedTag}` : "All Tags"}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-44 text-xs">
-                  <DropdownMenuLabel className="text-[11px] text-slate-400 uppercase">
-                    Filter by Tag
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem
-                    onClick={() => setSelectedTag(null)}
-                    className="cursor-pointer"
-                  >
-                    <span className={!selectedTag ? "font-bold text-slate-900" : ""}>
-                      All tags
-                    </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {allTags.map((tItem) => (
-                    <DropdownMenuItem
-                      key={tItem}
-                      onClick={() => setSelectedTag(tItem)}
-                      className="cursor-pointer flex items-center justify-between"
-                    >
-                      <span className={selectedTag === tItem ? "font-bold text-blue-600" : ""}>
-                        #{tItem}
-                      </span>
-                      {selectedTag === tItem && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-
             {/* Sort Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2.5 bg-white border-slate-200 text-slate-600 hover:bg-slate-50 rounded-lg text-xs"
+                  className="h-8.5 px-3 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-medium"
                 >
-                  <ArrowUpDown className="w-3.5 h-3.5 mr-1 text-slate-400" />
-                  <span className="hidden sm:inline">Sort</span>
+                  <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                  <span>
+                    {sortBy === "name"
+                      ? t("containers.sortName", { defaultValue: "Name (A - Z)" })
+                      : sortBy === "value-desc"
+                        ? t("containers.sortValueDesc", { defaultValue: "Value (Highest)" })
+                        : sortBy === "qty-desc"
+                          ? t("containers.sortQtyDesc", { defaultValue: "Quantity (Highest)" })
+                          : t("containers.sortDate", { defaultValue: "Recently Added" })}
+                  </span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40 text-xs">
-                <DropdownMenuLabel className="text-[11px] text-slate-400 uppercase">
-                  Sort Order
+              <DropdownMenuContent align="end" className="w-44 text-xs rounded-xl shadow-lg border-slate-200">
+                <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  {t("containers.sortOrder", { defaultValue: "Sort Order" })}
                 </DropdownMenuLabel>
                 <DropdownMenuItem
                   onClick={() => setSortBy("date")}
                   className={`cursor-pointer ${sortBy === "date" ? "font-bold text-slate-900" : ""}`}
                 >
-                  Recently Added
+                  {t("containers.sortDate", { defaultValue: "Recently Added" })}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setSortBy("name")}
                   className={`cursor-pointer ${sortBy === "name" ? "font-bold text-slate-900" : ""}`}
                 >
-                  Name (A - Z)
+                  {t("containers.sortName", { defaultValue: "Name (A - Z)" })}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setSortBy("value-desc")}
                   className={`cursor-pointer ${sortBy === "value-desc" ? "font-bold text-slate-900" : ""}`}
                 >
-                  Value (Highest)
+                  {t("containers.sortValueDesc", { defaultValue: "Value (Highest)" })}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setSortBy("qty-desc")}
                   className={`cursor-pointer ${sortBy === "qty-desc" ? "font-bold text-slate-900" : ""}`}
                 >
-                  Quantity (Highest)
+                  {t("containers.sortQtyDesc", { defaultValue: "Quantity (Highest)" })}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Bulk Upload Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBulkUploadOpen(true)}
-              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
-            >
-              <UploadCloud className="w-3.5 h-3.5 mr-1 text-slate-500" />
-              <span>Bulk Upload</span>
-            </Button>
-
-            {/* AI Tools Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
-                >
-                  <Sparkles className="w-3.5 h-3.5 mr-1 text-slate-500" />
-                  <span>AI Tools</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 text-xs">
-                <DropdownMenuLabel className="text-[11px] text-slate-400 uppercase">
-                  AI Recognition
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => setIsImagesUploadOpen(true)}
-                  className="cursor-pointer space-x-2"
-                >
-                  <ImageIcon className="w-4 h-4 text-slate-600" />
-                  <div>
-                    <div className="font-medium text-slate-900">Scan from Photos</div>
-                    <div className="text-[10px] text-slate-400">Detect items automatically</div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setIsVideoUploadOpen(true)}
-                  className="cursor-pointer space-x-2"
-                >
-                  <Video className="w-4 h-4 text-slate-600" />
-                  <div>
-                    <div className="font-medium text-slate-900">Scan from Video</div>
-                    <div className="text-[10px] text-slate-400">Process video walk-through</div>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* View Mode Toggle matching home.tsx */}
-            <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200/80 rounded-lg">
+            {/* View Mode Toggle */}
+            <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200/80 rounded-xl">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setViewMode("grid")}
-                className={`h-7 w-7 p-0 rounded-md ${viewMode === "grid"
+                className={`h-7.5 w-7.5 p-0 rounded-lg ${viewMode === "grid"
                     ? "bg-white text-slate-900 shadow-2xs font-bold"
                     : "text-slate-400 hover:text-slate-700"
                   }`}
-                title="Grid view"
+                title={t("containers.gridView", { defaultValue: "Grid view" })}
               >
                 <Grid className="w-3.5 h-3.5" />
               </Button>
@@ -1219,11 +1232,11 @@ const BinDetailsScreen: React.FC = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => setViewMode("list")}
-                className={`h-7 w-7 p-0 rounded-md ${viewMode === "list"
+                className={`h-7.5 w-7.5 p-0 rounded-lg ${viewMode === "list"
                     ? "bg-white text-slate-900 shadow-2xs font-bold"
                     : "text-slate-400 hover:text-slate-700"
                   }`}
-                title="List view"
+                title={t("containers.listView", { defaultValue: "List view" })}
               >
                 <List className="w-3.5 h-3.5" />
               </Button>
@@ -1231,19 +1244,56 @@ const BinDetailsScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Empty State matching home.tsx */}
+        {/* Interactive Tags Ribbon Strip */}
+        {allTags.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+            <button
+              onClick={() => setSelectedTag(null)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${!selectedTag
+                  ? "bg-slate-900 text-white shadow-2xs"
+                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+            >
+              {t("containers.allTags", { defaultValue: "All Tags" })} ({items.length})
+            </button>
+            {allTags.map((tag) => {
+              const count = items.filter((it) => it.tags?.includes(tag)).length;
+              const isSelected = selectedTag === tag;
+              return (
+                <button
+                  key={tag}
+                  onClick={() => setSelectedTag(isSelected ? null : tag)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${isSelected
+                      ? "bg-blue-600 text-white shadow-2xs font-semibold"
+                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                    }`}
+                >
+                  <span>#{tag}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                      }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Empty State */}
         {filteredItems.length === 0 ? (
-          <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 text-center max-w-md mx-auto my-6">
-            <div className="w-10 h-10 mx-auto mb-2 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-center text-slate-400">
-              <Package className="w-5 h-5" />
+          <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-10 text-center max-w-md mx-auto my-8 shadow-2xs">
+            <div className="w-12 h-12 mx-auto mb-3 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center text-slate-400">
+              <Package className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-bold text-slate-900 mb-1">
-              {searchQuery || selectedTag ? "No items found" : "No items yet"}
+              {searchQuery || selectedTag ? t("containers.noItemsFound", { defaultValue: "No items found" }) : t("containers.noItems", { defaultValue: "No items yet" })}
             </h3>
-            <p className="text-xs text-slate-400 mb-4 leading-relaxed">
+            <p className="text-xs text-slate-400 mb-5 leading-relaxed">
               {searchQuery || selectedTag
-                ? "Try adjusting your search terms or filters."
-                : "Add items manually or use bulk upload to populate this container."}
+                ? t("containers.noItemsSearchHint", { defaultValue: "Try adjusting your search terms or filters." })
+                : t("containers.noItemsHint", { defaultValue: "Add items manually or use bulk upload to populate this container." })}
             </p>
             {searchQuery || selectedTag ? (
               <Button
@@ -1253,9 +1303,9 @@ const BinDetailsScreen: React.FC = () => {
                   setSearchQuery("");
                   setSelectedTag(null);
                 }}
-                className="h-8 px-3 border-slate-200 text-xs text-slate-700"
+                className="h-8.5 px-3.5 border-slate-200 text-xs text-slate-700 rounded-xl"
               >
-                Clear filter
+                {t("actions.clearFilter", { defaultValue: "Clear filter" })}
               </Button>
             ) : (
               <Button
@@ -1263,16 +1313,16 @@ const BinDetailsScreen: React.FC = () => {
                   resetItemForm();
                   setIsAddItemOpen(true);
                 }}
-                className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold"
+                className="h-8.5 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs"
               >
-                <Plus className="w-3.5 h-3.5 mr-1" />
-                <span>Add First Item</span>
+                <Plus className="w-3.5 h-3.5 mr-1 text-blue-400" />
+                <span>{t("containers.addFirstItem", { defaultValue: "Add First Item" })}</span>
               </Button>
             )}
           </div>
         ) : viewMode === "grid" ? (
-          /* Grid View matching home.tsx card proportions */
-          <div className="grid gap-3.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5">
+          /* Redesigned Card Grid View */
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {filteredItems.map((item) => {
               const qty = Number(item.quantity ?? item.cuantity) || 1;
               const val = Number(item.value) || 0;
@@ -1280,138 +1330,159 @@ const BinDetailsScreen: React.FC = () => {
               return (
                 <div
                   key={item.id}
-                  className="group relative bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3 shadow-xs hover:shadow-md transition-all duration-200 flex flex-col justify-between"
+                  className="group relative bg-white rounded-2xl border border-slate-200/80 hover:border-slate-300 shadow-2xs hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between overflow-hidden h-full"
                 >
-                  <div>
-                    {/* Item Image */}
-                    <div
-                      className="relative aspect-[16/10] bg-slate-100 rounded-lg overflow-hidden cursor-pointer select-none"
-                      onClick={() => {
-                        if (item.imageUrl) {
-                          setSelectedModalImage(item.imageUrl);
-                          setZoomLevel(1);
-                          setIsImageModalOpen(true);
-                        }
-                      }}
-                    >
-                      {item.imageUrl ? (
-                        <img
-                          src={item.imageUrl}
-                          alt={item.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-300">
-                          <ImageIcon className="w-6 h-6" />
-                        </div>
-                      )}
-
-                      {/* Top Badges */}
-                      <div className="absolute top-2 left-2 flex items-center gap-1.5">
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-white/95 border border-slate-200/80 text-slate-800 font-mono text-[10px] font-semibold shadow-2xs">
-                          x{qty}
+                  {/* Image Viewport */}
+                  <div
+                    className="relative aspect-[4/3] bg-slate-50 overflow-hidden cursor-pointer select-none border-b border-slate-100"
+                    onClick={() => {
+                      if (item.imageUrl) {
+                        setSelectedModalImage(item.imageUrl);
+                        setZoomLevel(1);
+                        setIsImageModalOpen(true);
+                      }
+                    }}
+                  >
+                    {item.imageUrl ? (
+                      <img
+                        src={item.imageUrl}
+                        alt={item.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center text-slate-300 bg-gradient-to-b from-slate-50 to-slate-100/50">
+                        <ImageIcon className="w-8 h-8 stroke-[1.5]" />
+                        <span className="text-[11px] font-medium text-slate-400 mt-1">
+                          {t("containers.image", { defaultValue: "No photo" })}
                         </span>
                       </div>
+                    )}
 
-                      {val > 0 && (
-                        <div className="absolute top-2 right-2">
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-900/90 text-white font-mono text-[10px] font-semibold shadow-2xs">
-                            ${val.toFixed(2)}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Hover Zoom Eye */}
-                      {item.imageUrl && (
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <div className="w-7 h-7 rounded-full bg-white/90 text-slate-800 flex items-center justify-center shadow-xs">
-                            <ZoomIn className="w-3.5 h-3.5" />
-                          </div>
-                        </div>
-                      )}
+                    {/* Quantity Badge on Image */}
+                    <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-10">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white/95 backdrop-blur-md border border-white/60 text-slate-800 text-[11px] font-bold shadow-2xs font-mono">
+                        <span>x{qty}</span>
+                        <span className="text-[10px] text-slate-400 font-sans font-normal">{t("containers.units", { defaultValue: "units" })}</span>
+                      </span>
                     </div>
 
-                    {/* Title & Description */}
-                    <div className="mt-2.5">
-                      <h3
-                        className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight"
-                        title={item.name}
-                      >
-                        {item.name}
-                      </h3>
-                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mt-1">
-                        {item.description || (
-                          <span className="text-slate-300 italic">No description</span>
-                        )}
-                      </p>
-                    </div>
+                    {/* Valuation Badge on Image */}
+                    {val > 0 && (
+                      <div className="absolute top-2.5 right-2.5 z-10">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-slate-900/85 backdrop-blur-md text-white font-mono text-[11px] font-bold shadow-2xs">
+                          ${val.toFixed(2)}
+                        </span>
+                      </div>
+                    )}
 
-                    {/* Tags */}
-                    {item.tags && item.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {item.tags.map((tg, idx) => (
-                          <span
-                            key={idx}
-                            className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium"
-                          >
-                            #{tg}
-                          </span>
-                        ))}
+                    {/* Hover Zoom Eye Indicator */}
+                    {item.imageUrl && (
+                      <div className="absolute inset-0 bg-slate-950/20 backdrop-blur-[1px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="w-8 h-8 rounded-full bg-white text-slate-800 flex items-center justify-center shadow-md transform scale-90 group-hover:scale-100 transition-transform">
+                          <ZoomIn className="w-4 h-4" />
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* Card Footer Info & Actions */}
-                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 mt-2.5">
-                    <span className="text-[10px] text-slate-400">
-                      {new Date(item.createdAt || 0).toLocaleDateString()}
-                    </span>
-
-                    <div className="flex items-center space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditItem(item)}
-                        className="h-6 w-6 p-0 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded"
-                        title="Edit Item"
+                  {/* Card Body */}
+                  <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                    <div>
+                      {/* Item Title */}
+                      <h3
+                        className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-snug"
+                        title={item.name}
                       >
-                        <Edit3 className="w-3 h-3" />
-                      </Button>
+                        {item.name}
+                      </h3>
 
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                            title="Delete Item"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl bg-white max-w-sm">
-                          <AlertDialogHeader>
-                            <AlertDialogTitle className="text-base font-bold text-slate-900">
-                              Delete "{item.name}"?
-                            </AlertDialogTitle>
-                            <AlertDialogDescription className="text-xs text-slate-500">
-                              Are you sure you want to delete this item?
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter className="pt-2">
-                            <AlertDialogCancel className="rounded-lg border-slate-200 text-xs h-8">
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteItem(item.id, item.imageUrl)}
-                              className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-medium"
+                      {/* Description with Uniform 2 Lines */}
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed mt-1 min-h-[2rem]">
+                        {item.description || (
+                          <span className="text-slate-300 italic">{t("containers.noDescription", { defaultValue: "No description" })}</span>
+                        )}
+                      </p>
+
+                      {/* Clean Tags Preview (Max 2 tags + count) */}
+                      {item.tags && item.tags.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1 mt-2.5">
+                          {item.tags.slice(0, 2).map((tg, idx) => (
+                            <span
+                              key={idx}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedTag(tg);
+                              }}
+                              className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 border border-slate-200/50 transition-colors cursor-pointer truncate max-w-[120px]"
                             >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                              #{tg}
+                            </span>
+                          ))}
+                          {item.tags.length > 2 && (
+                            <span
+                              title={item.tags.slice(2).join(", ")}
+                              className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-500 border border-slate-200/50"
+                            >
+                              +{item.tags.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Card Footer Divider & Actions */}
+                    <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        {new Date(item.createdAt || 0).toLocaleDateString()}
+                      </span>
+
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditItem(item)}
+                          className="h-7 px-2 text-xs text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg flex items-center gap-1 transition-colors"
+                          title={t("containers.editItem", { defaultValue: "Edit Item" })}
+                        >
+                          <Edit3 className="w-3.5 h-3.5 text-slate-400" />
+                          <span className="text-[11px] font-medium">{t("actions.edit", { defaultValue: "Edit" })}</span>
+                        </Button>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                              title={t("containers.deleteItem", { defaultValue: "Delete Item" })}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="rounded-2xl border border-slate-200 shadow-xl bg-white max-w-sm p-5">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-base font-bold text-slate-900">
+                                {t("containers.deleteItemConfirmTitle", { name: item.name, defaultValue: `Delete "${item.name}"?` })}
+                              </AlertDialogTitle>
+                              <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed">
+                                {t("containers.deleteItemConfirmDesc", { defaultValue: "Are you sure you want to delete this item?" })}
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter className="pt-3">
+                              <AlertDialogCancel className="rounded-xl border-slate-200 text-xs h-8.5 font-medium">
+                                {t("actions.cancel", { defaultValue: "Cancel" })}
+                              </AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => deleteItem(item.id, item.imageUrl)}
+                                className="rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs h-8.5 font-semibold"
+                              >
+                                {t("actions.delete", { defaultValue: "Delete" })}
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1419,8 +1490,8 @@ const BinDetailsScreen: React.FC = () => {
             })}
           </div>
         ) : (
-          /* List View matching renderListView in home.tsx */
-          <div className="divide-y divide-slate-100 bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+          /* Redesigned Table / List View */
+          <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden">
             {filteredItems.map((item) => {
               const qty = Number(item.quantity ?? item.cuantity) || 1;
               const val = Number(item.value) || 0;
@@ -1428,12 +1499,12 @@ const BinDetailsScreen: React.FC = () => {
               return (
                 <div
                   key={item.id}
-                  className="group flex items-center justify-between px-4 py-2.5 hover:bg-slate-50/80 transition-colors"
+                  className="group flex items-center justify-between px-4 py-3 hover:bg-slate-50/80 transition-colors gap-3"
                 >
-                  {/* Left: Thumbnail & Name */}
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                  {/* Left: Thumbnail & Details */}
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
                     <div
-                      className="w-8 h-8 rounded-lg bg-slate-100 overflow-hidden cursor-pointer shrink-0 border border-slate-200/70"
+                      className="w-11 h-11 rounded-xl bg-slate-100 overflow-hidden cursor-pointer shrink-0 border border-slate-200/80 relative"
                       onClick={() => {
                         if (item.imageUrl) {
                           setSelectedModalImage(item.imageUrl);
@@ -1451,45 +1522,55 @@ const BinDetailsScreen: React.FC = () => {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-300">
-                          <ImageIcon className="w-4 h-4" />
+                          <ImageIcon className="w-5 h-5" />
                         </div>
                       )}
                     </div>
+
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-xs">
+                        <span className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-xs sm:text-sm">
                           {item.name}
                         </span>
                         {val > 0 && (
                           <Badge
                             variant="secondary"
-                            className="bg-slate-100 text-slate-700 font-mono text-[10px] h-4 px-1"
+                            className="bg-slate-100 text-slate-700 font-mono text-[10px] h-4.5 px-1.5 rounded-md"
                           >
                             ${val.toFixed(2)}
                           </Badge>
                         )}
                       </div>
-                      {item.description && (
-                        <p className="text-[11px] text-slate-400 truncate max-w-md">
+                      {item.description ? (
+                        <p className="text-xs text-slate-500 truncate max-w-lg mt-0.5">
                           {item.description}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-slate-300 italic mt-0.5">
+                          {t("containers.noDescription", { defaultValue: "No description" })}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Right: Quantity & Actions */}
+                  {/* Right: Quantity, Date & Actions */}
                   <div className="flex items-center gap-4 shrink-0 text-xs">
-                    <span className="font-semibold text-slate-700 min-w-[60px] text-right">
-                      x{qty} units
-                    </span>
+                    <div className="text-right hidden sm:block">
+                      <span className="font-bold text-slate-800 text-xs font-mono block">
+                        x{qty} {t("containers.units", { defaultValue: "units" })}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {new Date(item.createdAt || 0).toLocaleDateString()}
+                      </span>
+                    </div>
 
-                    <div className="flex items-center space-x-1">
+                    <div className="flex items-center gap-1">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => handleEditItem(item)}
-                        className="h-7 w-7 p-0 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded"
-                        title="Edit Item"
+                        className="h-8 w-8 p-0 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg"
+                        title={t("containers.editItem", { defaultValue: "Edit Item" })}
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </Button>
@@ -1499,30 +1580,30 @@ const BinDetailsScreen: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 w-7 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"
-                            title="Delete Item"
+                            className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            title={t("containers.deleteItem", { defaultValue: "Delete Item" })}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-xl border border-slate-200 shadow-xl bg-white max-w-sm">
+                        <AlertDialogContent className="rounded-2xl border border-slate-200 shadow-xl bg-white max-w-sm p-5">
                           <AlertDialogHeader>
                             <AlertDialogTitle className="text-base font-bold text-slate-900">
-                              Delete "{item.name}"?
+                              {t("containers.deleteItemConfirmTitle", { name: item.name, defaultValue: `Delete "${item.name}"?` })}
                             </AlertDialogTitle>
                             <AlertDialogDescription className="text-xs text-slate-500">
-                              Are you sure you want to delete this item?
+                              {t("containers.deleteItemConfirmDesc", { defaultValue: "Are you sure you want to delete this item?" })}
                             </AlertDialogDescription>
                           </AlertDialogHeader>
-                          <AlertDialogFooter className="pt-2">
-                            <AlertDialogCancel className="rounded-lg border-slate-200 text-xs h-8">
-                              Cancel
+                          <AlertDialogFooter className="pt-3">
+                            <AlertDialogCancel className="rounded-xl border-slate-200 text-xs h-8.5">
+                              {t("actions.cancel", { defaultValue: "Cancel" })}
                             </AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => deleteItem(item.id, item.imageUrl)}
-                              className="rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-medium"
+                              className="rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs h-8.5 font-semibold"
                             >
-                              Delete
+                              {t("actions.delete", { defaultValue: "Delete" })}
                             </AlertDialogAction>
                           </AlertDialogFooter>
                         </AlertDialogContent>
@@ -1542,7 +1623,7 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 1. Add Item Dialog */}
       <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+        <DialogContent className="max-w-md rounded-2xl border border-slate-200 shadow-xl p-5 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-sm font-bold text-slate-900">
               {t("containers.addNewItem", { defaultValue: "Add New Item" })}
@@ -1552,19 +1633,19 @@ const BinDetailsScreen: React.FC = () => {
           <div className="space-y-3.5 pt-2">
             {/* Image Dropzone */}
             <div>
-              <Label className="text-xs font-medium text-slate-700 block mb-1">
-                Photo (Optional)
+              <Label className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.photoOptional", { defaultValue: "Photo (Optional)" })}
               </Label>
-              <div className="border border-dashed border-slate-200 rounded-lg p-2.5 text-center hover:border-slate-400 transition-all bg-slate-50/50">
+              <div className="border border-dashed border-slate-200 rounded-xl p-3 text-center hover:border-slate-400 transition-all bg-slate-50/50">
                 {selectedImage ? (
                   <div className="flex items-center space-x-3">
                     <img
                       src={selectedImage}
                       alt="Preview"
-                      className="w-14 h-14 object-cover rounded-md border border-slate-200"
+                      className="w-14 h-14 object-cover rounded-xl border border-slate-200"
                     />
                     <div className="text-left flex-1">
-                      <p className="text-xs font-medium text-slate-800">Photo attached</p>
+                      <p className="text-xs font-semibold text-slate-800">{t("containers.photoAttached", { defaultValue: "Photo attached" })}</p>
                       <button
                         type="button"
                         onClick={() => {
@@ -1573,15 +1654,15 @@ const BinDetailsScreen: React.FC = () => {
                         }}
                         className="text-xs text-red-600 hover:underline mt-0.5"
                       >
-                        Remove
+                        {t("containers.remove", { defaultValue: "Remove" })}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <label className="cursor-pointer flex items-center justify-center space-x-2 py-2">
                     <ImageIcon className="w-4 h-4 text-slate-400" />
-                    <span className="text-xs text-blue-600 hover:underline font-medium">
-                      Select photo
+                    <span className="text-xs text-blue-600 hover:underline font-semibold">
+                      {t("containers.selectPhoto", { defaultValue: "Select photo" })}
                     </span>
                     <input
                       type="file"
@@ -1596,38 +1677,38 @@ const BinDetailsScreen: React.FC = () => {
 
             {/* Name */}
             <div>
-              <Label htmlFor="itemName" className="text-xs font-medium text-slate-700 block mb-1">
-                Name *
+              <Label htmlFor="itemName" className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.nameLabel", { defaultValue: "Name *" })}
               </Label>
               <Input
                 id="itemName"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
-                placeholder="Item name"
-                className="h-8 text-xs rounded-lg border-slate-200"
+                placeholder={t("containers.itemNamePlaceholder", { defaultValue: "Item name" })}
+                className="h-8.5 text-xs rounded-xl border-slate-200"
               />
             </div>
 
             {/* Description */}
             <div>
-              <Label htmlFor="itemDesc" className="text-xs font-medium text-slate-700 block mb-1">
-                Description
+              <Label htmlFor="itemDesc" className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.descriptionLabel", { defaultValue: "Description" })}
               </Label>
               <Textarea
                 id="itemDesc"
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
-                placeholder="Description, model, notes..."
+                placeholder={t("containers.itemDescPlaceholder", { defaultValue: "Description, model, notes..." })}
                 rows={2}
-                className="text-xs rounded-lg border-slate-200"
+                className="text-xs rounded-xl border-slate-200 resize-none"
               />
             </div>
 
             {/* Quantity & Value */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="itemQty" className="text-xs font-medium text-slate-700 block mb-1">
-                  Quantity
+                <Label htmlFor="itemQty" className="text-xs font-semibold text-slate-700 block mb-1">
+                  {t("containers.quantityLabel", { defaultValue: "Quantity" })}
                 </Label>
                 <div className="flex items-center space-x-1">
                   <Button
@@ -1635,7 +1716,7 @@ const BinDetailsScreen: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={decrementQuantity}
-                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                    className="h-8.5 w-8.5 p-0 rounded-xl border-slate-200"
                   >
                     <Minus className="w-3 h-3" />
                   </Button>
@@ -1644,15 +1725,23 @@ const BinDetailsScreen: React.FC = () => {
                     type="number"
                     min={1}
                     value={itemCuantity}
-                    onChange={(e) => setItemCuantity(Math.max(1, Number(e.target.value)))}
-                    className="h-8 text-xs text-center rounded-lg border-slate-200"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "") {
+                        setItemCuantity(1);
+                      } else {
+                        const num = parseInt(val, 10);
+                        setItemCuantity(isNaN(num) ? 1 : Math.max(1, num));
+                      }
+                    }}
+                    className="h-8.5 text-xs text-center rounded-xl border-slate-200 font-mono"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={incrementQuantity}
-                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                    className="h-8.5 w-8.5 p-0 rounded-xl border-slate-200"
                   >
                     <Plus className="w-3 h-3" />
                   </Button>
@@ -1660,11 +1749,11 @@ const BinDetailsScreen: React.FC = () => {
               </div>
 
               <div>
-                <Label htmlFor="itemVal" className="text-xs font-medium text-slate-700 block mb-1">
-                  Value ($)
+                <Label htmlFor="itemVal" className="text-xs font-semibold text-slate-700 block mb-1">
+                  {t("containers.valueLabel", { defaultValue: "Value ($)" })}
                 </Label>
                 <div className="relative">
-                  <DollarSign className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <DollarSign className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     id="itemVal"
                     type="number"
@@ -1673,7 +1762,7 @@ const BinDetailsScreen: React.FC = () => {
                     value={itemValue}
                     onChange={(e) => setItemValue(e.target.value)}
                     placeholder="0.00"
-                    className="h-8 pl-6 text-xs rounded-lg border-slate-200"
+                    className="h-8.5 pl-7 text-xs rounded-xl border-slate-200 font-mono"
                   />
                 </div>
               </div>
@@ -1681,30 +1770,30 @@ const BinDetailsScreen: React.FC = () => {
 
             {/* Tags */}
             <div>
-              <Label className="text-xs font-medium text-slate-700 block mb-1">
-                Tags
+              <Label className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.tagsLabel", { defaultValue: "Tags" })}
               </Label>
               <div className="flex space-x-1.5">
                 <Input
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Add a tag..."
+                  placeholder={t("containers.addTagPlaceholder", { defaultValue: "Add a tag..." })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       handleAddTag();
                     }
                   }}
-                  className="h-8 text-xs rounded-lg border-slate-200"
+                  className="h-8.5 text-xs rounded-xl border-slate-200"
                 />
                 <Button
                   type="button"
                   onClick={handleAddTag}
                   size="sm"
                   variant="outline"
-                  className="h-8 px-2.5 rounded-lg text-xs border-slate-200 bg-white"
+                  className="h-8.5 px-3 rounded-xl text-xs border-slate-200 bg-white font-medium"
                 >
-                  Add
+                  {t("containers.addTagBtn", { defaultValue: "Add" })}
                 </Button>
               </div>
 
@@ -1713,7 +1802,7 @@ const BinDetailsScreen: React.FC = () => {
                   {itemTags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md"
+                      className="inline-flex items-center gap-1 text-[11px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-lg border border-slate-200/50"
                     >
                       #{tag}
                       <button
@@ -1738,17 +1827,17 @@ const BinDetailsScreen: React.FC = () => {
                 setIsAddItemOpen(false);
                 resetItemForm();
               }}
-              className="rounded-lg text-xs h-8 border-slate-200"
+              className="rounded-xl text-xs h-8.5 border-slate-200"
             >
-              Cancel
+              {t("actions.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button
               onClick={handleSubmitItem}
               disabled={isSavingItem || !itemName.trim()}
               size="sm"
-              className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 font-semibold"
+              className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs h-8.5 font-bold"
             >
-              {isSavingItem ? "Saving..." : "Add Item"}
+              {isSavingItem ? t("containers.saving", { defaultValue: "Saving..." }) : t("containers.addItem", { defaultValue: "Add Item" })}
             </Button>
           </div>
         </DialogContent>
@@ -1756,29 +1845,29 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 2. Edit Item Dialog */}
       <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
-        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+        <DialogContent className="max-w-md rounded-2xl border border-slate-200 shadow-xl p-5 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-sm font-bold text-slate-900">
-              Edit Item
+              {t("containers.editItemTitle", { defaultValue: "Edit Item" })}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3.5 pt-2">
             {/* Image Dropzone */}
             <div>
-              <Label className="text-xs font-medium text-slate-700 block mb-1">
-                Photo
+              <Label className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.photo", { defaultValue: "Photo" })}
               </Label>
-              <div className="border border-dashed border-slate-200 rounded-lg p-2.5 text-center hover:border-slate-400 transition-all bg-slate-50/50">
+              <div className="border border-dashed border-slate-200 rounded-xl p-3 text-center hover:border-slate-400 transition-all bg-slate-50/50">
                 {selectedImage ? (
                   <div className="flex items-center space-x-3">
                     <img
                       src={selectedImage}
                       alt="Preview"
-                      className="w-14 h-14 object-cover rounded-md border border-slate-200"
+                      className="w-14 h-14 object-cover rounded-xl border border-slate-200"
                     />
                     <div className="text-left flex-1">
-                      <p className="text-xs font-medium text-slate-800">Photo attached</p>
+                      <p className="text-xs font-semibold text-slate-800">{t("containers.photoAttached", { defaultValue: "Photo attached" })}</p>
                       <button
                         type="button"
                         onClick={() => {
@@ -1787,15 +1876,15 @@ const BinDetailsScreen: React.FC = () => {
                         }}
                         className="text-xs text-red-600 hover:underline mt-0.5"
                       >
-                        Remove
+                        {t("containers.remove", { defaultValue: "Remove" })}
                       </button>
                     </div>
                   </div>
                 ) : (
                   <label className="cursor-pointer flex items-center justify-center space-x-2 py-2">
                     <ImageIcon className="w-4 h-4 text-slate-400" />
-                    <span className="text-xs text-blue-600 hover:underline font-medium">
-                      Select photo
+                    <span className="text-xs text-blue-600 hover:underline font-semibold">
+                      {t("containers.selectPhoto", { defaultValue: "Select photo" })}
                     </span>
                     <input
                       type="file"
@@ -1810,38 +1899,38 @@ const BinDetailsScreen: React.FC = () => {
 
             {/* Name */}
             <div>
-              <Label htmlFor="editItemName" className="text-xs font-medium text-slate-700 block mb-1">
-                Name *
+              <Label htmlFor="editItemName" className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.nameLabel", { defaultValue: "Name *" })}
               </Label>
               <Input
                 id="editItemName"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
-                placeholder="Item name"
-                className="h-8 text-xs rounded-lg border-slate-200"
+                placeholder={t("containers.itemNamePlaceholder", { defaultValue: "Item name" })}
+                className="h-8.5 text-xs rounded-xl border-slate-200"
               />
             </div>
 
             {/* Description */}
             <div>
-              <Label htmlFor="editItemDesc" className="text-xs font-medium text-slate-700 block mb-1">
-                Description
+              <Label htmlFor="editItemDesc" className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.descriptionLabel", { defaultValue: "Description" })}
               </Label>
               <Textarea
                 id="editItemDesc"
                 value={itemDescription}
                 onChange={(e) => setItemDescription(e.target.value)}
-                placeholder="Item description"
+                placeholder={t("containers.itemDescPlaceholder", { defaultValue: "Description, model, notes..." })}
                 rows={2}
-                className="text-xs rounded-lg border-slate-200"
+                className="text-xs rounded-xl border-slate-200 resize-none"
               />
             </div>
 
             {/* Quantity & Value */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label htmlFor="editItemQty" className="text-xs font-medium text-slate-700 block mb-1">
-                  Quantity
+                <Label htmlFor="editItemQty" className="text-xs font-semibold text-slate-700 block mb-1">
+                  {t("containers.quantityLabel", { defaultValue: "Quantity" })}
                 </Label>
                 <div className="flex items-center space-x-1">
                   <Button
@@ -1849,7 +1938,7 @@ const BinDetailsScreen: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={decrementQuantity}
-                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                    className="h-8.5 w-8.5 p-0 rounded-xl border-slate-200"
                   >
                     <Minus className="w-3 h-3" />
                   </Button>
@@ -1858,15 +1947,23 @@ const BinDetailsScreen: React.FC = () => {
                     type="number"
                     min={1}
                     value={itemCuantity}
-                    onChange={(e) => setItemCuantity(Math.max(1, Number(e.target.value)))}
-                    className="h-8 text-xs text-center rounded-lg border-slate-200"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "") {
+                        setItemCuantity(1);
+                      } else {
+                        const num = parseInt(val, 10);
+                        setItemCuantity(isNaN(num) ? 1 : Math.max(1, num));
+                      }
+                    }}
+                    className="h-8.5 text-xs text-center rounded-xl border-slate-200 font-mono"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={incrementQuantity}
-                    className="h-8 w-8 p-0 rounded-lg border-slate-200"
+                    className="h-8.5 w-8.5 p-0 rounded-xl border-slate-200"
                   >
                     <Plus className="w-3 h-3" />
                   </Button>
@@ -1874,11 +1971,11 @@ const BinDetailsScreen: React.FC = () => {
               </div>
 
               <div>
-                <Label htmlFor="editItemVal" className="text-xs font-medium text-slate-700 block mb-1">
-                  Value ($)
+                <Label htmlFor="editItemVal" className="text-xs font-semibold text-slate-700 block mb-1">
+                  {t("containers.valueLabel", { defaultValue: "Value ($)" })}
                 </Label>
                 <div className="relative">
-                  <DollarSign className="w-3.5 h-3.5 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <DollarSign className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <Input
                     id="editItemVal"
                     type="number"
@@ -1887,7 +1984,7 @@ const BinDetailsScreen: React.FC = () => {
                     value={itemValue}
                     onChange={(e) => setItemValue(e.target.value)}
                     placeholder="0.00"
-                    className="h-8 pl-6 text-xs rounded-lg border-slate-200"
+                    className="h-8.5 pl-7 text-xs rounded-xl border-slate-200 font-mono"
                   />
                 </div>
               </div>
@@ -1895,30 +1992,30 @@ const BinDetailsScreen: React.FC = () => {
 
             {/* Tags */}
             <div>
-              <Label className="text-xs font-medium text-slate-700 block mb-1">
-                Tags
+              <Label className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.tagsLabel", { defaultValue: "Tags" })}
               </Label>
               <div className="flex space-x-1.5">
                 <Input
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  placeholder="Add a tag..."
+                  placeholder={t("containers.addTagPlaceholder", { defaultValue: "Add a tag..." })}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
                       handleAddTag();
                     }
                   }}
-                  className="h-8 text-xs rounded-lg border-slate-200"
+                  className="h-8.5 text-xs rounded-xl border-slate-200"
                 />
                 <Button
                   type="button"
                   onClick={handleAddTag}
                   size="sm"
                   variant="outline"
-                  className="h-8 px-2.5 rounded-lg text-xs border-slate-200 bg-white"
+                  className="h-8.5 px-3 rounded-xl text-xs border-slate-200 bg-white font-medium"
                 >
-                  Add
+                  {t("containers.addTagBtn", { defaultValue: "Add" })}
                 </Button>
               </div>
 
@@ -1927,7 +2024,7 @@ const BinDetailsScreen: React.FC = () => {
                   {itemTags.map((tag, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-1 text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md"
+                      className="inline-flex items-center gap-1 text-[11px] bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-lg border border-slate-200/50"
                     >
                       #{tag}
                       <button
@@ -1952,17 +2049,17 @@ const BinDetailsScreen: React.FC = () => {
                 setIsEditItemOpen(false);
                 resetItemForm();
               }}
-              className="rounded-lg text-xs h-8 border-slate-200"
+              className="rounded-xl text-xs h-8.5 border-slate-200"
             >
-              Cancel
+              {t("actions.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button
               onClick={handleUpdateItem}
               disabled={isSavingItem || !itemName.trim()}
               size="sm"
-              className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 font-semibold"
+              className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs h-8.5 font-bold"
             >
-              {isSavingItem ? "Updating..." : "Update Item"}
+              {isSavingItem ? t("containers.updating", { defaultValue: "Updating..." }) : t("containers.updateItemBtn", { defaultValue: "Update Item" })}
             </Button>
           </div>
         </DialogContent>
@@ -1970,51 +2067,51 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 3. Edit Container Dialog */}
       <Dialog open={isEditBinOpen} onOpenChange={setIsEditBinOpen}>
-        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+        <DialogContent className="max-w-md rounded-2xl border border-slate-200 shadow-xl p-5 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-sm font-bold text-slate-900">
-              Edit Container
+              {t("containers.editBinTitle", { defaultValue: "Edit Container" })}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3.5 pt-2">
             <div>
-              <Label htmlFor="binName" className="text-xs font-medium text-slate-700 block mb-1">
-                Name *
+              <Label htmlFor="binName" className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.binNameLabel", { defaultValue: "Name *" })}
               </Label>
               <Input
                 id="binName"
                 value={binName}
                 onChange={(e) => setBinName(e.target.value)}
-                placeholder="Container name"
-                className="h-8 text-xs rounded-lg border-slate-200"
+                placeholder={t("containers.binNamePlaceholder", { defaultValue: "Container name" })}
+                className="h-8.5 text-xs rounded-xl border-slate-200"
               />
             </div>
 
             <div>
-              <Label htmlFor="binDesc" className="text-xs font-medium text-slate-700 block mb-1">
-                Description
+              <Label htmlFor="binDesc" className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.binDescLabel", { defaultValue: "Description" })}
               </Label>
               <Textarea
                 id="binDesc"
                 value={binDescription}
                 onChange={(e) => setBinDescription(e.target.value)}
-                placeholder="Description or notes"
+                placeholder={t("containers.binDescPlaceholder", { defaultValue: "Description or notes" })}
                 rows={2}
-                className="text-xs rounded-lg border-slate-200"
+                className="text-xs rounded-xl border-slate-200 resize-none"
               />
             </div>
 
             <div>
-              <Label htmlFor="binAddress" className="text-xs font-medium text-slate-700 block mb-1">
-                Address / Location
+              <Label htmlFor="binAddress" className="text-xs font-semibold text-slate-700 block mb-1">
+                {t("containers.binAddressLabel", { defaultValue: "Address / Location" })}
               </Label>
               <Input
                 id="binAddress"
                 value={binAddress}
                 onChange={(e) => setBinAddress(e.target.value)}
-                placeholder="Shelf, room, or physical address"
-                className="h-8 text-xs rounded-lg border-slate-200"
+                placeholder={t("containers.binAddressPlaceholder", { defaultValue: "Shelf, room, or physical address" })}
+                className="h-8.5 text-xs rounded-xl border-slate-200"
               />
             </div>
           </div>
@@ -2024,23 +2121,23 @@ const BinDetailsScreen: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={() => setIsEditBinOpen(false)}
-              className="rounded-lg text-xs h-8 border-slate-200"
+              className="rounded-xl text-xs h-8.5 border-slate-200"
             >
-              Cancel
+              {t("actions.cancel", { defaultValue: "Cancel" })}
             </Button>
             <Button
               onClick={handleUpdateBin}
               disabled={isUpdatingBin || !binName.trim()}
               size="sm"
-              className="rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs h-8 font-semibold"
+              className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs h-8.5 font-bold"
             >
               {isUpdatingBin ? (
                 <span className="flex items-center space-x-1.5">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Updating...</span>
+                  <span>{t("containers.updating", { defaultValue: "Updating..." })}</span>
                 </span>
               ) : (
-                "Update Container"
+                t("containers.updateBinBtn", { defaultValue: "Update Container" })
               )}
             </Button>
           </div>
@@ -2049,15 +2146,15 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 4. Bulk Upload Dialog */}
       <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
-        <DialogContent className="max-w-md rounded-xl border border-slate-200 shadow-xl p-5 bg-white">
+        <DialogContent className="max-w-md rounded-2xl border border-slate-200 shadow-xl p-5 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-sm font-bold text-slate-900">
-              Bulk Upload Photos
+              {t("containers.bulkUploadTitle", { defaultValue: "Bulk Upload Photos" })}
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3.5 pt-2">
-            <div className="border border-dashed border-slate-200 rounded-lg p-5 text-center bg-slate-50/50 hover:border-slate-400 transition-all">
+            <div className="border border-dashed border-slate-200 rounded-2xl p-6 text-center bg-slate-50/50 hover:border-slate-400 transition-all">
               <input
                 type="file"
                 id="bulkUploadInput"
@@ -2069,25 +2166,25 @@ const BinDetailsScreen: React.FC = () => {
               />
               <label
                 htmlFor="bulkUploadInput"
-                className="cursor-pointer flex flex-col items-center justify-center space-y-1.5"
+                className="cursor-pointer flex flex-col items-center justify-center space-y-2"
               >
-                <div className="w-9 h-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-slate-500 shadow-2xs">
-                  <UploadCloud className="w-4.5 h-4.5 text-slate-700" />
+                <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700 shadow-2xs">
+                  <UploadCloud className="w-5 h-5 text-slate-800" />
                 </div>
-                <span className="text-xs font-semibold text-slate-900">
-                  Select multiple photos
+                <span className="text-xs font-bold text-slate-900">
+                  {t("containers.selectMultiplePhotos", { defaultValue: "Select multiple photos" })}
                 </span>
-                <p className="text-[11px] text-slate-400">
-                  Each photo will create an item in this container
+                <p className="text-[11px] text-slate-400 max-w-xs">
+                  {t("containers.bulkUploadHint", { defaultValue: "Each photo will create an item in this container" })}
                 </p>
               </label>
             </div>
 
             {isBulkUploading && (
-              <div className="space-y-1.5 bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
-                <div className="flex justify-between text-xs text-slate-600 font-medium">
-                  <span>Uploading photos...</span>
-                  <span>{bulkProgress.done} of {bulkProgress.total}</span>
+              <div className="space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+                <div className="flex justify-between text-xs text-slate-600 font-semibold">
+                  <span>{t("containers.uploadingPhotos", { defaultValue: "Uploading photos..." })}</span>
+                  <span>{t("containers.uploadProgress", { done: bulkProgress.done, total: bulkProgress.total, defaultValue: `${bulkProgress.done} of ${bulkProgress.total}` })}</span>
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
                   <div
@@ -2107,9 +2204,9 @@ const BinDetailsScreen: React.FC = () => {
               size="sm"
               onClick={() => setIsBulkUploadOpen(false)}
               disabled={isBulkUploading}
-              className="rounded-lg text-xs h-8 border-slate-200"
+              className="rounded-xl text-xs h-8.5 border-slate-200"
             >
-              Cancel
+              {t("actions.cancel", { defaultValue: "Cancel" })}
             </Button>
           </div>
         </DialogContent>
@@ -2118,14 +2215,14 @@ const BinDetailsScreen: React.FC = () => {
       {/* 5. Clean Image Zoom Modal */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
         <DialogContent
-          className="max-w-3xl max-h-[85vh] p-0 overflow-hidden rounded-xl border-0 shadow-2xl bg-black/90 text-white"
+          className="max-w-3xl max-h-[85vh] p-0 overflow-hidden rounded-2xl border-0 shadow-2xl bg-black/95 text-white"
           showCloseButton={false}
         >
           <div className="relative w-full h-[70vh] flex items-center justify-center select-none overflow-hidden">
             {selectedModalImage && (
               <img
                 src={selectedModalImage}
-                alt="Full Preview"
+                alt={t("containers.detailsTitle", { defaultValue: "Preview" })}
                 style={{
                   transform: `scale(${zoomLevel})`,
                   transformOrigin: "center center",
@@ -2141,63 +2238,65 @@ const BinDetailsScreen: React.FC = () => {
                 setIsImageModalOpen(false);
                 setZoomLevel(1);
               }}
-              className="absolute top-3 right-3 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 text-white transition-colors"
+              className="absolute top-3 right-3 p-2 rounded-full bg-black/50 hover:bg-black/75 text-white transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
 
-            {/* Bottom Zoom Bar */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-xs">
+            {/* Bottom Zoom Control Bar */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 text-xs">
               <button
                 type="button"
                 onClick={() => setZoomLevel((z) => Math.max(1, z - 0.5))}
                 className="p-1 text-white hover:text-slate-300 rounded"
-                title="Zoom Out"
+                title={t("containers.zoomOut", { defaultValue: "Zoom Out" })}
               >
-                <ZoomOut className="w-3.5 h-3.5" />
+                <ZoomOut className="w-4 h-4" />
               </button>
-              <span className="font-mono text-[11px] text-slate-300">
+              <span className="font-mono text-[11px] text-slate-300 px-1">
                 {Math.round(zoomLevel * 100)}%
               </span>
               <button
                 type="button"
                 onClick={() => setZoomLevel((z) => Math.min(3, z + 0.5))}
                 className="p-1 text-white hover:text-slate-300 rounded"
-                title="Zoom In"
+                title={t("containers.zoomIn", { defaultValue: "Zoom In" })}
               >
-                <ZoomIn className="w-3.5 h-3.5" />
+                <ZoomIn className="w-4 h-4" />
               </button>
               <button
                 type="button"
                 onClick={() => setZoomLevel(1)}
                 className="p-1 text-white hover:text-slate-300 rounded ml-1"
-                title="Reset"
+                title={t("containers.resetZoom", { defaultValue: "Reset" })}
               >
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* 6. AI Image & Video Recognition Modals */}
+      {/* 6. AI Recognition Modals with hideTrigger={true} to remove ugly stray floating buttons */}
       <EnhancedImagesAIModal
         setIsVideoUploadOpen={setIsImagesUploadOpen}
         isVideoUploadOpen={isImagesUploadOpen}
-        itemId={id}
+        itemId={id || ""}
         setItems={setItems}
         userId={effectiveUserId}
+        hideTrigger={true}
       />
 
       <EnhancedVideoAIModal
         setIsVideoUploadOpen={setIsVideoUploadOpen}
         isVideoUploadOpen={isVideoUploadOpen}
-        itemId={id}
+        itemId={id || ""}
         setItems={setItems}
         userId={effectiveUserId}
+        hideTrigger={true}
       />
 
-      {/* Feedback Modal */}
+      {/* Global Modal Feedback */}
       <ModalMessage
         isOpen={modalState.isOpen}
         onClose={closeModal}

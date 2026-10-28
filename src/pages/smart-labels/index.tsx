@@ -113,7 +113,7 @@ export const SmartLabelsPage = () => {
       setAllLabels(labelsData);
     } catch (error: any) {
       console.error("Error fetching labels:", error);
-      toast.error(error.message || "Failed to load labels");
+      toast.error(error.message || t("smartLabels.toasts.failedToLoad", { defaultValue: "Failed to load labels" }));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -123,7 +123,7 @@ export const SmartLabelsPage = () => {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchLabels();
-    toast.success("Labels updated");
+    toast.success(t("smartLabels.toasts.labelsUpdated", { defaultValue: "Labels updated" }));
   };
 
   // Filtered labels
@@ -200,7 +200,12 @@ export const SmartLabelsPage = () => {
     e.stopPropagation();
     navigator.clipboard.writeText(qrcodeId);
     setCopiedId(qrcodeId);
-    toast.success(`QR ID ${qrcodeId} copied to clipboard`);
+    toast.success(
+      t("smartLabels.toasts.copied", {
+        id: qrcodeId,
+        defaultValue: `QR ID ${qrcodeId} copied to clipboard`,
+      })
+    );
     setTimeout(() => {
       setCopiedId((prev) => (prev === qrcodeId ? null : prev));
     }, 2000);
@@ -236,15 +241,25 @@ export const SmartLabelsPage = () => {
 
       toast.success(
         quantity === 1
-          ? "1 new QR label generated successfully"
-          : `${quantity} QR labels generated successfully`
+          ? t("smartLabels.toasts.createdSingle", {
+              defaultValue: "1 new QR label generated successfully",
+            })
+          : t("smartLabels.toasts.createdMultiple", {
+              count: quantity,
+              defaultValue: `${quantity} QR labels generated successfully`,
+            })
       );
 
       setShowQuantityModal(false);
       await fetchLabels();
     } catch (error: any) {
       console.error("Error creating labels:", error);
-      toast.error(error.message || "Failed to create labels");
+      toast.error(
+        error.message ||
+          t("smartLabels.toasts.createFailed", {
+            defaultValue: "Failed to create labels",
+          })
+      );
     } finally {
       setIsCreating(false);
     }
@@ -285,14 +300,13 @@ export const SmartLabelsPage = () => {
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
-              title="Refresh labels"
+              title={t("smartLabels.refresh", { defaultValue: "Refresh" })}
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"
-                }`}
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"
+                  }`}
               />
-              <span className="ml-1.5 hidden sm:inline">Refresh</span>
+              <span className="ml-1.5 hidden sm:inline">{t("smartLabels.refresh", { defaultValue: "Refresh" })}</span>
             </Button>
 
             <Button
@@ -315,7 +329,7 @@ export const SmartLabelsPage = () => {
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Total QR Codes
+                  {t("smartLabels.totalQrCodes", { defaultValue: "Total QR Codes" })}
                 </p>
                 <h3 className="text-lg font-black text-slate-900 leading-tight">
                   {stats.total}
@@ -323,7 +337,7 @@ export const SmartLabelsPage = () => {
               </div>
             </div>
             <span className="text-[11px] text-slate-400 hidden xl:inline">
-              Cataloged
+              {t("smartLabels.cataloged", { defaultValue: "Cataloged" })}
             </span>
           </div>
 
@@ -343,7 +357,7 @@ export const SmartLabelsPage = () => {
               </div>
             </div>
             <span className="text-[11px] text-emerald-600/70 hidden xl:inline">
-              Ready to print
+              {t("smartLabels.readyToPrint", { defaultValue: "Ready to print" })}
             </span>
           </div>
 
@@ -363,7 +377,7 @@ export const SmartLabelsPage = () => {
               </div>
             </div>
             <span className="text-[11px] text-slate-400 hidden xl:inline">
-              Assigned
+              {t("smartLabels.assigned", { defaultValue: "Assigned" })}
             </span>
           </div>
 
@@ -383,7 +397,7 @@ export const SmartLabelsPage = () => {
               </div>
             </div>
             <span className="text-[11px] text-indigo-600/70 hidden xl:inline">
-              In selection
+              {t("smartLabels.inSelection", { defaultValue: "In selection" })}
             </span>
           </div>
         </div>
@@ -402,7 +416,7 @@ export const SmartLabelsPage = () => {
                     ? t("smartLabels.label")
                     : t("smartLabels.labels")}
                 </span>{" "}
-                ready for template printing
+                {t("smartLabels.readyForTemplatePrinting", { defaultValue: "ready for template printing" })}
               </div>
             </div>
 
@@ -413,7 +427,7 @@ export const SmartLabelsPage = () => {
                 onClick={() => setSelectedLabels([])}
                 className="h-7 px-2.5 text-xs text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100/60"
               >
-                Clear selection
+                {t("smartLabels.clearSelection", { defaultValue: "Clear selection" })}
               </Button>
               <Button
                 size="sm"
@@ -434,24 +448,22 @@ export const SmartLabelsPage = () => {
           <div className="bg-slate-100 p-0.5 rounded-lg h-8 flex items-center border border-slate-200/70 shrink-0">
             <button
               onClick={() => setStatusFilter("all")}
-              className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${
-                statusFilter === "all"
-                  ? "bg-white text-slate-900 shadow-2xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${statusFilter === "all"
+                ? "bg-white text-slate-900 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
             >
-              <span>All</span>
+              <span>{t("smartLabels.all", { defaultValue: "All" })}</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-600">
                 {stats.total}
               </span>
             </button>
             <button
               onClick={() => setStatusFilter("available")}
-              className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${
-                statusFilter === "available"
-                  ? "bg-white text-slate-900 shadow-2xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${statusFilter === "available"
+                ? "bg-white text-slate-900 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
             >
               <span>{t("smartLabels.available")}</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800">
@@ -460,11 +472,10 @@ export const SmartLabelsPage = () => {
             </button>
             <button
               onClick={() => setStatusFilter("used")}
-              className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${
-                statusFilter === "used"
-                  ? "bg-white text-slate-900 shadow-2xs"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
+              className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${statusFilter === "used"
+                ? "bg-white text-slate-900 shadow-2xs"
+                : "text-slate-500 hover:text-slate-800"
+                }`}
             >
               <span>{t("smartLabels.used")}</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-600">
@@ -512,15 +523,16 @@ export const SmartLabelsPage = () => {
                 variant="outline"
                 size="sm"
                 onClick={() => setIsDateFilterOpen(!isDateFilterOpen)}
-                className={`h-8 px-2.5 text-xs border-slate-200 rounded-lg flex items-center gap-1.5 ${
-                  startDate || endDate
-                    ? "bg-blue-50 text-blue-700 border-blue-200 font-semibold"
-                    : "bg-white text-slate-700 hover:bg-slate-50"
-                }`}
+                className={`h-8 px-2.5 text-xs border-slate-200 rounded-lg flex items-center gap-1.5 ${startDate || endDate
+                  ? "bg-blue-50 text-blue-700 border-blue-200 font-semibold"
+                  : "bg-white text-slate-700 hover:bg-slate-50"
+                  }`}
               >
                 <Filter className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">
-                  {startDate || endDate ? "Dates Filtered" : "Filter by Date"}
+                  {startDate || endDate
+                    ? t("smartLabels.datesFiltered", { defaultValue: "Dates Filtered" })
+                    : t("smartLabels.filterByDate", { defaultValue: "Filter by Date" })}
                 </span>
                 {(startDate || endDate) && (
                   <span className="w-2 h-2 rounded-full bg-blue-600"></span>
@@ -531,7 +543,7 @@ export const SmartLabelsPage = () => {
                 <div className="absolute right-0 top-10 w-72 bg-white rounded-xl border border-slate-200 shadow-xl p-3 z-30 space-y-3">
                   <div className="flex items-center justify-between pb-1 border-b border-slate-100">
                     <span className="text-xs font-semibold text-slate-900">
-                      Date Range
+                      {t("smartLabels.dateRange", { defaultValue: "Date Range" })}
                     </span>
                     <button
                       onClick={() => setIsDateFilterOpen(false)}
@@ -544,7 +556,7 @@ export const SmartLabelsPage = () => {
                   <div className="space-y-2">
                     <div>
                       <Label className="text-[11px] text-slate-500 mb-1 block">
-                        Start Date
+                        {t("smartLabels.startDate", { defaultValue: "Start Date" })}
                       </Label>
                       <DatePicker
                         selected={startDate}
@@ -553,13 +565,13 @@ export const SmartLabelsPage = () => {
                         startDate={startDate || undefined}
                         endDate={endDate || undefined}
                         className="w-full h-7 px-2 text-xs border border-slate-200 rounded-md bg-slate-50 text-slate-800"
-                        placeholderText="Select start date"
+                        placeholderText={t("smartLabels.selectStartDate", { defaultValue: "Select start date" })}
                         maxDate={new Date()}
                       />
                     </div>
                     <div>
                       <Label className="text-[11px] text-slate-500 mb-1 block">
-                        End Date
+                        {t("smartLabels.endDate", { defaultValue: "End Date" })}
                       </Label>
                       <DatePicker
                         selected={endDate}
@@ -568,7 +580,7 @@ export const SmartLabelsPage = () => {
                         startDate={startDate || undefined}
                         endDate={endDate || undefined}
                         className="w-full h-7 px-2 text-xs border border-slate-200 rounded-md bg-slate-50 text-slate-800"
-                        placeholderText="Select end date"
+                        placeholderText={t("smartLabels.selectEndDate", { defaultValue: "Select end date" })}
                         minDate={startDate || undefined}
                         maxDate={new Date()}
                       />
@@ -586,7 +598,7 @@ export const SmartLabelsPage = () => {
                       }}
                       className="w-full h-7 text-xs text-red-600 hover:bg-red-50"
                     >
-                      Clear Dates
+                      {t("smartLabels.clearDates", { defaultValue: "Clear Dates" })}
                     </Button>
                   )}
                 </div>
@@ -602,8 +614,8 @@ export const SmartLabelsPage = () => {
                 className="h-8 px-2.5 text-xs text-slate-700 bg-white border-slate-200 hover:bg-slate-50 rounded-lg"
               >
                 {filteredLabels.every((l) => selectedLabels.includes(l.guid))
-                  ? "Deselect All"
-                  : "Select All"}
+                  ? t("smartLabels.deselectAll", { defaultValue: "Deselect All" })
+                  : t("smartLabels.selectAll", { defaultValue: "Select All" })}
               </Button>
             )}
 
@@ -611,22 +623,20 @@ export const SmartLabelsPage = () => {
             <div className="bg-slate-100 p-0.5 rounded-lg border border-slate-200/70 flex items-center">
               <button
                 onClick={() => setViewMode("grid")}
-                className={`p-1 rounded-md transition-colors ${
-                  viewMode === "grid"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-400 hover:text-slate-600"
-                }`}
+                className={`p-1 rounded-md transition-colors ${viewMode === "grid"
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-400 hover:text-slate-600"
+                  }`}
                 title={t("smartLabels.gridView")}
               >
                 <Grid className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => setViewMode("list")}
-                className={`p-1 rounded-md transition-colors ${
-                  viewMode === "list"
-                    ? "bg-white text-slate-900 shadow-2xs"
-                    : "text-slate-400 hover:text-slate-600"
-                }`}
+                className={`p-1 rounded-md transition-colors ${viewMode === "list"
+                  ? "bg-white text-slate-900 shadow-2xs"
+                  : "text-slate-400 hover:text-slate-600"
+                  }`}
                 title={t("smartLabels.listView")}
               >
                 <List className="w-3.5 h-3.5" />
@@ -639,7 +649,7 @@ export const SmartLabelsPage = () => {
         {searchTags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 p-2 bg-white rounded-lg border border-slate-200/80">
             <span className="text-[11px] font-semibold text-slate-500 mr-1">
-              Active Filters:
+              {t("smartLabels.activeFilters", { defaultValue: "Active Filters:" })}
             </span>
             {searchTags.map((tag, idx) => (
               <span
@@ -661,7 +671,7 @@ export const SmartLabelsPage = () => {
               onClick={() => setSearchTags([])}
               className="text-[11px] text-red-600 hover:underline ml-2"
             >
-              Clear all tags
+              {t("smartLabels.clearAllTags", { defaultValue: "Clear all tags" })}
             </button>
           </div>
         )}
@@ -700,7 +710,7 @@ export const SmartLabelsPage = () => {
               className="h-8 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs"
             >
               <Plus className="w-3.5 h-3.5 mr-1.5" />
-              <span>Create New QR Labels</span>
+              <span>{t("smartLabels.createNewQrLabels", { defaultValue: "Create New QR Labels" })}</span>
             </Button>
           </div>
         ) : (
@@ -716,11 +726,10 @@ export const SmartLabelsPage = () => {
                     <div
                       key={label.guid}
                       onClick={() => handleLabelSelect(label.guid)}
-                      className={`group relative bg-white rounded-xl border p-3.5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[138px] ${
-                        isSelected
-                          ? "border-indigo-500 ring-2 ring-indigo-500/15 bg-indigo-50/20"
-                          : "border-slate-200/90 hover:border-slate-300"
-                      }`}
+                      className={`group relative bg-white rounded-xl border p-3.5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[138px] ${isSelected
+                        ? "border-indigo-500 ring-2 ring-indigo-500/15 bg-indigo-50/20"
+                        : "border-slate-200/90 hover:border-slate-300"
+                        }`}
                     >
                       {/* Top Row: Checkbox, Badge & Copy */}
                       <div className="flex items-start justify-between gap-2">
@@ -737,11 +746,10 @@ export const SmartLabelsPage = () => {
 
                         <Badge
                           variant="secondary"
-                          className={`text-[10px] font-semibold h-4 px-1.5 border shrink-0 ${
-                            label.isUsed
-                              ? "bg-amber-50 text-amber-800 border-amber-200/80"
-                              : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
-                          }`}
+                          className={`text-[10px] font-semibold h-4 px-1.5 border shrink-0 ${label.isUsed
+                            ? "bg-amber-50 text-amber-800 border-amber-200/80"
+                            : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+                            }`}
                         >
                           {label.isUsed
                             ? t("smartLabels.used")
@@ -762,7 +770,7 @@ export const SmartLabelsPage = () => {
                             <button
                               onClick={(e) => handleCopyQrId(e, label.qrcodeId)}
                               className="text-slate-300 hover:text-slate-600 transition-colors p-0.5 rounded"
-                              title="Copy QR Code ID"
+                              title={t("smartLabels.copyQrId", { defaultValue: "Copy QR Code ID" })}
                             >
                               {isCopied ? (
                                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -788,7 +796,9 @@ export const SmartLabelsPage = () => {
                           </span>
                         </span>
                         <span className="text-[10px] text-slate-300 group-hover:text-indigo-500 font-medium transition-colors">
-                          {isSelected ? "Selected" : "Select"}
+                          {isSelected
+                            ? t("smartLabels.selectedBadge", { defaultValue: "Selected" })
+                            : t("smartLabels.select", { defaultValue: "Select" })}
                         </span>
                       </div>
                     </div>
@@ -809,9 +819,8 @@ export const SmartLabelsPage = () => {
                       <div
                         key={label.guid}
                         onClick={() => handleLabelSelect(label.guid)}
-                        className={`p-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-4 cursor-pointer ${
-                          isSelected ? "bg-indigo-50/20" : ""
-                        }`}
+                        className={`p-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-4 cursor-pointer ${isSelected ? "bg-indigo-50/20" : ""
+                          }`}
                       >
                         <div className="flex items-center space-x-3 min-w-0">
                           <div onClick={(e) => e.stopPropagation()}>
@@ -838,7 +847,7 @@ export const SmartLabelsPage = () => {
                                   handleCopyQrId(e, label.qrcodeId)
                                 }
                                 className="text-slate-300 hover:text-slate-600 transition-colors"
-                                title="Copy QR ID"
+                                title={t("smartLabels.copyQrId", { defaultValue: "Copy QR Code ID" })}
                               >
                                 {isCopied ? (
                                   <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -862,11 +871,10 @@ export const SmartLabelsPage = () => {
 
                           <Badge
                             variant="secondary"
-                            className={`text-[10px] font-semibold h-5 px-2 border ${
-                              label.isUsed
-                                ? "bg-amber-50 text-amber-800 border-amber-200/80"
-                                : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
-                            }`}
+                            className={`text-[10px] font-semibold h-5 px-2 border ${label.isUsed
+                              ? "bg-amber-50 text-amber-800 border-amber-200/80"
+                              : "bg-emerald-50 text-emerald-800 border-emerald-200/80"
+                              }`}
                           >
                             {label.isUsed
                               ? t("smartLabels.used")
@@ -898,7 +906,7 @@ export const SmartLabelsPage = () => {
                     {t("smartLabels.createModalTitle")}
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Generate unique QR identifier codes
+                    {t("smartLabels.createModalSubtitle", { defaultValue: "Generate unique QR identifier codes" })}
                   </p>
                 </div>
               </div>
@@ -913,7 +921,7 @@ export const SmartLabelsPage = () => {
             {/* Presets & Input */}
             <div className="space-y-3">
               <Label className="text-xs font-semibold text-slate-700">
-                Quantity to Generate
+                {t("smartLabels.quantityToGenerate", { defaultValue: "Quantity to Generate" })}
               </Label>
               <div className="grid grid-cols-5 gap-1.5">
                 {[1, 5, 10, 25, 50].map((preset) => (
@@ -921,11 +929,10 @@ export const SmartLabelsPage = () => {
                     key={preset}
                     type="button"
                     onClick={() => setQuantity(preset)}
-                    className={`h-8 rounded-lg text-xs font-semibold border transition-all ${
-                      quantity === preset
-                        ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                    }`}
+                    className={`h-8 rounded-lg text-xs font-semibold border transition-all ${quantity === preset
+                      ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                      : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                      }`}
                   >
                     +{preset}
                   </button>
@@ -944,11 +951,11 @@ export const SmartLabelsPage = () => {
               </div>
 
               <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-500">
-                <span>Preview: </span>
+                <span>{t("smartLabels.preview", { defaultValue: "Preview: " })}</span>
                 <span className="font-mono font-bold text-slate-800">
                   {generateQrCodeId()}
                 </span>
-                <span> (random 3-char unique alphanumeric ID)</span>
+                <span> {t("smartLabels.randomCodeNote", { defaultValue: "(random 3-char unique alphanumeric ID)" })}</span>
               </div>
             </div>
 
@@ -971,11 +978,18 @@ export const SmartLabelsPage = () => {
                 {isCreating ? (
                   <>
                     <RefreshCw className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                    <span>Generating...</span>
+                    <span>{t("smartLabels.generating", { defaultValue: "Generating..." })}</span>
                   </>
                 ) : (
                   <span>
-                    {quantity > 1 ? `Generate ${quantity} Labels` : "Generate Label"}
+                    {quantity > 1
+                      ? t("smartLabels.generateLabelsBtn", {
+                          count: quantity,
+                          defaultValue: `Generate ${quantity} Labels`,
+                        })
+                      : t("smartLabels.generateLabelBtn", {
+                          defaultValue: "Generate Label",
+                        })}
                   </span>
                 )}
               </Button>

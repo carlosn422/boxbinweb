@@ -1,10 +1,13 @@
+import { useAuth } from "@/context/AuthContext";
 import { Sidebar } from "./Sidebar";
+import { BoxBinCopilotDrawer } from "@/components/ai/BoxBinCopilotDrawer";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
+  const { currentUser } = useAuth();
   return (
     <div className="flex flex-col md:flex-row h-screen overflow-hidden safe-top safe-bottom bg-slate-50/50 font-sans">
       {/* Sidebar (Desktop navigation + Mobile top bar & slide-over drawer) */}
@@ -19,6 +22,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
         </main>
       </div>
+
+      {/* BoxBin AI Copilot Assistant (Floating + Slide-over Drawer) */}
+      <BoxBinCopilotDrawer key={currentUser?.id || "anonymous"} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { copilotText as ct } from '@/lib/copilotI18n';
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,7 @@ import {
   RefreshCw,
   QrCode,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -30,6 +32,7 @@ import { AddBinModal, type BinData } from "@/components/layout/AddBin";
 import { toast } from "sonner";
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
+import { openBinCopilot } from "@/services/boxbinCopilotService";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -331,6 +334,12 @@ export default function HomeScreen() {
       console.error("Error fetching stats:", error);
     }
   };
+
+  useEffect(() => {
+    const refresh = () => { void fetchBins(); void fetchLocations(); void fetchStats(); };
+    window.addEventListener("boxbin-inventory-changed", refresh);
+    return () => window.removeEventListener("boxbin-inventory-changed", refresh);
+  }, [effectiveUserId]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -654,6 +663,17 @@ export default function HomeScreen() {
           </div>
 
           <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openBinCopilot("", "")}
+              className="h-8 px-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-800 hover:from-blue-100 hover:to-indigo-100 rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
+              title={ct('askCopilot')}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+              <span className="hidden sm:inline">{ct('aiCopilot')}</span>
+            </Button>
+
             <Button
               variant="outline"
               size="sm"

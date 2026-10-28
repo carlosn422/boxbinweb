@@ -1,18 +1,18 @@
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
-
-// ⚡ Usa el SDK de Stripe que ya tengas en lib/stripe
 import { createStripePaymentIntent } from "@/lib/stripe";
+import { useTranslation } from "react-i18next";
+import { Loader2 } from "lucide-react";
 
 type TokenCheckoutFormProps = {
   userId: string;
-  tokens: number; // tokens a comprar
-  price: number; // precio en cents (ej. 499 = $4.99)
+  tokens: number;
+  price: number;
   currency?: string;
 };
 
@@ -22,6 +22,7 @@ export default function TokenCheckoutForm({
   price,
   currency = "usd",
 }: TokenCheckoutFormProps) {
+  const { t } = useTranslation();
   const stripe = useStripe();
   const elements = useElements();
   const { currentUser } = useAuth();
@@ -41,7 +42,6 @@ export default function TokenCheckoutForm({
     setError(null);
 
     try {
-      // 1. Crear PaymentIntent con tu helper (sin backend extra)
       const { clientSecret } = await createStripePaymentIntent(
         price,
         currency,
@@ -49,7 +49,6 @@ export default function TokenCheckoutForm({
         nameOnCard
       );
 
-      // 2. Confirmar pago
       const result = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: elements.getElement(CardElement)!,
@@ -96,57 +95,84 @@ export default function TokenCheckoutForm({
           window.location.href = "/home";
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError("Unexpected error");
+      setError(err?.message || "Unexpected error");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    console.log(tokens, " 1");
-    console.log(price, " 2");
-  }, []);
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Datos del comprador */}
-      <div className="space-y-2">
-        <Label htmlFor="nameOnCard">Name on Card</Label>
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-1.5">
+        <Label htmlFor="nameOnCard" className="text-xs font-semibold text-slate-700">
+          {t("aiModals.nameOnCard", { defaultValue: "Name on Card" })}
+        </Label>
         <Input
           id="nameOnCard"
           value={nameOnCard}
           onChange={(e) => setNameOnCard(e.target.value)}
+          placeholder="Jane Doe"
+          className="h-9 text-xs rounded-xl border-slate-200"
           required
         />
       </div>
 
-      {/* Resumen */}
-      <div className="p-4 border rounded-lg bg-blue-50">
-        <h3 className="font-semibold text-lg mb-3">Order Summary</h3>
-        <div className="flex justify-between">
-          <span>Tokens to Buy:</span>
-          <span className="font-semibold">{tokens}</span>
+      <div className="p-3.5 border border-blue-100 rounded-xl bg-blue-50/60 text-xs">
+        <h4 className="font-bold text-slate-900 mb-2">
+          {t("aiModals.orderSummary", { defaultValue: "Order Summary" })}
+        </h4>
+        <div className="flex justify-between text-slate-600 mb-1">
+          <span>{t("aiModals.tokensToBuy", { defaultValue: "Tokens to Buy:" })}</span>
+          <span className="font-bold text-slate-900">{tokens.toLocaleString()}</span>
         </div>
-        <div className="flex justify-between text-lg font-bold mt-2">
-          <span>Total to Pay:</span>
-          <span>{formatPrice(price)}</span>
+        <div className="flex justify-between font-bold text-sm text-slate-900 pt-1.5 border-t border-blue-200/60 mt-1.5">
+          <span>{t("aiModals.totalToPay", { defaultValue: "Total to Pay:" })}</span>
+          <span className="text-blue-700 font-mono">{formatPrice(price)}</span>
         </div>
       </div>
 
-      {/* Tarjeta */}
-      <div className="space-y-2">
-        <Label>Card Information</Label>
-        <CardElement className="p-3 border rounded-md" />
+      <div className="space-y-1.5">
+        <Label className="text-xs font-semibold text-slate-700">
+          {t("aiModals.cardInformation", { defaultValue: "Card Information" })}
+        </Label>
+        <div className="p-3 border border-slate-200 rounded-xl bg-white shadow-2xs">
+          <CardElement
+            options={{
+              style: {
+                base: {
+                  fontSize: "13px",
+                  color: "#1e293b",
+                  "::placeholder": {
+                    color: "#94a3b8",
+                  },
+                },
+              },
+            }}
+          />
+        </div>
       </div>
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && <p className="text-red-500 text-xs">{error}</p>}
 
-      <Button type="submit" className="w-full" disabled={!stripe || loading}>
-        {loading
-          ? "Processing..."
-          : `Buy ${tokens} tokens - ${formatPrice(price)}`}
+      <Button
+        type="submit"
+        className="w-full h-9 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs"
+        disabled={!stripe || loading}
+      >
+        {loading ? (
+          <span className="flex items-center gap-1.5">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>{t("aiModals.processingPayment", { defaultValue: "Processing payment..." })}</span>
+          </span>
+        ) : (
+          t("aiModals.buyTokensBtn", {
+            tokens: tokens.toLocaleString(),
+            price: formatPrice(price),
+            defaultValue: `Buy ${tokens} tokens - ${formatPrice(price)}`,
+          })
+        )}
       </Button>
     </form>
   );

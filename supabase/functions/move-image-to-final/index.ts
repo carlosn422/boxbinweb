@@ -27,7 +27,7 @@ serve(async (req) => {
 
     const BUCKET = "binventory-storage";
 
-    // Extract path from Supabase or Firebase URL
+    // Extract the migrated object path; copying and deletion use Supabase Storage only
     let oldPath: string | null = null;
     if (imageUrl.includes("/binventory-storage/")) {
       const parts = imageUrl.split("/binventory-storage/");

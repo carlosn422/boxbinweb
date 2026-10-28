@@ -285,8 +285,8 @@ export default function ActiveSubscriptionPage() {
               <Badge
                 variant="outline"
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isActive
-                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-amber-50 text-amber-700 border-amber-200"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
                   }`}
               >
                 {isActive
@@ -640,10 +640,10 @@ export default function ActiveSubscriptionPage() {
               <div className="space-y-6">
                 <div
                   className={`grid gap-4 grid-cols-1 ${plans.length === 1
-                      ? "sm:grid-cols-1 max-w-sm mx-auto"
-                      : plans.length === 2
-                        ? "sm:grid-cols-2"
-                        : "sm:grid-cols-3"
+                    ? "sm:grid-cols-1 max-w-sm mx-auto"
+                    : plans.length === 2
+                      ? "sm:grid-cols-2"
+                      : "sm:grid-cols-3"
                     }`}
                 >
                   {plans.map((plan: any) => {
@@ -659,10 +659,10 @@ export default function ActiveSubscriptionPage() {
                           handleUpgradeToPlan(plan.id);
                         }}
                         className={`group relative rounded-xl border p-4 cursor-pointer transition-all flex flex-col justify-between ${isSelected
-                            ? "border-slate-900 ring-2 ring-slate-900 bg-slate-50/40 shadow-sm"
-                            : plan.popular
-                              ? "border-blue-300 bg-white shadow-2xs hover:border-slate-400"
-                              : "border-slate-200 bg-white hover:border-slate-300 shadow-2xs"
+                          ? "border-slate-900 ring-2 ring-slate-900 bg-slate-50/40 shadow-sm"
+                          : plan.popular
+                            ? "border-blue-300 bg-white shadow-2xs hover:border-slate-400"
+                            : "border-slate-200 bg-white hover:border-slate-300 shadow-2xs"
                           }`}
                       >
                         {plan.popular && (
@@ -731,8 +731,8 @@ export default function ActiveSubscriptionPage() {
                             handleUpgradeToPlan(plan.id);
                           }}
                           className={`w-full mt-4 h-8 text-xs font-semibold rounded-lg transition-colors ${isSelected
-                              ? "bg-slate-900 text-white hover:bg-slate-800"
-                              : "bg-white border border-slate-200 text-slate-900 hover:bg-slate-50"
+                            ? "bg-slate-900 text-white hover:bg-slate-800"
+                            : "bg-white border border-slate-200 text-slate-900 hover:bg-slate-50"
                             }`}
                         >
                           {isUpgradingThis ? (

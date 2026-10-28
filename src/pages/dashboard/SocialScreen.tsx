@@ -133,7 +133,9 @@ export default function SocialScreen() {
       setModalState({
         isOpen: true,
         type: "error",
-        message: t("social.errors.emptyUsername") || "Please enter a valid username",
+        message: t("shareAccess.errors.emptyUsername", {
+          defaultValue: "Please enter a valid username",
+        }),
       });
       return;
     }
@@ -152,7 +154,9 @@ export default function SocialScreen() {
         setModalState({
           isOpen: true,
           type: "error",
-          message: t("social.errors.userNotFound") || "User not found",
+          message: t("shareAccess.errors.userNotFound", {
+            defaultValue: "User not found",
+          }),
         });
         setIsProcessing(false);
         setUsername("");
@@ -171,7 +175,9 @@ export default function SocialScreen() {
         setModalState({
           isOpen: true,
           type: "error",
-          message: t("social.alreadyShared.message") || "Access is already shared with this user",
+          message: t("shareAccess.errors.alreadyShared", {
+            defaultValue: "Access is already shared with this user",
+          }),
         });
         setIsProcessing(false);
         return;
@@ -188,7 +194,9 @@ export default function SocialScreen() {
       setModalState({
         isOpen: true,
         type: "success",
-        message: t("social.success.message") || "Access shared successfully",
+        message: t("shareAccess.success.shared", {
+          defaultValue: "Access shared successfully",
+        }),
       });
       await fetchSharedData();
     } catch (error) {
@@ -196,7 +204,9 @@ export default function SocialScreen() {
       setModalState({
         isOpen: true,
         type: "error",
-        message: t("social.errors.grantFailed") || "Failed to grant access",
+        message: t("shareAccess.errors.grantFailed", {
+          defaultValue: "Failed to grant access",
+        }),
       });
     } finally {
       setIsProcessing(false);
@@ -210,8 +220,10 @@ export default function SocialScreen() {
 
   const handleRevokeAccess = async (accountId: any, accountName: any) => {
     const confirmRevoke = window.confirm(
-      t("shareAccess.revokeMessage", { name: accountName }) ||
-      `Are you sure you want to revoke access for ${accountName}?`
+      t("shareAccess.revokeConfirm", {
+        name: accountName,
+        defaultValue: `Are you sure you want to revoke access for ${accountName}?`,
+      })
     );
 
     if (confirmRevoke) {
@@ -221,14 +233,18 @@ export default function SocialScreen() {
         setModalState({
           isOpen: true,
           type: "success",
-          message: "Access revoked successfully",
+          message: t("shareAccess.revokeSuccess", {
+            defaultValue: "Access revoked successfully",
+          }),
         });
       } catch (error) {
         console.error("Error revoking access:", error);
         setModalState({
           isOpen: true,
           type: "error",
-          message: t("social.errors.revokeFailed") || "Failed to revoke access",
+          message: t("shareAccess.errors.revokeFailed", {
+            defaultValue: "Failed to revoke access",
+          }),
         });
       }
     }
@@ -242,15 +258,17 @@ export default function SocialScreen() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                {t("shareAccess.title") || "Shared Access"}
+                {t("shareAccess.title", { defaultValue: "Shared Access" })}
               </h1>
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
-                Team
+                {t("shareAccess.teamBadge", { defaultValue: "Team" })}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              {t("shareAccess.subtitle") ||
-                "Collaborate with your team by sharing access to inventories and containers"}
+              {t("shareAccess.subtitle", {
+                defaultValue:
+                  "Collaborate with your team by sharing access to inventories and containers",
+              })}
             </p>
           </div>
 
@@ -259,7 +277,7 @@ export default function SocialScreen() {
             className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5 self-start sm:self-auto"
           >
             <UserPlus className="w-3.5 h-3.5" />
-            <span>{t("shareAccess.addNew") || "Grant Access"}</span>
+            <span>{t("shareAccess.addNew", { defaultValue: "Grant Access" })}</span>
           </Button>
         </div>
 
@@ -269,8 +287,8 @@ export default function SocialScreen() {
           <div
             onClick={() => setActiveTab("withMe")}
             className={`rounded-xl border p-3 flex items-center justify-between shadow-2xs cursor-pointer transition-all ${activeTab === "withMe"
-                ? "bg-white border-blue-500 ring-2 ring-blue-500/15"
-                : "bg-white border-slate-200/80 hover:border-slate-300"
+              ? "bg-white border-blue-500 ring-2 ring-blue-500/15"
+              : "bg-white border-slate-200/80 hover:border-slate-300"
               }`}
           >
             <div className="flex items-center space-x-3">
@@ -286,15 +304,17 @@ export default function SocialScreen() {
                 </h3>
               </div>
             </div>
-            <span className="text-[11px] text-slate-400">Accessible</span>
+            <span className="text-[11px] text-slate-400">
+              {t("shareAccess.accessible", { defaultValue: "Accessible" })}
+            </span>
           </div>
 
           {/* Shared By Me Card */}
           <div
             onClick={() => setActiveTab("byMe")}
             className={`rounded-xl border p-3 flex items-center justify-between shadow-2xs cursor-pointer transition-all ${activeTab === "byMe"
-                ? "bg-white border-blue-500 ring-2 ring-blue-500/15"
-                : "bg-white border-slate-200/80 hover:border-slate-300"
+              ? "bg-white border-blue-500 ring-2 ring-blue-500/15"
+              : "bg-white border-slate-200/80 hover:border-slate-300"
               }`}
           >
             <div className="flex items-center space-x-3">
@@ -303,14 +323,16 @@ export default function SocialScreen() {
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {t("shareAccess.sharedByMe") || "Shared By Me"}
+                  {t("shareAccess.sharedByMe", { defaultValue: "Shared By Me" })}
                 </p>
                 <h3 className="text-lg font-black text-slate-900 leading-tight">
                   {sharedByMeAccounts.length}
                 </h3>
               </div>
             </div>
-            <span className="text-[11px] text-slate-400">Delegated</span>
+            <span className="text-[11px] text-slate-400">
+              {t("shareAccess.delegated", { defaultValue: "Delegated" })}
+            </span>
           </div>
         </div>
 
@@ -319,22 +341,32 @@ export default function SocialScreen() {
           <button
             onClick={() => setActiveTab("withMe")}
             className={`h-7 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === "withMe"
-                ? "bg-white text-slate-900 shadow-2xs"
-                : "text-slate-500 hover:text-slate-800"
+              ? "bg-white text-slate-900 shadow-2xs"
+              : "text-slate-500 hover:text-slate-800"
               }`}
           >
             <UserCheck className="w-3.5 h-3.5" />
-            <span>Shared with Me ({sharedAccounts.length})</span>
+            <span>
+              {t("shareAccess.sharedWithMeTab", {
+                count: sharedAccounts.length,
+                defaultValue: `Shared with Me (${sharedAccounts.length})`,
+              })}
+            </span>
           </button>
           <button
             onClick={() => setActiveTab("byMe")}
             className={`h-7 text-xs font-semibold rounded-md transition-all flex items-center justify-center gap-1.5 ${activeTab === "byMe"
-                ? "bg-white text-slate-900 shadow-2xs"
-                : "text-slate-500 hover:text-slate-800"
+              ? "bg-white text-slate-900 shadow-2xs"
+              : "text-slate-500 hover:text-slate-800"
               }`}
           >
             <Users className="w-3.5 h-3.5" />
-            <span>Shared by Me ({sharedByMeAccounts.length})</span>
+            <span>
+              {t("shareAccess.sharedByMeTab", {
+                count: sharedByMeAccounts.length,
+                defaultValue: `Shared by Me (${sharedByMeAccounts.length})`,
+              })}
+            </span>
           </button>
         </div>
 
@@ -390,10 +422,10 @@ export default function SocialScreen() {
                       className="bg-emerald-50 text-emerald-700 border-emerald-200/70 text-[10px] font-semibold h-5 px-2"
                     >
                       <Shield className="w-2.5 h-2.5 mr-1" />
-                      <span>{t("shareAccess.active") || "Active Access"}</span>
+                      <span>{t("shareAccess.active", { defaultValue: "Active Access" })}</span>
                     </Badge>
                     <span className="text-xs font-semibold text-blue-600 group-hover:translate-x-0.5 transition-transform flex items-center">
-                      <span>View Inventory</span>
+                      <span>{t("shareAccess.viewInventory", { defaultValue: "View Inventory" })}</span>
                       <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                     </span>
                   </div>
@@ -406,11 +438,15 @@ export default function SocialScreen() {
                 <UserCheck className="w-6 h-6" />
               </div>
               <h3 className="text-sm font-semibold text-slate-900 mb-1">
-                {t("shareAccess.noAccountsSharedWithYou") || "No shared accounts available"}
+                {t("shareAccess.noAccountsSharedWithYou", {
+                  defaultValue: "No shared accounts available",
+                })}
               </h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                {t("shareAccess.subtitle2") ||
-                  "When other users share their inventory with you, they will appear here."}
+                {t("shareAccess.subtitle2", {
+                  defaultValue:
+                    "When other users share their inventory with you, they will appear here.",
+                })}
               </p>
             </div>
           )
@@ -445,7 +481,7 @@ export default function SocialScreen() {
                     className="bg-blue-50 text-blue-700 border-blue-200/70 text-[10px] font-semibold h-5 px-2"
                   >
                     <Shield className="w-2.5 h-2.5 mr-1" />
-                    <span>{t("shareAccess.shared") || "Shared"}</span>
+                    <span>{t("shareAccess.shared", { defaultValue: "Shared" })}</span>
                   </Badge>
 
                   <Button
@@ -460,7 +496,7 @@ export default function SocialScreen() {
                     className="h-7 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md"
                   >
                     <Trash2 className="w-3.5 h-3.5 mr-1" />
-                    <span>Revoke</span>
+                    <span>{t("shareAccess.revoke", { defaultValue: "Revoke" })}</span>
                   </Button>
                 </div>
               </div>
@@ -472,11 +508,15 @@ export default function SocialScreen() {
               <Users className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-semibold text-slate-900 mb-1">
-              {t("shareAccess.noAccountsSharedByYou") || "No shared access granted"}
+              {t("shareAccess.noAccountsSharedByYou", {
+                defaultValue: "No shared access granted",
+              })}
             </h3>
             <p className="text-xs text-slate-500 max-w-sm mx-auto mb-4">
-              {t("shareAccess.shared2") ||
-                "Grant access to colleagues or warehouse managers so they can view your inventory."}
+              {t("shareAccess.shared2", {
+                defaultValue:
+                  "Grant access to colleagues or warehouse managers so they can view your inventory.",
+              })}
             </p>
             <Button
               size="sm"
@@ -484,7 +524,7 @@ export default function SocialScreen() {
               className="h-8 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs"
             >
               <UserPlus className="w-3.5 h-3.5 mr-1.5" />
-              <span>Grant Access to a User</span>
+              <span>{t("shareAccess.grantAccessBtn", { defaultValue: "Grant Access to a User" })}</span>
             </Button>
           </div>
         )}
@@ -496,14 +536,14 @@ export default function SocialScreen() {
           <DialogHeader className="pb-2">
             <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Share2 className="w-4 h-4 text-blue-600" />
-              <span>{t("shareAccess.title") || "Grant Shared Access"}</span>
+              <span>{t("shareAccess.title", { defaultValue: "Grant Shared Access" })}</span>
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-3.5 pt-1">
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-700 block">
-                {t("shareAccess.user") || "Username to share with"}
+                {t("shareAccess.user", { defaultValue: "Username to share with" })}
               </label>
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
@@ -511,12 +551,16 @@ export default function SocialScreen() {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={t("shareAccess.inputPlaceholder") || "Enter exact username (e.g. john_doe)"}
+                  placeholder={t("shareAccess.inputPlaceholder", {
+                    defaultValue: "Enter exact username (e.g. john_doe)",
+                  })}
                   className="h-8.5 pl-8 text-xs bg-slate-50 border-slate-200"
                 />
               </div>
               <p className="text-[11px] text-slate-400">
-                The user must have an active BoxBin account.
+                {t("shareAccess.activeAccountNote", {
+                  defaultValue: "The user must have an active BoxBin account.",
+                })}
               </p>
             </div>
 
@@ -530,7 +574,7 @@ export default function SocialScreen() {
                 }}
                 className="flex-1 h-8 text-xs border-slate-200"
               >
-                {t("shareAccess.cancel") || "Cancel"}
+                {t("shareAccess.cancel", { defaultValue: "Cancel" })}
               </Button>
               <Button
                 size="sm"
@@ -541,10 +585,10 @@ export default function SocialScreen() {
                 {isProcessing ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                    <span>Processing...</span>
+                    <span>{t("shareAccess.processing", { defaultValue: "Processing..." })}</span>
                   </>
                 ) : (
-                  <span>{t("shareAccess.share") || "Grant Access"}</span>
+                  <span>{t("shareAccess.share", { defaultValue: "Grant Access" })}</span>
                 )}
               </Button>
             </div>

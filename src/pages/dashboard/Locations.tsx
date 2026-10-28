@@ -203,6 +203,12 @@ export const LocationsManager = () => {
     );
   }, [locations, searchText]);
 
+  useEffect(() => {
+    const refresh = () => { void loadLocations(); void getTotalLocations(); };
+    window.addEventListener("boxbin-inventory-changed", refresh);
+    return () => window.removeEventListener("boxbin-inventory-changed", refresh);
+  }, [effectiveUserId]);
+
   const handleSubmit = async () => {
     if (!itemName.trim() || !currentUser) return;
 
@@ -211,7 +217,10 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: `You have reached your limit of ${limit} locations for your current plan.`,
+        message: t("locations.limitReached", {
+          limit,
+          defaultValue: `You have reached your limit of ${limit} locations for your current plan.`,
+        }),
       });
       return;
     }
@@ -233,7 +242,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "success",
-        message: "Location registered successfully",
+        message: t("locations.registeredSuccess", {
+          defaultValue: "Location registered successfully",
+        }),
       });
 
       await loadLocations(1);
@@ -243,7 +254,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: "Failed to create location",
+        message: t("locations.createFailed", {
+          defaultValue: "Failed to create location",
+        }),
       });
     } finally {
       setOperationLoading(false);
@@ -275,7 +288,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "success",
-        message: "Location updated successfully",
+        message: t("locations.updatedSuccess", {
+          defaultValue: "Location updated successfully",
+        }),
       });
 
       await loadLocations(currentPage);
@@ -284,7 +299,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: "Failed to update location",
+        message: t("locations.updateFailed", {
+          defaultValue: "Failed to update location",
+        }),
       });
     } finally {
       setOperationLoading(false);
@@ -292,7 +309,13 @@ export const LocationsManager = () => {
   };
 
   const confirmDeleteLocation = async (locationId: string) => {
-    if (!window.confirm(t("locations.confirmDelete") || "Are you sure you want to delete this location?")) {
+    if (
+      !window.confirm(
+        t("locations.confirmDelete", {
+          defaultValue: "Are you sure you want to delete this location?",
+        })
+      )
+    ) {
       return;
     }
 
@@ -309,7 +332,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "success",
-        message: "Location deleted successfully",
+        message: t("locations.deletedSuccess", {
+          defaultValue: "Location deleted successfully",
+        }),
       });
 
       await loadLocations(currentPage);
@@ -319,7 +344,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: "Failed to delete location",
+        message: t("locations.deleteFailed", {
+          defaultValue: "Failed to delete location",
+        }),
       });
     } finally {
       setOperationLoading(false);
@@ -410,7 +437,8 @@ export const LocationsManager = () => {
         <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5">
           <div className="container mx-auto max-w-7xl flex items-center justify-between text-xs text-amber-900">
             <span>
-              Impersonating: <strong>{userImpersonated?.ownerUsername}</strong>
+              {t("dashboard.impersonating", { defaultValue: "Impersonating: " })}
+              <strong>{userImpersonated?.ownerUsername}</strong>
             </span>
             <Button
               size="sm"
@@ -483,7 +511,9 @@ export const LocationsManager = () => {
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Registered Facilities
+                  {t("locations.registeredFacilities", {
+                    defaultValue: "Registered Facilities",
+                  })}
                 </p>
                 <h3 className="text-lg font-black text-slate-900 leading-tight">
                   {totalLocations}
@@ -491,7 +521,7 @@ export const LocationsManager = () => {
               </div>
             </div>
             <span className="text-[11px] text-slate-400 hidden xl:inline">
-              Active
+              {t("locations.activeStatus", { defaultValue: "Active" })}
             </span>
           </div>
 
@@ -503,17 +533,26 @@ export const LocationsManager = () => {
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Plan Quota
+                  {t("locations.planQuota", { defaultValue: "Plan Quota" })}
                 </p>
                 <h3 className="text-lg font-black text-slate-900 leading-tight">
-                  {maxLocations > 0 ? `${totalLocations} / ${maxLocations}` : `${totalLocations} (Unlimited)`}
+                  {maxLocations > 0
+                    ? `${totalLocations} / ${maxLocations}`
+                    : `${totalLocations} (${t("locations.unlimited", {
+                      defaultValue: "Unlimited",
+                    })})`}
                 </h3>
               </div>
             </div>
             <span className="text-[11px] text-emerald-600/70 hidden xl:inline font-medium">
               {maxLocations > 0 && maxLocations - totalLocations > 0
-                ? `${maxLocations - totalLocations} slots left`
-                : "Active status"}
+                ? t("locations.slotsLeft", {
+                  count: maxLocations - totalLocations,
+                  defaultValue: `${maxLocations - totalLocations} slots left`,
+                })
+                : t("locations.activePlanStatus", {
+                  defaultValue: "Active status",
+                })}
             </span>
           </div>
 
@@ -525,7 +564,9 @@ export const LocationsManager = () => {
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  Visible Locations
+                  {t("locations.visibleLocations", {
+                    defaultValue: "Visible Locations",
+                  })}
                 </p>
                 <h3 className="text-lg font-black text-slate-900 leading-tight">
                   {filteredLocations.length}
@@ -533,7 +574,7 @@ export const LocationsManager = () => {
               </div>
             </div>
             <span className="text-[11px] text-slate-400 hidden xl:inline">
-              In view
+              {t("locations.inView", { defaultValue: "In view" })}
             </span>
           </div>
         </div>
@@ -655,8 +696,8 @@ export const LocationsManager = () => {
                     setSelectedLocation(isSelected ? null : loc)
                   }
                   className={`group relative bg-white rounded-xl border p-3.5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[152px] ${isSelected
-                      ? "border-blue-500 ring-2 ring-blue-500/15 bg-blue-50/15"
-                      : "border-slate-200/90 hover:border-slate-300"
+                    ? "border-blue-500 ring-2 ring-blue-500/15 bg-blue-50/15"
+                    : "border-slate-200/90 hover:border-slate-300"
                     }`}
                 >
                   {/* Top Row: Icon, Name & Actions Dropdown */}
@@ -715,7 +756,11 @@ export const LocationsManager = () => {
                   {/* Middle: Description */}
                   <div className="my-auto py-1">
                     <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
-                      {loc.description || "No description provided for this storage facility."}
+                      {loc.description ||
+                        t("locations.noDescription", {
+                          defaultValue:
+                            "No description provided for this storage facility.",
+                        })}
                     </p>
                   </div>
 
@@ -727,7 +772,11 @@ export const LocationsManager = () => {
                     </span>
 
                     <span className="text-[10px] font-medium text-slate-300 group-hover:text-blue-600 transition-colors flex items-center">
-                      <span>{isSelected ? "Selected" : "Details"}</span>
+                      <span>
+                        {isSelected
+                          ? t("locations.selected", { defaultValue: "Selected" })
+                          : t("locations.details", { defaultValue: "Details" })}
+                      </span>
                       <ArrowUpRight className="w-3 h-3 ml-0.5" />
                     </span>
                   </div>
@@ -741,7 +790,12 @@ export const LocationsManager = () => {
         {!searchText && totalPages > 1 && (
           <div className="flex items-center justify-between bg-white rounded-xl p-3 border border-slate-200/80 shadow-2xs">
             <span className="text-xs text-slate-500">
-              Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong> ({totalLocations} total)
+              {t("locations.pageCount", {
+                current: currentPage,
+                total: totalPages,
+                count: totalLocations,
+                defaultValue: `Page ${currentPage} of ${totalPages} (${totalLocations} total)`,
+              })}
             </span>
 
             <div className="flex items-center space-x-1.5">
@@ -758,7 +812,7 @@ export const LocationsManager = () => {
                 className="h-7 px-2 text-xs border-slate-200"
               >
                 <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-                <span>Prev</span>
+                <span>{t("pagination.previous", { defaultValue: "Prev" })}</span>
               </Button>
               <Button
                 variant="outline"
@@ -772,7 +826,7 @@ export const LocationsManager = () => {
                 disabled={!hasNextPage || pageLoading}
                 className="h-7 px-2 text-xs border-slate-200"
               >
-                <span>Next</span>
+                <span>{t("pagination.next", { defaultValue: "Next" })}</span>
                 <ChevronRight className="w-3.5 h-3.5 ml-1" />
               </Button>
             </div>

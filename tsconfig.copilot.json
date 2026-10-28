@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": []
+  },
+  "include": ["supabase/functions/_shared/*.ts", "supabase/functions/boxbin-copilot/*.ts", "supabase/functions/boxbin-image/*.ts", "supabase/functions/boxbin-copilot-voice/*.ts", "tests/edge-globals.d.ts"]
+}

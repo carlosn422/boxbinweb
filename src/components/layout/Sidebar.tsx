@@ -1,3 +1,4 @@
+import { copilotText as ct } from '@/lib/copilotI18n';
 // components/layout/Sidebar.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -24,7 +25,9 @@ import {
   ChevronRight,
   Menu,
   X,
+  Bot,
 } from "lucide-react";
+import { openBinCopilot } from "@/services/boxbinCopilotService";
 
 interface SidebarProps {
   className?: string;
@@ -47,6 +50,13 @@ export function Sidebar({ className }: SidebarProps) {
   }, [location.pathname]);
 
   const sidebarItems = [
+    {
+      title: ct('aiCopilot'),
+      href: "#copilot",
+      icon: Bot,
+      badge: "AI",
+      onClick: () => openBinCopilot("", ""),
+    },
     {
       title: t("sidebar.dashboard", { defaultValue: "Dashboard" }),
       href: "/home",
@@ -226,7 +236,11 @@ export function Sidebar({ className }: SidebarProps) {
                     <button
                       key={item.href}
                       onClick={() => {
-                        navigate(item.href);
+                        if (item.onClick) {
+                          item.onClick();
+                        } else {
+                          navigate(item.href);
+                        }
                         setIsMobileOpen(false);
                       }}
                       className={cn(
@@ -373,7 +387,13 @@ export function Sidebar({ className }: SidebarProps) {
                 <div key={item.href} className="relative group">
                   <Button
                     variant="ghost"
-                    onClick={() => navigate(item.href)}
+                    onClick={() => {
+                      if (item.onClick) {
+                        item.onClick();
+                      } else {
+                        navigate(item.href);
+                      }
+                    }}
                     className={cn(
                       "w-full h-9 rounded-xl font-medium text-xs transition-all duration-150 flex items-center",
                       collapsed ? "px-0 justify-center" : "px-2.5 justify-start",

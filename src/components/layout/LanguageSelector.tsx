@@ -21,11 +21,12 @@ export function LanguageSelector({ collapsed = false, className }: LanguageSelec
   const [isOpen, setIsOpen] = useState(false);
 
   const languages = [
-    { code: 'es', name: 'Español', flag: '🇪🇸' },
     { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'es', name: 'Español', flag: '🇪🇸' },
   ];
 
-  const currentLanguage = languages.find(lang => lang.code === i18n.language) || languages[0];
+  const code = (i18n.resolvedLanguage || i18n.language || 'en').split('-')[0];
+  const currentLanguage = languages.find(lang => lang.code === code) || languages[0];
 
   const changeLanguage = (langCode: string) => {
     i18n.changeLanguage(langCode);
@@ -77,7 +78,7 @@ export function LanguageSelector({ collapsed = false, className }: LanguageSelec
               <span className="text-lg">{language.flag}</span>
               <span className="font-medium">{language.name}</span>
             </div>
-            {i18n.language === language.code && (
+            {code === language.code && (
               <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             )}
           </DropdownMenuItem>

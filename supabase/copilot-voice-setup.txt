@@ -1,0 +1,138 @@
+BoxBin Copilot: conversación continua con Gemini Live y Supabase
+
+Qué cambia
+El botón «Hablar con Gemini» abre una conversación con micrófono continuo.
+Gemini detecta cuándo termina de hablar el usuario, responde con audio nativo y
+admite interrupciones. No hay una llamada de texto seguida de otro proveedor TTS.
+El dictado del formulario de texto sigue disponible como una función aparte.
+
+Configuración y despliegue
+1. Revisar copilot-preflight.sql y aplicar la migración del copiloto
+   migrations/202610240001_boxbin_copilot.sql si aún no se ha aplicado. Esta
+   integración no necesita nuevas tablas; reutiliza historial, cuotas y permisos.
+2. Copiar functions/.env.example a un archivo privado terminado en .local.
+   Configurar GEMINI_API_KEY y STRIPE_SECRET_KEY en Supabase, como requiere el
+   copiloto existente. La clave de Gemini debe tener acceso a Live API.
+   COPILOT_LIVE_MODEL=gemini-3.8-live
+   COPILOT_LIVE_VOICE=Kore
+   El modelo predeterminado sigue la documentación oficial consultada. Confirmar
+   disponibilidad para el proyecto de Google; se puede configurar otro modelo
+   Live compatible. No usar el modelo de generación de texto en esta variable.
+   COPILOT_CHAT_MODEL y COPILOT_IMAGE_MODEL se mantienen independientes.
+   Nunca colocar claves del proveedor en VITE_ ni publicarlas en Git.
+3. Iniciar sesión, cargar secretos y desplegar desde la raíz del repositorio:
+   npx supabase login
+   npx supabase secrets set --env-file /ruta/privada/server.env.local --project-ref YOUR_PROJECT_REF
+   npx supabase functions deploy boxbin-copilot --project-ref YOUR_PROJECT_REF --use-api
+   npx supabase functions deploy boxbin-copilot-voice --project-ref YOUR_PROJECT_REF --use-api
+   npx supabase functions deploy boxbin-image --project-ref YOUR_PROJECT_REF --use-api
+   --use-api permite desplegar sin instalar Docker. También se pueden guardar
+   los secretos directamente en Supabase Dashboard > Edge Functions > Secrets.
+   Subir solamente secretos con valores reales; no cargar la plantilla vacía.
+   Si aparece 403 al listar o desplegar funciones, comprobar que la cuenta de
+   npx supabase login tenga acceso al proyecto indicado. La clave anon del
+   frontend no autoriza despliegues ni reemplaza la sesión de la CLI.
+4. Para probar el frontend en local contra las funciones desplegadas:
+   npm run dev
+   Abrir la URL localhost indicada por Vite e iniciar sesión. El .env del frontend
+   debe apuntar al mismo proyecto con VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY.
+   GEMINI_API_KEY pertenece a los secretos remotos, aunque el frontend sea local.
+   No hace falta levantar Supabase local ni publicar el frontend para esta prueba.
+   Para publicar el frontend, usar su proceso habitual. Incluir el archivo
+   public/worklets/boxbin-pcm.js, que Vite copia al directorio dist/worklets.
+   Se requiere HTTPS para el micrófono (localhost sirve para desarrollo).
+
+Autenticación
+supabase/config.toml desactiva la comprobación JWT del gateway SOLAMENTE para
+boxbin-copilot-voice. El navegador envía su sesión en un subprotocolo WebSocket.
+La función verifica el usuario con Supabase Auth y su suscripción ANTES de aceptar
+la conexión. El ámbito de caja se comprueba antes de conectar con Google.
+El cliente no puede enviar configuración del modelo ni ejecutar herramientas.
+Las búsquedas y propuestas se validan en el servidor. Las escrituras usan el
+flujo de confirmación manual existente, con validación y transacción en Supabase.
+No desactivar la comprobación del gateway en boxbin-copilot ni boxbin-image.
+Para servir WebSockets con Supabase CLI local, configurar el worker por instancia:
+[edge_runtime]
+policy = "per_worker"
+
+Idiomas
+El selector de idioma de la plataforma controla el chat, el dictado y Gemini Live.
+Inglés es el valor predeterminado; la preferencia español se conserva al recargar.
+La sesión Live recibe el idioma en sus instrucciones (el audio nativo no admite
+languageCode). El dictado del navegador usa en-US o es-MX. Cambiar de idioma
+durante una llamada la finaliza; iniciar otra para aplicar el idioma nuevo.
+El historial existente se conserva en su idioma original.
+
+Uso
+- Hablar con Gemini: solicita permiso del micrófono y establece la llamada.
+- Hablar normalmente, sin pulsar Enviar. Esperar a que aparezca «Te escucho».
+- Hablar mientras responde interrumpe su generación y descarta el audio pendiente.
+- El control del micrófono permite silenciar/activar la captura.
+- Detener audio silencia la reproducción actual; el micrófono sigue disponible.
+- Finalizar, cerrar el panel o salir de la cuenta libera micrófono y audio.
+- Las transcripciones quedan en el mismo historial, guardadas en orden por turno.
+- Para confirmar acciones o editar documentos, finalizar la llamada primero.
+- El chat de texto, fotos, PDFs e imágenes siguen disponibles fuera de la llamada.
+- Si falla el micrófono o la conexión, se informa y el chat de texto queda usable.
+
+Flujo y optimizaciones
+AudioWorklet -> PCM mono 16 kHz en paquetes de 100 ms -> WebSocket autenticado
+Supabase -> Gemini Live. El audio nativo de respuesta llega como PCM mono 24 kHz
+por el mismo relay y se reproduce progresivamente con Web Audio API.
+Captura con cancelación de eco y supresión de ruido; no se envía audio grabado
+antes de estar conectados ni se acumula para reproducirlo tras una reconexión.
+Detección automática de actividad, 650 ms de silencio de fin de turno e
+interrupciones nativas. Respuestas breves para reducir espera y consumo.
+
+Gemini llama herramientas de lectura para inventario actualizado y precios web.
+La búsqueda web usa una petición separada con producto público, sin enviarle
+el historial ni todo el inventario. Devuelve fuentes al chat. La herramienta
+propose_action solo prepara tarjetas pendientes; no modifica la base de datos.
+Las herramientas canceladas por interrupción no entregan propuestas tardías.
+Se conservan el límite de contexto y la validación de caja, ítem y ubicación.
+
+Duración, límites y renovación
+- Rotación preventiva del relay alrededor de los 110 segundos; espera un turno
+  inactivo y como máximo llega a 130 segundos. Se descuenta el tiempo de
+  autenticación y suscripción para respetar la duración de las Edge Functions.
+- Usa reanudación de Gemini si hay un punto seguro; el identificador está cifrado
+  y vinculado a usuario, dueño, caja y modelo, con caducidad de cinco minutos.
+- Si no hay punto seguro, conecta una sesión nueva con los últimos ocho mensajes.
+  Se muestra «Reconectando»; puede existir una pausa breve en esta renovación.
+- Si no termina el turno antes del límite, se guarda como interrumpido y se renueva.
+- Corte inesperado de red: finaliza con aviso; no reenvía automáticamente audio.
+- Hasta 10 turnos por conexión, 20 mensajes por chat, 100 consultas diarias y
+  30 conexiones Live diarias por cuenta, contando renovaciones. Además, máximo
+  ocho renovaciones en una llamada del navegador y cierre tras 90 s sin transcripción.
+- Máximo seis herramientas y dos búsquedas web por turno; buffers de audio y
+  contexto limitados. El navegador no puede acelerar el envío ilimitadamente.
+Estas cuotas contienen el consumo; Gemini Live tiene facturación de audio propia.
+No se promete latencia cero: influyen conexión, detección de silencio, modelo,
+herramientas y consultas externas. Medir el recorrido real después de desplegar.
+
+Validación local y límites de evidencia
+npm run test:copilot
+npm run test:copilot:browser
+npm run build
+Pruebas de PostgreSQL local, límites y permisos, cifrado/ámbito de reanudación,
+herramientas canceladas, remuestreo PCM, Chrome con micrófono simulado y WebAudio
+real, conversación de varios turnos, interrupciones, permisos y cierre de pistas.
+Gemini y Supabase remotos están simulados en esas pruebas. No verifican la voz
+real, calidad acústica del micrófono, latencia externa ni configuración desplegada.
+
+Verificación posterior al despliegue
+Con una cuenta real: iniciar una llamada, preguntar ubicación y costo registrado,
+pedir precio web con fuentes, interrumpir hablando y continuar sin pulsar Enviar.
+Probar silencio del micrófono, renovación después de dos minutos y cierre del
+panel; comprobar que desaparece el indicador de micrófono. Revisar transcripciones
+y confirmar una propuesta; probar otra cuenta y una caja ajena para aislamiento.
+Probar Chrome/Safari y un móvil con altavoz; medir tiempo desde fin de habla
+hasta primer audio. Si hay eco en un dispositivo, comparar con auriculares.
+
+Referencias oficiales
+https://ai.google.dev/gemini-api/docs/live-api
+https://ai.google.dev/gemini-api/docs/live-api/capabilities
+https://ai.google.dev/gemini-api/docs/live-api/tools
+https://ai.google.dev/gemini-api/docs/live-api/session-management
+https://ai.google.dev/api/live
+https://supabase.com/docs/guides/functions/websockets

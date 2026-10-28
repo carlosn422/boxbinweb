@@ -71,7 +71,7 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
     return `$${(priceInCents / 100).toFixed(2)}`;
   };
 
-  // Function to validate coupon using Firebase Functions
+  // Validate the coupon through the Supabase Edge Function.
   const validateCoupon = async () => {
     if (!couponCode.trim()) {
       setCouponError('Please enter a coupon code');
