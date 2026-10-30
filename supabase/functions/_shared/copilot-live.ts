@@ -73,7 +73,7 @@ export class LiveTurnTools {
         const proposal = await canonicalProposal(this.ctx, { type, data: actionData(type, args.data), status: 'pending' }, this.scope);
         signal.throwIfAborted();
         this.proposal = proposal;
-        result = { status: 'pending_confirmation', proposal, message: 'Validated proposal only. User must end call and confirm on screen. No changes executed.' };
+        result = { status: 'pending_confirmation', proposal, message: proposal.type === 'focus_bin_chat' ? 'Proposal created. Tell the user to confirm on screen to navigate directly to that bin.' : 'Validated proposal only. User can confirm on screen. No changes executed.' };
       } finally { this.proposing = false; }
     } else return { error: 'Tool not permitted.' };
     signal.throwIfAborted();

@@ -33,22 +33,23 @@ const LoginByToken = () => {
           setStatusMessage("Validating authorization token...");
         }
 
-        const { error } = await supabase.auth.setSession({
+        const { data, error } = await supabase.auth.setSession({
           access_token: token,
           refresh_token: refreshToken,
         });
 
-        if (error) {
-          throw error;
+        if (error || !data?.session) {
+          throw error || new Error("Failed to initialize session");
         }
 
         if (isMounted) {
           setStatusMessage("Redirecting to your workspace...");
         }
 
+        const destination = url || "/home";
         setTimeout(() => {
-          navigate(url || "/billing", { replace: true });
-        }, 500);
+          navigate(destination, { replace: true });
+        }, 400);
       } catch (e: any) {
         console.error("Login by token failed:", e);
         if (isMounted) {

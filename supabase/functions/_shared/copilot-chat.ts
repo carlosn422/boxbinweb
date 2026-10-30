@@ -161,7 +161,7 @@ async function document(ctx: Context, binId: string | null, title: string, langu
   const content = [
     es ? `## Inventario registrado` : `## Recorded inventory`,
     `${es ? "Consulta realizada" : "Retrieved at"}: ${formattedDateTime}. ${es ? "Los datos pueden cambiar después de esta consulta. No acredita verificación física." : "Data may change after this query. This is not evidence of physical verification."}`,
-    `${es ? "Registros" : "Records"}: ${count}. ${es ? "Valor registrado calculable" : "Calculable recorded value"}: ${first.inventoryMetrics.totalEstimatedValue} (${es ? "moneda no registrada" : "currency not recorded"}). ${es ? "Registros sin valuación completa" : "Records with incomplete valuation"}: ${first.inventoryMetrics.unvaluedItems}.`,
+    `${es ? "Registros" : "Records"}: ${count}. ${es ? "Valor registrado calculable" : "Calculable recorded value"}: $${first.inventoryMetrics.totalEstimatedValue} USD. ${es ? "Registros sin valuación completa" : "Records with incomplete valuation"}: ${first.inventoryMetrics.unvaluedItems}.`,
     es ? '| Ítem | Caja | Ubicación | Cantidad | Valor unitario registrado |' : '| Item | Bin | Location | Quantity | Recorded unit value |',
     '| --- | --- | --- | --- | --- |',
     ...items.map(i => {

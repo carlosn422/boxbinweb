@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - task/AI-Processing
+      - task/supabase
+      - main
 
 jobs:
   build-and-deploy:

@@ -30,7 +30,8 @@ const messages: Record<string, string> = {
 export function failure(error: unknown) {
   const e = error instanceof CopilotError ? error : new CopilotError('COPILOT_UNAVAILABLE', 503);
   console.error('Copilot request failed', {
-    code: e.code
+    code: e.code,
+    error: error instanceof Error ? error.message : String(error),
   });
   return json({
     error: messages[e.code] || 'No se pudo completar la solicitud. Intenta nuevamente.',
@@ -103,6 +104,7 @@ export async function rpc(db: any, name: string, args: Record<string, unknown>):
     error
   } = await db.rpc(name, args);
   if (error) {
+    console.error('RPC error in ' + name, error);
     const code = Object.keys(messages).find(c => error.message?.includes(c));
     throw new CopilotError(code || 'COPILOT_UNAVAILABLE', code === 'COPILOT_QUOTA' || code === 'COPILOT_BUSY' ? 429 : code ? 400 : 503);
   }
