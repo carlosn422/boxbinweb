@@ -412,7 +412,16 @@
     "binUpdatedToast": "Container updated successfully",
     "binUpdateErrorToast": "Failed to update container",
     "binDeletedToast": "Container deleted successfully",
-    "binDeleteErrorToast": "Failed to delete container"
+    "binDeleteErrorToast": "Failed to delete container",
+    "editItemTitle": "Edit Item",
+    "aiRecognition": "AI Recognition",
+    "aiCopilot": "AI Copilot",
+    "askBinCopilot": "Ask BoxBin AI Copilot about this bin",
+    "quickActions": "Quick actions",
+    "manageContainer": "Manage container",
+    "dropzoneHint": "Click or drag an image here (PNG, JPG, WEBP)",
+    "selectedPhoto": "Selected photo",
+    "changePhoto": "Change photo"
   },
   "aiModals": {
     "imagesModalTitle": "AI Image Analysis",

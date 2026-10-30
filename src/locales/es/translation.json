@@ -412,7 +412,16 @@
     "binUpdatedToast": "Contenedor actualizado exitosamente",
     "binUpdateErrorToast": "Error al actualizar el contenedor",
     "binDeletedToast": "Contenedor eliminado exitosamente",
-    "binDeleteErrorToast": "Error al eliminar el contenedor"
+    "binDeleteErrorToast": "Error al eliminar el contenedor",
+    "editItemTitle": "Editar Artículo",
+    "aiRecognition": "Reconocimiento con IA",
+    "aiCopilot": "Copiloto IA",
+    "askBinCopilot": "Preguntar a BoxBin Copilot IA sobre esta caja",
+    "quickActions": "Acciones rápidas",
+    "manageContainer": "Gestionar contenedor",
+    "dropzoneHint": "Haz clic o arrastra una imagen aquí (PNG, JPG, WEBP)",
+    "selectedPhoto": "Foto seleccionada",
+    "changePhoto": "Cambiar foto"
   },
   "aiModals": {
     "imagesModalTitle": "Análisis de Imágenes con IA",
