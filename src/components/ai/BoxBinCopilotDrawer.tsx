@@ -65,6 +65,7 @@ export function BoxBinCopilotDrawer() {
   const liveSave = useRef<Promise<void>>(Promise.resolve());
   const callActive = liveState !== 'ended';
   const cancelVoice = () => {
+    callEpoch.current++;
     voiceStream.current?.stop();
     voiceStream.current = null;
     setLiveState('ended');
@@ -95,6 +96,7 @@ export function BoxBinCopilotDrawer() {
     fileInput = useRef<HTMLInputElement>(null),
     identity = useRef(userId),
     epoch = useRef(0),
+    callEpoch = useRef(0),
     contextRequest = useRef(0);
   identity.current = userId;
   const locked = busy || !!artifact || callActive;
@@ -287,11 +289,11 @@ export function BoxBinCopilotDrawer() {
     setShowCaptions(true);
     setLiveCaption({ input: '', output: '' });
     setVoiceWarning(''); setMicMuted(false);
-    const turn = ++epoch.current;
+    const callId = ++callEpoch.current;
     let id = sessionId;
     liveMessages.current = messages;
     livePartial.current = null;
-    const isCurrent = () => turn === epoch.current && identity.current === userId;
+    const isCurrentCall = () => callId === callEpoch.current && identity.current === userId;
     const save = (list: ChatMessage[]) => {
       const chatId = id;
       if (!chatId) return;
@@ -299,7 +301,7 @@ export function BoxBinCopilotDrawer() {
       liveSave.current = liveSave.current.catch(() => { }).then(() => persist(list, chatId, binId));
     };
     const complete = (data: { id: string; input: string; interrupted: boolean; answer: import('@/services/boxbinCopilotService').CopilotResponse }) => {
-      if (!isCurrent()) return;
+      if (!isCurrentCall()) return;
       const list: ChatMessage[] = [...liveMessages.current,
       { id: `voice-user-${data.id}`, sender: 'user', text: data.input || ct('voiceNoTranscript'), timestamp: new Date() },
       {
@@ -320,16 +322,18 @@ export function BoxBinCopilotDrawer() {
     const call = new CopilotVoiceStream({
       history: () => liveMessages.current.slice(-8).map(m => ({ sender: m.sender, text: m.text, actionProposal: m.actionProposal })),
       onState: state => {
-        if (!isCurrent()) return;
-        setLiveState(state);
         if (state === 'ended') {
           voiceStream.current = null;
           const partial = livePartial.current;
           if (partial && (partial.input || partial.output)) complete({ ...partial, interrupted: true, answer: { reply: partial.output || ct('callEnded'), suggestedActions: [], suggestedQuestions: [] } });
+          cancelVoice();
+          return;
         }
+        if (!isCurrentCall()) return;
+        setLiveState(state);
       },
       onTranscript: data => {
-        if (!isCurrent()) return;
+        if (!isCurrentCall()) return;
         livePartial.current = data;
         setLiveCaption({ input: data.input, output: data.output });
         setMessages([...liveMessages.current,
@@ -338,7 +342,21 @@ export function BoxBinCopilotDrawer() {
         ]);
       },
       onTurn: complete,
-      onWarning: message => { if (isCurrent()) setVoiceWarning(message); }
+      onWarning: message => {
+        if (identity.current === userId) {
+          setVoiceWarning(message);
+          const lower = message.toLowerCase();
+          if (
+            lower.includes('finalizada') ||
+            lower.includes('cancelada') ||
+            lower.includes('terminada') ||
+            lower.includes('ended') ||
+            lower.includes('closed')
+          ) {
+            cancelVoice();
+          }
+        }
+      }
     });
     voiceStream.current = call;
     const prepared = call.prepare(); // Activate microphone/audio in this click.
@@ -346,12 +364,12 @@ export function BoxBinCopilotDrawer() {
       // Attach rejection handling immediately while the session is created.
       const created = id ? Promise.resolve(id) : createCopilotSession(userId, ct('voiceConversation'), binId || undefined);
       const [chatId] = await Promise.all([created, prepared]);
-      if (!isCurrent() || voiceStream.current !== call) { call.stop(); return; }
+      if (!isCurrentCall() || voiceStream.current !== call) { call.stop(); return; }
       id = chatId; setSessionId(chatId);
       await call.connect(binId);
     } catch (error) {
       call.stop();
-      if (isCurrent()) { setVoiceWarning(errorText(error)); voiceStream.current = null; }
+      if (isCurrentCall()) { setVoiceWarning(errorText(error)); cancelVoice(); }
     }
   };
   const sendLiveText = () => {
