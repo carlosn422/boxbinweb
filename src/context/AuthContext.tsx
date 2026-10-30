@@ -4,9 +4,16 @@ import { supabase, formatSupabaseUser, syncUserProfile, type AppUser } from '@/l
 interface AuthContextType {
   currentUser: AppUser | null;
   loading: boolean;
+  setCurrentUser: (user: AppUser | null) => void;
+  refreshUser: () => Promise<AppUser | null>;
 }
 
-const AuthContext = createContext<AuthContextType>({ currentUser: null, loading: true });
+const AuthContext = createContext<AuthContextType>({
+  currentUser: null,
+  loading: true,
+  setCurrentUser: () => {},
+  refreshUser: async () => null,
+});
 
 export const useAuth = () => useContext(AuthContext);
 
@@ -17,6 +24,21 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const refreshUser = async (): Promise<AppUser | null> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = formatSupabaseUser(session?.user ?? null);
+      setCurrentUser(user);
+      if (user) {
+        syncUserProfile(user);
+      }
+      return user;
+    } catch (e) {
+      console.warn('Failed to refresh user:', e);
+      return null;
+    }
+  };
 
   useEffect(() => {
     // 1. Obtener la sesión activa inicial
@@ -49,6 +71,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const value = {
     currentUser,
     loading,
+    setCurrentUser,
+    refreshUser,
   };
 
   return (

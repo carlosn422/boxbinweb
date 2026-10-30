@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { supabase } from "@/lib/supabase";
+import { supabase, formatSupabaseUser, syncUserProfile } from "@/lib/supabase";
+import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "react-i18next";
 import LogoIcon from "@/assets/logo.png";
 import { ShieldCheck, Lock, AlertCircle, ArrowRight } from "lucide-react";
@@ -10,6 +11,7 @@ const LoginByToken = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const { refreshUser, setCurrentUser } = useAuth();
   const [statusMessage, setStatusMessage] = useState<string>(
     t("messages.loadingAccount") || "Authenticating your secure session..."
   );
@@ -33,14 +35,39 @@ const LoginByToken = () => {
           setStatusMessage("Validating authorization token...");
         }
 
-        const { data, error } = await supabase.auth.setSession({
-          access_token: token,
-          refresh_token: refreshToken,
-        });
+        let activeUser = null;
 
-        if (error || !data?.session) {
-          throw error || new Error("Failed to initialize session");
+        // 1. Try to initialize session with Supabase
+        try {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: token,
+            refresh_token: refreshToken,
+          });
+          if (data?.session?.user) {
+            activeUser = formatSupabaseUser(data.session.user);
+          } else if (error) {
+            console.warn("setSession warning:", error.message);
+          }
+        } catch (setErr) {
+          console.warn("setSession exception:", setErr);
         }
+
+        // 2. Fallback: If setSession didn't resolve user, verify token directly
+        if (!activeUser) {
+          const { data: userData, error: userError } = await supabase.auth.getUser(token);
+          if (userError || !userData?.user) {
+            throw userError || new Error("Failed to initialize session");
+          }
+          activeUser = formatSupabaseUser(userData.user);
+        }
+
+        // 3. Immediately seed and sync AuthContext so route guards don't bounce to /login
+        if (activeUser) {
+          setCurrentUser(activeUser);
+          syncUserProfile(activeUser);
+        }
+
+        await refreshUser();
 
         if (isMounted) {
           setStatusMessage("Redirecting to your workspace...");
@@ -49,7 +76,7 @@ const LoginByToken = () => {
         const destination = url || "/home";
         setTimeout(() => {
           navigate(destination, { replace: true });
-        }, 400);
+        }, 300);
       } catch (e: any) {
         console.error("Login by token failed:", e);
         if (isMounted) {
