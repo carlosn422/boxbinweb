@@ -3,7 +3,7 @@ import { copilotText as ct, copilotLanguage } from '@/lib/copilotI18n';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Box, MapPin, Package, Search, PencilLine, FileText, ArrowLeft, ChevronRight, MessageSquare, ShieldCheck, Bot, Check, Phone, PhoneOff, Square, History, Loader2, Mic, MicOff, Paperclip, Plus, Send, Sparkles, Trash2, X, AudioLines, Captions } from 'lucide-react';
+import { Box, MapPin, Package, Search, PencilLine, FileText, ArrowLeft, ChevronDown, ChevronRight, MessageSquare, ShieldCheck, Bot, Check, Phone, PhoneOff, Square, History, Loader2, Mic, MicOff, Paperclip, Plus, Send, Sparkles, Trash2, X, AudioLines, Captions } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { CopilotProposalFields } from './CopilotProposalFields';
@@ -99,7 +99,8 @@ export function BoxBinCopilotDrawer() {
   identity.current = userId;
   const locked = busy || !!artifact || callActive;
   const limitReached = messages.filter(m => !m.id.startsWith('welcome-')).length >= MAX_MESSAGES_PER_CHAT;
-  const voiceProposal = [...messages].reverse().find(message => message.sender === 'copilot' && message.actionProposal && message.actionProposal.status !== 'executed' && message.actionProposal.status !== 'cancelled')?.actionProposal;
+  const voiceProposalMessage = [...messages].reverse().find(message => message.sender === 'copilot' && message.actionProposal && message.actionProposal.status !== 'executed' && message.actionProposal.status !== 'cancelled');
+  const voiceProposal = voiceProposalMessage?.actionProposal;
   const scrollToBottom = useCallback((smooth = false) => {
     const el = messagesContainer.current;
     if (el) {
@@ -196,8 +197,16 @@ export function BoxBinCopilotDrawer() {
     }
   }, [messages, isOpen, historyOpen, scrollToBottom]);
   useEffect(() => {
-    if (!isOpen) { voiceService.stopListening(); cancelVoice(); }
+    if (!isOpen) {
+      voiceService.stopListening();
+    }
   }, [isOpen]);
+  useEffect(() => {
+    return () => {
+      voiceStream.current?.stop();
+      voiceService.stopListening();
+    };
+  }, []);
   useEffect(() => {
     const changed = () => {
       if (isOpen) void refreshContext();
@@ -355,9 +364,6 @@ export function BoxBinCopilotDrawer() {
     setQuery('');
   };
   const reviewVoiceAction = () => {
-    voiceStream.current?.stop();
-    voiceStream.current = null;
-    setLiveState('ended');
     setVoiceMode('text');
   };
   const send = async (textToSend?: string) => {
@@ -463,7 +469,7 @@ export function BoxBinCopilotDrawer() {
   const execute = async (msg: ChatMessage) => {
     setProposalError(null);
     const p = msg.actionProposal;
-    if (!p || p.status === 'executed' || p.status === 'cancelled' || busyRef.current || voiceStream.current || artifact) return;
+    if (!p || p.status === 'executed' || p.status === 'cancelled' || busyRef.current || artifact) return;
     busyRef.current = true;
     setBusy(true);
     const turn = ++epoch.current;
@@ -494,6 +500,8 @@ export function BoxBinCopilotDrawer() {
         if (turn !== epoch.current) return;
         setBinId(p.data.binId);
         await completeProposal(msg.id, p, ct('focusedChat', { name: p.data.binName }), 'executed', p.data.binId);
+        setIsOpen(false);
+        navigate(`/bin-details/${p.data.binId}`);
         return;
       }
       const executors = {
@@ -607,16 +615,45 @@ export function BoxBinCopilotDrawer() {
     drag.current = null;
   };
   return <>
-    {!isOpen && <button aria-label={ct('openCopilot')} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={() => {
-      drag.current = null;
-    }} onKeyDown={e => {
-      if (e.key === 'Enter' || e.key === ' ') setIsOpen(true);
-    }} style={position ? {
-      left: position.x,
-      top: position.y
-    } : undefined} className={`fixed z-40 size-14 rounded-2xl bg-slate-900 text-white shadow-lg flex items-center justify-center touch-none ${position ? '' : 'bottom-6 right-6'}`}>
-      <Bot />
-    </button>}
+    {!isOpen && (
+      <div
+        style={position ? { left: position.x, top: position.y } : undefined}
+        className={`fixed z-40 touch-none ${position ? '' : 'bottom-6 right-6'}`}
+      >
+        {callActive && (
+          <div className="absolute -top-9 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-blue-400/40 bg-slate-950/90 px-3 py-1 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm pointer-events-none whitespace-nowrap">
+            <span className={`size-2 rounded-full ${liveState === 'responding' ? 'bg-blue-400 animate-ping' : 'bg-emerald-400'}`} />
+            <span>{ct(liveState === 'connecting' ? 'connecting' : liveState === 'reconnecting' ? 'reconnecting' : liveState === 'responding' ? 'speaking' : micMuted ? 'micMuted' : 'listening')}</span>
+          </div>
+        )}
+        <button
+          aria-label={callActive ? ct('voiceLive') : ct('openCopilot')}
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={up}
+          onPointerCancel={() => { drag.current = null; }}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setIsOpen(true); }}
+          className={`relative size-14 rounded-2xl flex items-center justify-center text-white transition-all shadow-xl cursor-pointer ${
+            callActive
+              ? 'bg-gradient-to-br from-blue-600 to-indigo-600 shadow-[0_0_30px_rgba(59,130,246,0.65)] ring-4 ring-blue-400/40'
+              : 'bg-slate-900 shadow-lg hover:bg-slate-800'
+          }`}
+        >
+          {callActive && (
+            <span className="absolute -inset-1 rounded-2xl bg-blue-500 opacity-40 animate-ping pointer-events-none" />
+          )}
+          {callActive ? (
+            micMuted ? (
+              <MicOff className="size-6 text-red-200" />
+            ) : (
+              <AudioLines className="size-6 text-white animate-pulse" />
+            )
+          ) : (
+            <Bot className="size-6" />
+          )}
+        </button>
+      </div>
+    )}
 
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent showCloseButton={false} style={viewport} onOpenAutoFocus={event => { event.preventDefault(); scrollToBottom(false); if (window.innerWidth >= 640) composer.current?.focus(); }}
@@ -630,7 +667,7 @@ export function BoxBinCopilotDrawer() {
             <div className="flex shrink-0 items-center">
               <Button size="icon" variant="ghost" className="size-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-label={historyOpen ? ct('returnChat') : ct('history')} disabled={locked} onClick={() => { setHistoryOpen(!historyOpen); void refreshSessions().catch(e => setSavingError(errorText(e))); }}>{historyOpen ? <ArrowLeft className="size-4" /> : <History className="size-4" />}</Button>
               <Button size="icon" variant="ghost" className="size-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-label={ct('newGlobalChat')} disabled={locked} onClick={() => void newSession()}><Plus className="size-5" /></Button>
-              <Button size="icon" variant="ghost" className="size-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-label={ct('close')} onClick={() => setIsOpen(false)}><X className="size-5" /></Button>
+              <Button size="icon" variant="ghost" className="size-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-label={ct('close')} title={callActive ? 'Minimizar (llamada activa en segundo plano)' : ct('close')} onClick={() => setIsOpen(false)}>{callActive ? <ChevronDown className="size-5" /> : <X className="size-5" />}</Button>
             </div>
           </div>
           <div aria-label={ct('contextLabel')} className="mt-3 flex min-w-0 items-center gap-2 text-xs">
@@ -655,7 +692,36 @@ export function BoxBinCopilotDrawer() {
             <p className="relative mt-2 max-w-xs text-sm leading-relaxed text-slate-400">{ct('voiceModeHint')}</p>
             <Button type="button" variant="ghost" className="relative mt-5 min-h-10 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-pressed={showCaptions} aria-label={ct(showCaptions ? 'hideCaptions' : 'showCaptions')} onClick={() => setShowCaptions(value => !value)}><Captions className="mr-2 size-4" />{ct(showCaptions ? 'hideCaptions' : 'showCaptions')}</Button>
             {showCaptions && (liveCaption.input || liveCaption.output) && <div aria-live="polite" className="relative mt-5 max-h-48 w-full max-w-2xl overflow-y-auto rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-left text-base leading-7 text-slate-100 shadow-lg sm:text-lg"><p className="text-xs font-semibold uppercase tracking-wide text-blue-200">{liveCaption.input ? ct('you') : ct('assistant')}</p>{liveCaption.input && <p className="mt-1 break-words">{liveCaption.input}</p>}{liveCaption.output && <p className="mt-3 break-words border-t border-white/15 pt-3">{liveCaption.output}</p>}</div>}
-            {voiceProposal && <div className="relative mt-5 w-full max-w-md rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 text-left"><p className="text-xs font-semibold uppercase tracking-wide text-amber-200">{ct('voiceActionReady')}</p><p className="mt-1 text-sm font-semibold text-white">{titles()[voiceProposal.type] || ct('proposal')}</p><p className="mt-1 text-xs leading-relaxed text-slate-300">{ct('voiceActionHint')}</p><Button type="button" variant="secondary" className="mt-3 min-h-10 rounded-xl text-xs" onClick={reviewVoiceAction}>{ct('reviewAction')}</Button></div>}
+            {voiceProposal && (
+              <div className="relative mt-5 w-full max-w-md rounded-2xl border border-amber-300/30 bg-amber-400/10 p-4 text-left">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-200">{ct('voiceActionReady')}</p>
+                <p className="mt-1 text-sm font-semibold text-white">{titles()[voiceProposal.type] || ct('proposal')}</p>
+                <p className="mt-1 text-xs leading-relaxed text-slate-300">{ct('voiceActionHint')}</p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {voiceProposal.type === 'focus_bin_chat' ? (
+                    <Button
+                      type="button"
+                      className="min-h-10 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 shadow-md flex items-center gap-1.5"
+                      onClick={() => {
+                        if (voiceProposalMessage) void execute(voiceProposalMessage);
+                      }}
+                    >
+                      <Check className="size-4 shrink-0" />
+                      <span>{ct('confirmAction')}{voiceProposal.data.binName ? ` (${voiceProposal.data.binName})` : ''}</span>
+                    </Button>
+                  ) : (
+                    <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs" onClick={reviewVoiceAction}>
+                      {ct('reviewAction')}
+                    </Button>
+                  )}
+                  {voiceProposal.type === 'focus_bin_chat' && (
+                    <Button type="button" variant="ghost" className="min-h-10 rounded-xl text-xs text-slate-300 hover:bg-white/10 hover:text-white" onClick={reviewVoiceAction}>
+                      {ct('reviewAction')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
             <div className="relative mt-8 flex items-center gap-2 text-xs text-slate-400"><span className={`size-2 rounded-full ${liveState === 'responding' ? 'bg-blue-300 animate-ping' : 'bg-emerald-400'}`} />{ct('voiceLive')}</div>
           </section> : <div ref={messagesContainer} data-testid="copilot-messages" className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-5 sm:py-5">
             {binId && <p className="mb-3 flex items-center gap-2 text-xs text-blue-700"><ShieldCheck className="size-3.5 shrink-0" />{ct('binScope')}</p>}
@@ -683,7 +749,7 @@ export function BoxBinCopilotDrawer() {
                 </> : <>
                   <CopilotProposalFields proposal={msg.actionProposal} disabled={locked} update={patch => updateProposal(msg.id, patch)} />
                   {proposalError?.id === msg.id && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{proposalError.text}</p>}
-                  <div className="flex flex-wrap gap-2"><Button disabled={locked} onClick={() => void execute(msg)} className="min-h-11 flex-1 rounded-xl bg-blue-600 px-3 text-sm text-white hover:bg-blue-700"><Check className="mr-1 size-4 shrink-0" />{ct(['generate_inventory_pdf', 'generate_image'].includes(msg.actionProposal.type) ? 'reviewFile' : 'confirmAction')}</Button><Button variant="outline" className="min-h-11 rounded-xl" disabled={locked} onClick={() => void completeProposal(msg.id, msg.actionProposal!, ct('discarded'), 'cancelled')}>{ct('discard')}</Button></div>
+                  <div className="flex flex-wrap gap-2"><Button disabled={busy || !!artifact} onClick={() => void execute(msg)} className="min-h-11 flex-1 rounded-xl bg-blue-600 px-3 text-sm text-white hover:bg-blue-700"><Check className="mr-1 size-4 shrink-0" />{ct(['generate_inventory_pdf', 'generate_image'].includes(msg.actionProposal.type) ? 'reviewFile' : 'confirmAction')}</Button><Button variant="outline" className="min-h-11 rounded-xl" disabled={busy || !!artifact} onClick={() => void completeProposal(msg.id, msg.actionProposal!, ct('discarded'), 'cancelled')}>{ct('discard')}</Button></div>
                 </>}</div>
               </div>}
               {!!msg.actions?.length && <div className="mt-3 flex flex-wrap gap-2">{msg.actions.filter(a => /^\/(home|locations|bin-details\/[a-zA-Z0-9_-]+)$/.test(a.path)).map((a, i) => <Button key={i} variant="outline" className="min-h-11 max-w-full rounded-xl whitespace-normal text-xs" disabled={locked} onClick={() => { navigate(a.path); setIsOpen(false); }}>{a.label}<ChevronRight className="ml-1 size-3" /></Button>)}</div>}

@@ -57,3 +57,4 @@ end $$;
 
 revoke all on function public.copilot_inventory(uuid, text, text, integer, integer, text) from public, anon, authenticated;
 grant execute on function public.copilot_inventory(uuid, text, text, integer, integer, text) to service_role;
+
