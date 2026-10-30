@@ -603,11 +603,11 @@ const BinDetailsScreen: React.FC = () => {
         prev.map((item) =>
           item.id === currentItem.id
             ? {
-                ...item,
-                ...updateData,
-                cuantity: itemCuantity.toString(),
-                quantity: itemCuantity.toString(),
-              }
+              ...item,
+              ...updateData,
+              cuantity: itemCuantity.toString(),
+              quantity: itemCuantity.toString(),
+            }
             : item
         )
       );
@@ -1221,8 +1221,8 @@ const BinDetailsScreen: React.FC = () => {
                 size="sm"
                 onClick={() => setViewMode("grid")}
                 className={`h-7.5 w-7.5 p-0 rounded-lg ${viewMode === "grid"
-                    ? "bg-white text-slate-900 shadow-2xs font-bold"
-                    : "text-slate-400 hover:text-slate-700"
+                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  : "text-slate-400 hover:text-slate-700"
                   }`}
                 title={t("containers.gridView", { defaultValue: "Grid view" })}
               >
@@ -1233,8 +1233,8 @@ const BinDetailsScreen: React.FC = () => {
                 size="sm"
                 onClick={() => setViewMode("list")}
                 className={`h-7.5 w-7.5 p-0 rounded-lg ${viewMode === "list"
-                    ? "bg-white text-slate-900 shadow-2xs font-bold"
-                    : "text-slate-400 hover:text-slate-700"
+                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  : "text-slate-400 hover:text-slate-700"
                   }`}
                 title={t("containers.listView", { defaultValue: "List view" })}
               >
@@ -1250,8 +1250,8 @@ const BinDetailsScreen: React.FC = () => {
             <button
               onClick={() => setSelectedTag(null)}
               className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all ${!selectedTag
-                  ? "bg-slate-900 text-white shadow-2xs"
-                  : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                ? "bg-slate-900 text-white shadow-2xs"
+                : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 }`}
             >
               {t("containers.allTags", { defaultValue: "All Tags" })} ({items.length})
@@ -1264,8 +1264,8 @@ const BinDetailsScreen: React.FC = () => {
                   key={tag}
                   onClick={() => setSelectedTag(isSelected ? null : tag)}
                   className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${isSelected
-                      ? "bg-blue-600 text-white shadow-2xs font-semibold"
-                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                    ? "bg-blue-600 text-white shadow-2xs font-semibold"
+                    : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
                     }`}
                 >
                   <span>#{tag}</span>
