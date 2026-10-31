@@ -1,4 +1,12 @@
 {
+  "workspaceDesign": {
+    "details": "Detalles",
+    "tools": "Herramientas",
+    "sortAndView": "Orden y vista",
+    "aboutCopilot": "Acerca del asistente",
+    "moreActions": "Más acciones",
+    "suggestions": "Preguntas sugeridas"
+  },
   "messages": {
     "loading": "Cargando...",
     "loadingAccount": "Cargando tu cuenta...",
@@ -20,6 +28,12 @@
     "authenticating": "Autenticando, por favor espera…"
   },
   "sidebar": {
+    "navigation": "Navegación principal",
+    "more": "Más",
+    "menu": "Menú",
+    "openAccount": "Abrir cuenta y menú",
+    "closeMenu": "Cerrar menú",
+
     "dashboard": "Dashboard",
     "locations": "Ubicaciones",
     "new": "Nuevo",

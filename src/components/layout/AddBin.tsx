@@ -132,7 +132,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent
-        className="max-w-md w-full p-0 gap-0 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden font-sans"
+        className="workspace-safe-dialog max-w-md w-full p-0 gap-0 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden font-sans"
         showCloseButton={false}
       >
         {/* Modal Header */}

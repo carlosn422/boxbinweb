@@ -58,6 +58,16 @@
 }
 
 :root {
+  /* One source for safe-area geometry, including dialogs portalled to body. */
+  --app-safe-top: env(safe-area-inset-top, 0px);
+  --app-safe-right: env(safe-area-inset-right, 0px);
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --app-safe-left: env(safe-area-inset-left, 0px);
+  --mobile-navigation-height: calc(73px + var(--app-safe-bottom));
+  --workspace-dialog-top: max(12px, var(--app-safe-top));
+  --workspace-dialog-bottom: max(12px, var(--app-safe-bottom));
+  --workspace-dialog-left: max(12px, var(--app-safe-left));
+  --workspace-dialog-right: max(12px, var(--app-safe-right));
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -134,3 +144,22 @@
     @apply bg-background text-foreground;
   }
 }
+/* Center workspace dialogs in the usable rectangle, not behind device cutouts. */
+.workspace-safe-dialog[data-slot] {
+  top: calc(50% + (var(--workspace-dialog-top) - var(--workspace-dialog-bottom)) / 2);
+  left: calc(50% + (var(--workspace-dialog-left) - var(--workspace-dialog-right)) / 2);
+  width: calc(100vw - var(--workspace-dialog-left) - var(--workspace-dialog-right));
+  max-height: calc(100dvh - var(--workspace-dialog-top) - var(--workspace-dialog-bottom));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.workspace-safe-dialog.copilot-artifact-dialog {
+  --artifact-max-width: 96vw;
+  max-width: min(var(--artifact-max-width), calc(100vw - var(--workspace-dialog-left) - var(--workspace-dialog-right))) !important;
+  overflow: hidden;
+}
+@media (min-width: 640px) { .workspace-safe-dialog.copilot-artifact-dialog { --artifact-max-width: 95vw; } }
+@media (min-width: 768px) { .workspace-safe-dialog.copilot-artifact-dialog { --artifact-max-width: 94vw; } }
+@media (min-width: 1024px) { .workspace-safe-dialog.copilot-artifact-dialog { --artifact-max-width: 1440px; } }
+@media (min-width: 1280px) { .workspace-safe-dialog.copilot-artifact-dialog { --artifact-max-width: 1560px; } }
+@media (min-width: 1536px) { .workspace-safe-dialog.copilot-artifact-dialog { --artifact-max-width: 1720px; } }

@@ -1,3 +1,5 @@
+import "./bin-detail.css";
+import { ResponsiveDisclosure } from "@/components/layout/ResponsiveDisclosure";
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -1069,8 +1071,8 @@ const BinDetailsScreen: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-20 font-sans">
-      <div className="container mx-auto px-4 sm:px-6 py-6 max-w-7xl space-y-5">
+    <div className="bin-detail-page">
+      <div className="bin-detail-content">
         {/* Impersonation Banner */}
         {userImpersonated && (
           <div className="bg-amber-50 border border-amber-200/90 px-4 py-3 rounded-2xl flex items-center justify-between text-xs text-amber-900 shadow-sm animate-in fade-in duration-200">
@@ -1098,20 +1100,20 @@ const BinDetailsScreen: React.FC = () => {
         )}
 
         {/* Top Hero Container Header */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-sm flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+        <div className="bin-detail-header">
           {/* Left: Container Brand, Info & Badges */}
-          <div className="flex items-start gap-4 min-w-0">
+          <div className="bin-detail-identity">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate("/home")}
-              className="h-10 w-10 p-0 bg-white hover:bg-slate-100 border-slate-200 text-slate-700 rounded-2xl shrink-0 shadow-2xs mt-0.5 transition-all"
+              className="bin-detail-back"
               title={t("containers.backToDashboard", { defaultValue: "Back to Dashboard" })}
             >
               <ArrowLeft className="w-4 h-4" />
             </Button>
 
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 text-white flex items-center justify-center shrink-0 shadow-md mt-0.5">
+            <div className="bin-detail-icon">
               <Box className="w-6 h-6 text-blue-400" />
             </div>
 
@@ -1128,6 +1130,7 @@ const BinDetailsScreen: React.FC = () => {
                 )}
               </div>
 
+              <ResponsiveDisclosure label={t("workspaceDesign.details")} className="bin-detail-metadata">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-1.5 text-xs text-slate-500">
                 {bin.description && (
                   <span className="text-slate-600 truncate max-w-md">{bin.description}</span>
@@ -1143,23 +1146,25 @@ const BinDetailsScreen: React.FC = () => {
                   <span>{new Date(bin.createdAt).toLocaleDateString()}</span>
                 </span>
               </div>
+              </ResponsiveDisclosure>
             </div>
           </div>
 
           {/* Right: Actions Suite */}
-          <div className="flex items-center flex-wrap gap-2 shrink-0 pt-3 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+          <div className="bin-detail-actions">
             {/* Copilot IA */}
             <Button
               variant="outline"
               size="sm"
               onClick={() => openBinCopilot(bin.id, bin.name)}
-              className="h-9 px-3.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white rounded-xl text-xs font-bold shadow-sm hover:shadow transition-all duration-200 flex items-center gap-2 border-0"
+              className="bin-detail-copilot"
               title={t("containers.askBinCopilot", { defaultValue: "Ask BoxBin AI Copilot about this bin" })}
             >
               <Sparkles className="w-3.5 h-3.5 text-blue-200 animate-pulse" />
               <span>{t("containers.aiCopilot", { defaultValue: "AI Copilot" })}</span>
             </Button>
 
+            <ResponsiveDisclosure label={t("workspaceDesign.tools")} className="bin-detail-tools">
             {/* AI Recognition Tools Menu */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1262,7 +1267,7 @@ const BinDetailsScreen: React.FC = () => {
                       <span>{t("actions.delete", { defaultValue: "Delete" })}</span>
                     </div>
                   </AlertDialogTrigger>
-                  <AlertDialogContent className="rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-md p-6">
+                  <AlertDialogContent className="workspace-safe-dialog rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-md p-6">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="text-base font-black text-slate-900">
                         {t("containers.deleteConfirmTitle", { name: bin.name, defaultValue: `Delete "${bin.name}"?` })}
@@ -1291,13 +1296,15 @@ const BinDetailsScreen: React.FC = () => {
               </DropdownMenuContent>
             </DropdownMenu>
 
+            </ResponsiveDisclosure>
+
             {/* Primary Add Item CTA */}
             <Button
               onClick={() => {
                 resetItemForm();
                 setIsAddItemOpen(true);
               }}
-              className="h-9 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black shadow-sm hover:shadow flex items-center gap-1.5 transition-all"
+              className="bin-detail-add"
             >
               <Plus className="w-4 h-4 text-blue-400" />
               <span>{t("containers.addItem", { defaultValue: "Add Item" })}</span>
@@ -1306,9 +1313,9 @@ const BinDetailsScreen: React.FC = () => {
         </div>
 
         {/* Dashboard KPI Stats Ribbon (3 Modern Cards) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        <div className="bin-detail-stats">
           {/* Card 1: Total Items */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 flex items-center justify-between">
+          <div className="bin-detail-stat">
             <div className="flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0 shadow-2xs">
                 <Package className="w-5 h-5" />
@@ -1328,7 +1335,7 @@ const BinDetailsScreen: React.FC = () => {
           </div>
 
           {/* Card 2: Total Units */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 flex items-center justify-between">
+          <div className="bin-detail-stat">
             <div className="flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 shadow-2xs">
                 <Layers className="w-5 h-5" />
@@ -1348,7 +1355,7 @@ const BinDetailsScreen: React.FC = () => {
           </div>
 
           {/* Card 3: Total Valuation */}
-          <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 flex items-center justify-between">
+          <div className="bin-detail-stat">
             <div className="flex items-center gap-3.5">
               <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs">
                 <TrendingUp className="w-5 h-5" />
@@ -1369,11 +1376,12 @@ const BinDetailsScreen: React.FC = () => {
         </div>
 
         {/* Integrated Unified Controls Bar: Search, Sort & View Toggle */}
-        <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="bin-detail-controls">
           {/* Search Input */}
-          <div className="relative flex-1 max-w-md">
+          <div className="bin-detail-search">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <Input
+              aria-label={t("containers.searchPlaceholder")}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("containers.searchPlaceholder", { defaultValue: "Search items by name, tag, or description..." })}
@@ -1389,6 +1397,7 @@ const BinDetailsScreen: React.FC = () => {
             )}
           </div>
 
+          <ResponsiveDisclosure label={t("workspaceDesign.sortAndView")} className="bin-detail-filter-options">
           {/* Filter, Sort, & View Mode Switcher */}
           <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
             {/* Sort Dropdown */}
@@ -1454,6 +1463,7 @@ const BinDetailsScreen: React.FC = () => {
                     ? "bg-white text-slate-900 shadow-2xs font-bold"
                     : "text-slate-400 hover:text-slate-700"
                 }`}
+                aria-pressed={viewMode === "grid"}
                 title={t("containers.gridView", { defaultValue: "Grid view" })}
               >
                 <Grid className="w-3.5 h-3.5" />
@@ -1467,18 +1477,21 @@ const BinDetailsScreen: React.FC = () => {
                     ? "bg-white text-slate-900 shadow-2xs font-bold"
                     : "text-slate-400 hover:text-slate-700"
                 }`}
+                aria-pressed={viewMode === "list"}
                 title={t("containers.listView", { defaultValue: "List view" })}
               >
                 <List className="w-3.5 h-3.5" />
               </Button>
             </div>
           </div>
+          </ResponsiveDisclosure>
         </div>
 
         {/* Interactive Tags Ribbon Strip */}
         {allTags.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+          <div className="bin-detail-tags flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
             <button
+              aria-pressed={!selectedTag}
               onClick={() => setSelectedTag(null)}
               className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-2xs ${
                 !selectedTag
@@ -1494,6 +1507,7 @@ const BinDetailsScreen: React.FC = () => {
               return (
                 <button
                   key={tag}
+                  aria-pressed={isSelected}
                   onClick={() => setSelectedTag(isSelected ? null : tag)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shadow-2xs ${
                     isSelected
@@ -1517,7 +1531,7 @@ const BinDetailsScreen: React.FC = () => {
 
         {/* Content View: Empty State vs Grid View vs List View */}
         {filteredItems.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-dashed border-slate-200 p-12 text-center max-w-md mx-auto my-10 shadow-sm">
+          <div className="bin-detail-empty">
             <div className="w-14 h-14 mx-auto mb-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center text-slate-400 shadow-2xs">
               <Package className="w-7 h-7" />
             </div>
@@ -1558,7 +1572,7 @@ const BinDetailsScreen: React.FC = () => {
           </div>
         ) : viewMode === "grid" ? (
           /* Redesigned Card Grid View */
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="bin-detail-grid">
             {filteredItems.map((item) => {
               const qty = Number(item.quantity ?? item.cuantity) || 1;
               const val = Number(item.value) || 0;
@@ -1566,11 +1580,11 @@ const BinDetailsScreen: React.FC = () => {
               return (
                 <div
                   key={item.id}
-                  className="group relative bg-white rounded-3xl border border-slate-200/80 hover:border-slate-300 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between overflow-hidden h-full"
+                  className="bin-detail-item group"
                 >
                   {/* Image Viewport */}
                   <div
-                    className="relative aspect-[4/3] bg-slate-50 overflow-hidden cursor-pointer select-none border-b border-slate-100"
+                    className="bin-detail-item-image"
                     onClick={() => {
                       if (item.imageUrl) {
                         setSelectedModalImage(item.imageUrl);
@@ -1625,7 +1639,7 @@ const BinDetailsScreen: React.FC = () => {
                   </div>
 
                   {/* Card Body */}
-                  <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
+                  <div className="bin-detail-item-body">
                     <div>
                       {/* Item Title */}
                       <h3
@@ -1698,7 +1712,7 @@ const BinDetailsScreen: React.FC = () => {
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-sm p-5">
+                          <AlertDialogContent className="workspace-safe-dialog rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-sm p-5">
                             <AlertDialogHeader>
                               <AlertDialogTitle className="text-base font-black text-slate-900">
                                 {t("containers.deleteItemConfirmTitle", { name: item.name, defaultValue: `Delete "${item.name}"?` })}
@@ -1729,7 +1743,7 @@ const BinDetailsScreen: React.FC = () => {
           </div>
         ) : (
           /* Redesigned Table / List View */
-          <div className="divide-y divide-slate-100 bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div className="bin-detail-list">
             {filteredItems.map((item) => {
               const qty = Number(item.quantity ?? item.cuantity) || 1;
               const val = Number(item.value) || 0;
@@ -1737,7 +1751,7 @@ const BinDetailsScreen: React.FC = () => {
               return (
                 <div
                   key={item.id}
-                  className="group flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/90 transition-colors gap-4"
+                  className="bin-detail-list-row group"
                 >
                   {/* Left: Thumbnail & Details */}
                   <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -1828,7 +1842,7 @@ const BinDetailsScreen: React.FC = () => {
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </AlertDialogTrigger>
-                        <AlertDialogContent className="rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-sm p-5">
+                        <AlertDialogContent className="workspace-safe-dialog rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-sm p-5">
                           <AlertDialogHeader>
                             <AlertDialogTitle className="text-base font-black text-slate-900">
                               {t("containers.deleteItemConfirmTitle", { name: item.name, defaultValue: `Delete "${item.name}"?` })}
@@ -1861,7 +1875,7 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 1. Add Item Dialog */}
       <Dialog open={isAddItemOpen} onOpenChange={setIsAddItemOpen}>
-        <DialogContent className="max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
+        <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
               <Plus className="w-5 h-5 text-blue-600" />
@@ -1897,7 +1911,7 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 2. Edit Item Dialog */}
       <Dialog open={isEditItemOpen} onOpenChange={setIsEditItemOpen}>
-        <DialogContent className="max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
+        <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
               <Edit3 className="w-5 h-5 text-blue-600" />
@@ -1933,7 +1947,7 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 3. Edit Container Dialog */}
       <Dialog open={isEditBinOpen} onOpenChange={setIsEditBinOpen}>
-        <DialogContent className="max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
+        <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
               <Box className="w-5 h-5 text-blue-600" />
@@ -2013,7 +2027,7 @@ const BinDetailsScreen: React.FC = () => {
 
       {/* 4. Bulk Upload Dialog */}
       <Dialog open={isBulkUploadOpen} onOpenChange={setIsBulkUploadOpen}>
-        <DialogContent className="max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
+        <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
               <UploadCloud className="w-5 h-5 text-blue-600" />
@@ -2083,7 +2097,7 @@ const BinDetailsScreen: React.FC = () => {
       {/* 5. Clean Image Zoom Modal */}
       <Dialog open={isImageModalOpen} onOpenChange={setIsImageModalOpen}>
         <DialogContent
-          className="max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-3xl border-0 shadow-2xl bg-black/95 text-white"
+          className="workspace-safe-dialog max-w-4xl max-h-[90vh] p-0 overflow-hidden rounded-3xl border-0 shadow-2xl bg-black/95 text-white"
           showCloseButton={false}
         >
           <div className="relative w-full h-[75vh] flex items-center justify-center select-none overflow-hidden">

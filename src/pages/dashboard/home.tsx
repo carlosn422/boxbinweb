@@ -240,8 +240,8 @@ export default function HomeScreen() {
       const filtered = binsWithQRCodes.filter((bin) => {
         const matchesSearch = searchTerm
           ? [bin.name, bin.description, bin.qrcodeId].some((field) =>
-              normalizeText(field).includes(normalizedSearch)
-            )
+            normalizeText(field).includes(normalizedSearch)
+          )
           : true;
 
         const matchesLocation = currentLocFilter
@@ -293,8 +293,8 @@ export default function HomeScreen() {
 
       const filtered = searchTerm
         ? locData.filter((loc) =>
-            normalizeText(loc.name).includes(normalizeText(searchTerm))
-          )
+          normalizeText(loc.name).includes(normalizeText(searchTerm))
+        )
         : locData;
       setFilteredLocations(filtered);
 
@@ -437,21 +437,24 @@ export default function HomeScreen() {
     }
   };
 
-  // --- COMPACT SPACE-OPTIMIZED CARDS ---
+  // Existing inventory content, with the reference palette and surfaces.
   const renderBinCard = (bin: Bin) => (
     <div
       key={bin.id}
-      className="group relative bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[152px]"
+      className="inventory-card group"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click(); } }}
       onClick={() => navigate(`/bin-details/${bin.id}`)}
     >
       {/* Top Header Row */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="inventory-card-top">
         <div className="flex items-center space-x-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors shrink-0">
+          <div className="inventory-card-icon">
             <Package className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight">
+            <h3 className="inventory-card-title">
               {bin.name}
             </h3>
             {bin.location?.name && (
@@ -481,7 +484,7 @@ export default function HomeScreen() {
       </div>
 
       {/* Description */}
-      <div className="my-1.5">
+      <div className="inventory-card-description">
         <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
           {bin.description || (
             <span className="text-slate-300 italic">No description</span>
@@ -490,7 +493,7 @@ export default function HomeScreen() {
       </div>
 
       {/* Footer Info Row */}
-      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+      <div className="inventory-card-footer">
         <div className="flex items-center gap-1.5 font-medium text-slate-700">
           <Layers className="w-3 h-3 text-slate-400" />
           <span>{bin.itemCount ?? 0} items</span>
@@ -503,13 +506,16 @@ export default function HomeScreen() {
   const renderLocationCard = (location: Location) => (
     <div
       key={location.id}
-      className="group relative bg-white rounded-xl border border-slate-200/90 hover:border-slate-300 p-3.5 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[152px]"
+      className="inventory-card group"
+      role="button"
+      tabIndex={0}
+      onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click(); } }}
       onClick={() => handleLocationFilter(location)}
     >
       {/* Top Header Row */}
-      <div className="flex items-start justify-between gap-2">
+      <div className="inventory-card-top">
         <div className="flex items-center space-x-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100/70 flex items-center justify-center text-blue-600 shrink-0">
+          <div className="inventory-card-icon">
             {location.type === "warehouse" ? (
               <Building2 className="w-4 h-4" />
             ) : (
@@ -517,7 +523,7 @@ export default function HomeScreen() {
             )}
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight">
+            <h3 className="inventory-card-title">
               {location.name}
             </h3>
             <span className="text-[11px] text-slate-400">Location</span>
@@ -528,7 +534,7 @@ export default function HomeScreen() {
       </div>
 
       {/* Description */}
-      <div className="my-1.5">
+      <div className="inventory-card-description">
         <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
           {location.description || (
             <span className="text-slate-300 italic">No description</span>
@@ -537,7 +543,7 @@ export default function HomeScreen() {
       </div>
 
       {/* Footer Metrics */}
-      <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+      <div className="inventory-card-footer">
         <div className="flex items-center gap-3">
           <span className="text-slate-700 font-medium">
             <strong>{location.binCount ?? 0}</strong> Bins
@@ -621,7 +627,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="inventory-home">
       {/* Impersonation Banner */}
       {userImpersonated && (
         <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5">
@@ -641,13 +647,13 @@ export default function HomeScreen() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
+      <div className="inventory-content">
         {/* Compact Top Bar */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="inventory-header">
           <div className="flex items-center space-x-3">
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+                <h1 className="inventory-title">
                   {t("dashboard.title")}
                 </h1>
                 {subscription?.plan && subscription.plan !== "Unknown Plan" && (
@@ -656,18 +662,18 @@ export default function HomeScreen() {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="inventory-subtitle">
                 {t("dashboard.subtitle")}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="inventory-header-actions">
             <Button
               variant="outline"
               size="sm"
               onClick={() => openBinCopilot("", "")}
-              className="h-8 px-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-blue-800 hover:from-blue-100 hover:to-indigo-100 rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
+              className="inventory-copilot-action"
               title={ct('askCopilot')}
             >
               <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
@@ -679,7 +685,7 @@ export default function HomeScreen() {
               size="sm"
               onClick={handleRefresh}
               disabled={isRefreshing}
-              className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
+              className="inventory-refresh"
               title="Refresh inventory data"
             >
               <RefreshCw
@@ -692,7 +698,7 @@ export default function HomeScreen() {
 
             <Button
               onClick={() => setIsAddBinModalOpen(true)}
-              className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
+              className="inventory-new"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{t("dashboard.new")}</span>
@@ -701,9 +707,9 @@ export default function HomeScreen() {
         </div>
 
         {/* Space-Optimized KPI Stat Ribbon (Compact 62px height!) */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="inventory-stats">
           {/* Card 1: Total Bins */}
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+          <div className="inventory-stat-card">
             <div className="flex items-center space-x-3">
               <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
                 <Package className="w-4.5 h-4.5" />
@@ -723,7 +729,7 @@ export default function HomeScreen() {
           </div>
 
           {/* Card 2: Locations */}
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+          <div className="inventory-stat-card">
             <div className="flex items-center space-x-3">
               <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
                 <MapPin className="w-4.5 h-4.5" />
@@ -743,7 +749,7 @@ export default function HomeScreen() {
           </div>
 
           {/* Card 3: Total Items */}
-          <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
+          <div className="inventory-stat-card">
             <div className="flex items-center space-x-3">
               <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                 <TrendingUp className="w-4.5 h-4.5" />
@@ -767,11 +773,11 @@ export default function HomeScreen() {
         <Tabs
           value={activeTab}
           onValueChange={(val) => setActiveTab(val as "bins" | "locations")}
-          className="space-y-3.5"
+          className="inventory-tabs"
         >
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 bg-white p-2 rounded-xl border border-slate-200/80 shadow-2xs">
+          <div className="inventory-controls">
             {/* Segmented Pill Tabs */}
-            <TabsList className="bg-slate-100 p-0.5 rounded-lg h-8 grid grid-cols-2 w-full sm:w-64 border border-slate-200/70">
+            <TabsList className="inventory-tab-list">
               <TabsTrigger
                 value="bins"
                 className="flex items-center justify-center gap-1.5 text-xs font-semibold data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-2xs rounded-md transition-all h-7 px-2"
@@ -812,14 +818,15 @@ export default function HomeScreen() {
             )}
 
             {/* Search Box & View Mode Toggle */}
-            <div className="flex items-center gap-2 flex-1 sm:justify-end">
-              <div className="relative flex-1 sm:max-w-xs">
+            <div className="inventory-search-and-view">
+              <div className="inventory-search">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
                 <Input
+                  aria-label={t(`search.${activeTab}Placeholder`)}
                   value={currentSearchText}
                   onChange={(e) => setCurrentSearchText(e.target.value)}
                   placeholder={t(`search.${activeTab}Placeholder`)}
-                  className="pl-8 pr-7 h-8 bg-slate-50/80 border-slate-200 rounded-lg text-xs placeholder:text-slate-400 focus:bg-white focus:border-slate-300"
+                  className="inventory-search-input"
                 />
                 {currentSearchText && (
                   <button
@@ -832,7 +839,7 @@ export default function HomeScreen() {
               </div>
 
               {/* View Mode Toggle */}
-              <div className="flex items-center p-0.5 bg-slate-100 border border-slate-200/80 rounded-lg">
+              <div className="inventory-view-switch">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -842,6 +849,7 @@ export default function HomeScreen() {
                       ? "bg-white text-slate-900 shadow-2xs font-bold"
                       : "text-slate-400 hover:text-slate-700"
                   }`}
+                  aria-pressed={viewMode === "grid"}
                   title="Grid view"
                 >
                   <Grid className="w-3.5 h-3.5" />
@@ -855,6 +863,7 @@ export default function HomeScreen() {
                       ? "bg-white text-slate-900 shadow-2xs font-bold"
                       : "text-slate-400 hover:text-slate-700"
                   }`}
+                  aria-pressed={viewMode === "list"}
                   title="List view"
                 >
                   <List className="w-3.5 h-3.5" />
@@ -898,7 +907,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 {viewMode === "grid" ? (
-                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5">
+                  <div className="inventory-grid">
                     {filteredBins.map(renderBinCard)}
                   </div>
                 ) : (
@@ -945,7 +954,7 @@ export default function HomeScreen() {
             ) : (
               <>
                 {viewMode === "grid" ? (
-                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5">
+                  <div className="inventory-grid">
                     {filteredLocations.map(renderLocationCard)}
                   </div>
                 ) : (

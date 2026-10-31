@@ -405,7 +405,7 @@ export function CopilotArtifactEditor({
     >
       <DialogContent
         closeLabel={ct('close')}
-        className="z-[200] !w-[96vw] !max-w-[96vw] sm:!w-[95vw] sm:!max-w-[95vw] md:!w-[94vw] md:!max-w-[94vw] lg:!w-[92vw] lg:!max-w-[1440px] xl:!max-w-[1560px] 2xl:!max-w-[1720px] h-[95dvh] sm:h-[92dvh] flex flex-col p-4 sm:p-6 overflow-hidden bg-white rounded-2xl shadow-2xl border border-slate-200/80"
+        className="workspace-safe-dialog copilot-artifact-dialog z-[200] !w-[96vw] !max-w-[96vw] sm:!w-[95vw] sm:!max-w-[95vw] md:!w-[94vw] md:!max-w-[94vw] lg:!w-[92vw] lg:!max-w-[1440px] xl:!max-w-[1560px] 2xl:!max-w-[1720px] h-[95dvh] sm:h-[92dvh] flex flex-col p-4 sm:p-6 overflow-hidden bg-white rounded-2xl shadow-2xl border border-slate-200/80"
         onInteractOutside={(e) => e.preventDefault()}
       >
         {/* Top Header Bar */}

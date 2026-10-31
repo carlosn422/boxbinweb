@@ -73,7 +73,7 @@ export const ModalMessage: React.FC<ModalProps> = ({
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent className={`${config.bgColor} ${config.borderColor} border-2`}>
+      <AlertDialogContent className={`workspace-safe-dialog ${config.bgColor} ${config.borderColor} border-2`}>
         <AlertDialogHeader>
           <div className="flex items-center gap-3">
             <IconComponent className={`h-6 w-6 ${config.iconColor}`} />

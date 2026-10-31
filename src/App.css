@@ -2,8 +2,8 @@
 
 /* Reset básico para el root */
 #root {
-  height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   margin: 0;
   padding: 0;
   /* ELIMINADO: overflow: hidden; - Esto bloqueaba el scroll */

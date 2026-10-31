@@ -1,0 +1,10 @@
+.responsive-disclosure-toggle { display: none; }
+@media (max-width: 767px) {
+  .responsive-disclosure { min-width: 0; }
+  .responsive-disclosure-toggle { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; color: #7b7873; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .responsive-disclosure-toggle svg { width: 15px; height: 15px; flex-shrink: 0; transition: transform .15s; }
+  .responsive-disclosure[data-expanded="true"] > .responsive-disclosure-toggle svg { transform: rotate(180deg); }
+  .responsive-disclosure[data-expanded="false"] > .responsive-disclosure-content { display: none; }
+  .responsive-disclosure-toggle:focus-visible { outline: 2px solid #6960ed; outline-offset: 3px; border-radius: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .responsive-disclosure-toggle svg { transition: none; } }

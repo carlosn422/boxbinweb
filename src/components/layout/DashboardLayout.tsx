@@ -1,3 +1,4 @@
+import "./dashboard.css";
 import { useAuth } from "@/context/AuthContext";
 import { Sidebar } from "./Sidebar";
 import { BoxBinCopilotDrawer } from "@/components/ai/BoxBinCopilotDrawer";
@@ -9,15 +10,15 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const { currentUser } = useAuth();
   return (
-    <div className="flex flex-col md:flex-row h-screen overflow-hidden safe-top safe-bottom bg-slate-50/50 font-sans">
+    <div className="boxbin-dashboard">
       {/* Sidebar (Desktop navigation + Mobile top bar & slide-over drawer) */}
       <Sidebar />
       
       {/* Main Content */}
-      <div className="flex flex-1 flex-col overflow-hidden min-w-0">
+      <div className="boxbin-main">
         {/* Page Content */}
-        <main className="flex-1 overflow-auto bg-slate-50/50">
-          <div className="mx-auto max-w-7xl">
+        <main className="boxbin-main-scroll">
+          <div className="boxbin-page">
             {children}
           </div>
         </main>
