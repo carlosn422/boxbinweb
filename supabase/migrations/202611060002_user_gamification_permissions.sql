@@ -5,3 +5,4 @@ begin;
 grant select, insert, update, delete on public.user_gamification to anon, authenticated;
 
 commit;
+
