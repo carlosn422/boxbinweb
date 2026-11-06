@@ -671,15 +671,23 @@ export default function HomeScreen() {
 
         </div>
 
-        {/* Primary inventory action and supporting controls share the reference's card hierarchy. */}
+        {/* Primary inventory action and supporting controls */}
         <div className="inventory-overview">
+          {/* Card 1: Total Containers Hero */}
           <section className="inventory-summary-card" aria-label={t("dashboard.totalBins")}>
-            <div className="inventory-summary-copy">
-              <span className="inventory-summary-label"><Package aria-hidden="true" />{t("dashboard.totalBins")}</span>
-              <strong className="inventory-summary-count">{stats.totalBins}</strong>
-              <span className="inventory-summary-note">{t("dashboard.summaryHint")}</span>
+            <div className="inventory-summary-main">
+              <div className="inventory-summary-copy">
+                <span className="inventory-summary-label">
+                  <Package className="w-3.5 h-3.5 text-brand-600" aria-hidden="true" />
+                  {t("dashboard.totalBins")}
+                </span>
+                <div className="inventory-summary-count-row">
+                  <strong className="inventory-summary-count">{stats.totalBins}</strong>
+                  <span className="inventory-summary-note">{t("dashboard.summaryHint")}</span>
+                </div>
+              </div>
+              <StorageBinIllustration className="inventory-summary-art" />
             </div>
-            <StorageBinIllustration className="inventory-summary-art" />
             <Button
               onClick={() => setIsAddBinModalOpen(true)}
               className="inventory-new"
@@ -688,6 +696,39 @@ export default function HomeScreen() {
               <span>{t("dashboard.new")}</span>
             </Button>
           </section>
+
+          {/* Stat Cards: Locations & Total Items */}
+          <div className="inventory-stats">
+            {/* Card 2: Locations */}
+            <div className="inventory-stat-card">
+              <div className="inventory-stat-header">
+                <div className="inventory-stat-icon-wrap bg-amber-50 text-amber-700 border border-amber-200/70">
+                  <MapPin className="w-3.5 h-3.5" />
+                </div>
+                <span className="inventory-stat-label">{t("dashboard.locations")}</span>
+              </div>
+              <div className="inventory-stat-body">
+                <strong className="inventory-stat-count">{stats.totalLocations}</strong>
+                <span className="inventory-stat-hint">{t("dashboard.warehousesHint")}</span>
+              </div>
+            </div>
+
+            {/* Card 3: Total Items */}
+            <div className="inventory-stat-card">
+              <div className="inventory-stat-header">
+                <div className="inventory-stat-icon-wrap bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                </div>
+                <span className="inventory-stat-label">{t("dashboard.totalItems")}</span>
+              </div>
+              <div className="inventory-stat-body">
+                <strong className="inventory-stat-count">{stats.totalItems}</strong>
+                <span className="inventory-stat-hint">{t("dashboard.itemsHint")}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 4: Quick Actions */}
           <div className="inventory-quick-actions">
             <Button
               variant="outline"
@@ -696,8 +737,13 @@ export default function HomeScreen() {
               className="inventory-copilot-action"
               title={ct('askCopilot')}
             >
-              <Sparkles className="w-3.5 h-3.5 text-brand-600" />
-              <span>{ct('aiCopilot')}</span>
+              <div className="inventory-action-icon-wrap bg-amber-50 text-brand-600 border border-amber-200/70">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <div className="inventory-action-text">
+                <span className="inventory-action-title">{ct('aiCopilot')}</span>
+                <span className="inventory-action-sub">{t("dashboard.copilotHint")}</span>
+              </div>
             </Button>
 
             <Button
@@ -708,58 +754,19 @@ export default function HomeScreen() {
               className="inventory-refresh"
               title={t("dashboard.refresh")}
             >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${
-                  isRefreshing ? "animate-spin text-brand-600" : "text-slate-500"
-                }`}
-              />
-              <span>{t("dashboard.refresh")}</span>
+              <div className="inventory-action-icon-wrap bg-slate-100 text-slate-600 border border-slate-200">
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${
+                    isRefreshing ? "animate-spin text-brand-600" : "text-slate-600"
+                  }`}
+                />
+              </div>
+              <div className="inventory-action-text">
+                <span className="inventory-action-title">{t("dashboard.refresh")}</span>
+                <span className="inventory-action-sub">{t("dashboard.syncHint")}</span>
+              </div>
             </Button>
           </div>
-
-        {/* Existing location and item totals remain visible beside the primary card. */}
-        <div className="inventory-stats">
-          {/* Card 2: Locations */}
-          <div className="inventory-stat-card">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
-                <MapPin className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {t("dashboard.locations")}
-                </p>
-                <h3 className="text-lg font-black text-slate-900 leading-tight">
-                  {stats.totalLocations}
-                </h3>
-              </div>
-            </div>
-            <span className="text-[11px] text-slate-400 hidden xl:inline">
-              Warehouses
-            </span>
-          </div>
-
-          {/* Card 3: Total Items */}
-          <div className="inventory-stat-card">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
-                <TrendingUp className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {t("dashboard.totalItems")}
-                </p>
-                <h3 className="text-lg font-black text-slate-900 leading-tight">
-                  {stats.totalItems}
-                </h3>
-              </div>
-            </div>
-            <span className="text-[11px] text-slate-400 hidden xl:inline">
-              Cataloged
-            </span>
-          </div>
-        </div>
-
         </div>
 
         {/* Integrated Unified Controls Row (Tabs + Search + Filter + View Toggle) */}

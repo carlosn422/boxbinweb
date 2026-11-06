@@ -62,7 +62,11 @@
       "bins": "Contenedores ({{count}})",
       "locations": "Ubicaciones ({{count}})"
     },
-    "new": "Nuevo Contenedor"
+    "new": "Nuevo Contenedor",
+    "warehousesHint": "Almacenes y espacios",
+    "itemsHint": "Artículos registrados",
+    "copilotHint": "Asistente de voz y chat",
+    "syncHint": "Sincronizar datos"
   },
   "view": {
     "grid": "Cuadrícula",

@@ -62,7 +62,11 @@
     },
     "new": "Add New Container",
     "by": "by",
-    "stopImpersonation": "Stop Impersonation"
+    "stopImpersonation": "Stop Impersonation",
+    "warehousesHint": "Warehouses & rooms",
+    "itemsHint": "Cataloged items",
+    "copilotHint": "Voice & chat assistant",
+    "syncHint": "Sync inventory"
   },
   "view": {
     "grid": "Grid",
