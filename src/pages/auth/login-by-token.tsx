@@ -101,23 +101,13 @@ const LoginByToken = () => {
     <div className="min-h-screen w-full bg-slate-50 flex flex-col justify-between items-center font-sans p-6 selection:bg-brand-100 selection:text-brand-900">
       {/* Header */}
       <div className="w-full max-w-5xl py-4 flex items-center justify-center">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center p-1">
-            <img
-              src={LogoIcon}
-              alt="BoxBin"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="font-bold text-lg text-slate-900 tracking-tight">
-              BoxBin
-            </span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
-              App
-            </span>
-          </div>
-        </div>
+        <a href="/" className="flex items-center group transition-transform hover:opacity-95">
+          <img
+            src={LogoIcon}
+            alt="BoxBin.io"
+            className="h-10 sm:h-12 w-auto object-contain"
+          />
+        </a>
       </div>
 
       {/* Main Card */}

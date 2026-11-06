@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 import { copilotText as ct } from "@/lib/copilotI18n";
 import { openBinCopilot } from "@/services/boxbinCopilotService";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import LogoIcon from "@/assets/logo.png";
+import LogoFull from "@/assets/logo-full.png";
+import LogoIcon from "@/assets/logo-icon.png";
 import { LanguageSelector } from "./LanguageSelector";
 import { Home, QrCode, MapPin, Users, CreditCard, Sparkles, Download, LogOut, ChevronLeft, ChevronRight, MoreHorizontal, Bot } from "lucide-react";
 
@@ -101,9 +102,12 @@ export function Sidebar({ className }: SidebarProps) {
     return (parts.length > 1 ? parts[0][0] + parts[1][0] : parts[0].slice(0, 2)).toUpperCase();
   };
   const brand = (compact = false) => (
-    <button className="boxbin-brand" onClick={() => goTo("/home")} aria-label="BoxBin">
-      <img className="boxbin-brand-logo" src={LogoIcon} alt="" />
-      {!compact && <span>BoxBin<span className="text-brand-500">.io</span></span>}
+    <button className="boxbin-brand" onClick={() => goTo("/home")} aria-label="BoxBin.io">
+      {compact ? (
+        <img className="boxbin-brand-logo" src={LogoIcon} alt="BoxBin" />
+      ) : (
+        <img className="boxbin-brand-full" src={LogoFull} alt="BoxBin.io" />
+      )}
     </button>
   );
   const navigation = (compact: boolean) => (

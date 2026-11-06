@@ -32,12 +32,9 @@ const NotFoundPage = () => {
         >
           <img
             src={LogoIcon}
-            alt="BoxBin"
-            className="w-9 h-9 object-contain group-hover:scale-105 transition-transform"
+            alt="BoxBin.io"
+            className="h-10 w-auto object-contain group-hover:scale-105 transition-transform"
           />
-          <span className="font-bold text-lg tracking-tight text-slate-900">
-            BoxBin
-          </span>
         </div>
 
         <Button

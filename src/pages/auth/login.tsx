@@ -92,23 +92,13 @@ const LoginPage = () => {
           href="https://boxbin.io"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center space-x-2.5 group"
+          className="flex items-center group transition-transform hover:opacity-95"
         >
-          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center p-1 group-hover:border-brand-300 transition-colors">
-            <img
-              src={LogoIcon}
-              alt="BoxBin"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className="font-bold text-lg text-slate-900 group-hover:text-brand-600 transition-colors tracking-tight">
-              BoxBin
-            </span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
-              App
-            </span>
-          </div>
+          <img
+            src={LogoIcon}
+            alt="BoxBin.io"
+            className="h-10 sm:h-12 w-auto object-contain"
+          />
         </a>
 
         <div className="flex items-center space-x-3">
@@ -170,11 +160,11 @@ const LoginPage = () => {
               <div className="bg-white rounded-2xl border border-slate-200/90 shadow-sm p-8 sm:p-9">
                 {/* Header with centered clean logo badge */}
                 <div className="flex flex-col items-center text-center mb-6">
-                  <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200/80 shadow-2xs flex items-center justify-center p-2 mb-3">
+                  <div className="h-12 w-auto flex items-center justify-center mb-3">
                     <img
                       src={LogoIcon}
-                      alt="BoxBin"
-                      className="w-full h-full object-contain"
+                      alt="BoxBin.io"
+                      className="h-11 w-auto object-contain"
                     />
                   </div>
                   <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
