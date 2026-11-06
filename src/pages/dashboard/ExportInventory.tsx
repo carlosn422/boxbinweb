@@ -160,7 +160,7 @@ export default function ExportInventory() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
       {/* Impersonation Banner if active */}
       {userImpersonated && (
         <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5">
@@ -188,7 +188,7 @@ export default function ExportInventory() {
               </h1>
               <Badge
                 variant="outline"
-                className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border-blue-200"
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border-brand-200"
               >
                 {t("export.pdfSuite", { defaultValue: "PDF Suite" })}
               </Badge>
@@ -228,7 +228,7 @@ export default function ExportInventory() {
         {/* Compact KPI Stats Ribbon */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
               <FileText className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -256,7 +256,7 @@ export default function ExportInventory() {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
               <Images className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -330,7 +330,7 @@ export default function ExportInventory() {
             <CardHeader className="p-4 border-b border-slate-100 flex flex-row items-start justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
                     <FileText className="w-4 h-4" />
                   </div>
                   <div>
@@ -347,7 +347,7 @@ export default function ExportInventory() {
                   </div>
                 </div>
               </div>
-              <Badge variant="outline" className="text-[10px] font-semibold bg-blue-50 text-blue-700 border-blue-200">
+              <Badge variant="outline" className="text-[10px] font-semibold bg-brand-50 text-brand-700 border-brand-200">
                 {t("export.recommended", { defaultValue: "Recommended" })}
               </Badge>
             </CardHeader>
@@ -363,7 +363,7 @@ export default function ExportInventory() {
 
                 <div className="rounded-lg bg-slate-50/70 border border-slate-200/70 p-3 space-y-2 text-xs text-slate-600">
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureLocationBreakdown", {
                         defaultValue: "Location-by-location bin breakdown",
@@ -371,7 +371,7 @@ export default function ExportInventory() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureBarcodeTracking", {
                         defaultValue: "Barcode & Smart Label tracking codes",
@@ -379,7 +379,7 @@ export default function ExportInventory() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureCategoriesValuation", {
                         defaultValue: "Item categories, unit values & quantities",
@@ -387,7 +387,7 @@ export default function ExportInventory() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureCertifiedTimestamp", {
                         defaultValue:
@@ -429,7 +429,7 @@ export default function ExportInventory() {
             <CardHeader className="p-4 border-b border-slate-100 flex flex-row items-start justify-between">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
                     <Images className="w-4 h-4" />
                   </div>
                   <div>
@@ -446,7 +446,7 @@ export default function ExportInventory() {
                   </div>
                 </div>
               </div>
-              <Badge variant="outline" className="text-[10px] font-semibold bg-purple-50 text-purple-700 border-purple-200">
+              <Badge variant="outline" className="text-[10px] font-semibold bg-brand-50 text-brand-700 border-brand-200">
                 {t("export.visualBinder", { defaultValue: "Visual Binder" })}
               </Badge>
             </CardHeader>
@@ -462,7 +462,7 @@ export default function ExportInventory() {
 
                 <div className="rounded-lg bg-slate-50/70 border border-slate-200/70 p-3 space-y-2 text-xs text-slate-600">
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureHighResPhotos", {
                         defaultValue: "High-resolution item photo cards",
@@ -470,7 +470,7 @@ export default function ExportInventory() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureVisualBinTags", {
                         defaultValue: "Visual bin tags & storage location chips",
@@ -478,7 +478,7 @@ export default function ExportInventory() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureOptimized3x2", {
                         defaultValue:
@@ -487,7 +487,7 @@ export default function ExportInventory() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />
                     <span>
                       {t("export.featureQrVerificationTags", {
                         defaultValue:
@@ -515,7 +515,7 @@ export default function ExportInventory() {
                     </>
                   ) : (
                     <>
-                      <Download className="w-3.5 h-3.5 text-purple-600" />
+                      <Download className="w-3.5 h-3.5 text-brand-600" />
                       <span>
                         {t("export.downloadVisualPdf", {
                           defaultValue: "Download Visual Catalog PDF",
@@ -533,7 +533,7 @@ export default function ExportInventory() {
         <Card className="border-slate-200/80 shadow-2xs bg-white rounded-xl overflow-hidden">
           <CardHeader className="p-4 border-b border-slate-100">
             <CardTitle className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-blue-600" />
+              <ShieldCheck className="w-4 h-4 text-brand-600" />
               {t("export.exportInfoTitle") || "Report Specifications & Standards"}
             </CardTitle>
           </CardHeader>

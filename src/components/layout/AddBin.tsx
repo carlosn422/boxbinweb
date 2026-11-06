@@ -251,15 +251,15 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                         key={location.id}
                         onClick={() => handleLocationSelect(location)}
                         className={`group flex items-center justify-between p-3 rounded-xl border transition-all cursor-pointer ${isSelected
-                          ? "bg-blue-50/80 border-blue-200 text-blue-900 shadow-2xs"
+                          ? "bg-brand-50/80 border-brand-200 text-brand-900 shadow-2xs"
                           : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80 text-slate-900"
                           }`}
                       >
                         <div className="flex items-center space-x-3 min-w-0">
                           <div
                             className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isSelected
-                              ? "bg-blue-600 text-white"
-                              : "bg-slate-100 text-slate-500 group-hover:bg-blue-50 group-hover:text-blue-600"
+                              ? "bg-brand-600 text-white"
+                              : "bg-slate-100 text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-600"
                               }`}
                           >
                             <Building2 className="w-3.5 h-3.5" />
@@ -277,7 +277,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                         </div>
 
                         {isSelected && (
-                          <div className="w-5 h-5 rounded-full bg-blue-600 text-white flex items-center justify-center shrink-0">
+                          <div className="w-5 h-5 rounded-full bg-brand-600 text-white flex items-center justify-center shrink-0">
                             <Check className="w-3 h-3" />
                           </div>
                         )}
@@ -359,7 +359,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                     className="w-full flex items-center justify-between p-2.5 rounded-xl border border-dashed border-slate-200 hover:border-slate-300 hover:bg-slate-50/80 transition-all text-left group"
                   >
                     <div className="flex items-center space-x-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-blue-600 group-hover:bg-blue-50 transition-colors">
+                      <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-brand-600 group-hover:bg-brand-50 transition-colors">
                         <Plus className="w-3.5 h-3.5" />
                       </div>
                       <div>
@@ -373,20 +373,20 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                         </p>
                       </div>
                     </div>
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-600 transition-colors mr-1" />
+                    <MapPin className="w-3.5 h-3.5 text-slate-400 group-hover:text-brand-600 transition-colors mr-1" />
                   </button>
                 ) : (
-                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 shadow-2xs">
+                  <div className="flex items-center justify-between p-2.5 rounded-xl bg-brand-50/70 border border-brand-200/80 shadow-2xs">
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <div className="w-7 h-7 rounded-lg bg-blue-100/90 flex items-center justify-center text-blue-700 shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-brand-100/90 flex items-center justify-center text-brand-700 shrink-0">
                         <MapPin className="w-3.5 h-3.5" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-blue-900 truncate">
+                        <p className="text-xs font-semibold text-brand-900 truncate">
                           {selectedLocation.name}
                         </p>
                         {selectedLocation.address && (
-                          <p className="text-[10px] text-blue-700/80 truncate">
+                          <p className="text-[10px] text-brand-700/80 truncate">
                             {selectedLocation.address}
                           </p>
                         )}
@@ -397,7 +397,7 @@ export const AddBinModal: React.FC<AddBinModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setShowLocationSelector(true)}
-                        className="px-2 py-1 text-blue-700 hover:text-blue-900 text-[11px] font-semibold hover:underline"
+                        className="px-2 py-1 text-brand-700 hover:text-brand-900 text-[11px] font-semibold hover:underline"
                       >
                         {t("addBin.change", { defaultValue: "Change" })}
                       </button>

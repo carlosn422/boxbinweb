@@ -47,6 +47,8 @@
     "smartLabels": "Etiquetas inteligentes"
   },
   "dashboard": {
+    "refresh": "Actualizar",
+    "summaryHint": "Un lugar para cada cosa.",
     "loading": "Cargando panel...",
     "title": "Resumen de Inventario",
     "by": "por",
@@ -637,6 +639,7 @@
     }
   },
   "copilot": {
+    "callAction": "Llamada de voz",
     "registerItem": "Registrar ítem",
     "createBin": "Crear caja",
     "moveItem": "Mover ítem",
@@ -719,7 +722,7 @@
     "unsupportedDictation": "Este navegador no admite dictado.",
     "queryLabel": "Consulta al copiloto",
     "listeningDictation": "Escuchando…",
-    "queryPlaceholder": "Haz una pregunta o describe un cambio…",
+    "queryPlaceholder": "Pregunta o describe un cambio…",
     "sendQuery": "Enviar consulta",
     "focusHint": "Abre el chat desde la caja para enfocarla.",
     "user": "Usuario",

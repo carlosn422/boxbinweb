@@ -35,8 +35,8 @@ import { toast } from "sonner";
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
 const planVisuals = [
-  { icon: Package, bg: "bg-blue-50 text-blue-700", ring: "ring-blue-100" },
-  { icon: Zap, bg: "bg-purple-50 text-purple-700", ring: "ring-purple-100" },
+  { icon: Package, bg: "bg-brand-50 text-brand-700", ring: "ring-brand-100" },
+  { icon: Zap, bg: "bg-brand-50 text-brand-700", ring: "ring-brand-100" },
   { icon: Crown, bg: "bg-amber-50 text-amber-700", ring: "ring-amber-100" },
   { icon: Sparkles, bg: "bg-emerald-50 text-emerald-700", ring: "ring-emerald-100" },
 ];
@@ -198,7 +198,7 @@ export default function BillingPage() {
   const selectedPlanObj = availablePlans.find((p) => p.id === selectedPlan);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-16 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-16 font-sans">
       {/* Mobile WebView Sticky Bar */}
       {isReactNative && (
         <div className="bg-white border-b border-slate-200 px-4 py-2 sticky top-0 z-20">
@@ -285,7 +285,7 @@ export default function BillingPage() {
               </h1>
               <Badge
                 variant="outline"
-                className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200"
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full border bg-brand-50 text-brand-700 border-brand-200"
               >
                 BoxBin Cloud
               </Badge>
@@ -311,7 +311,7 @@ export default function BillingPage() {
         {/* Compact KPI Stats / Highlights Ribbon */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
               <Package className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -325,7 +325,7 @@ export default function BillingPage() {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
               <Zap className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -442,14 +442,14 @@ export default function BillingPage() {
                       isSelected
                         ? "border-slate-900 ring-2 ring-slate-900 bg-slate-50/40 shadow-sm"
                         : isPopular
-                        ? "border-blue-300 bg-white hover:border-slate-400 shadow-2xs"
+                        ? "border-brand-300 bg-white hover:border-slate-400 shadow-2xs"
                         : "border-slate-200 bg-white hover:border-slate-300 shadow-2xs"
                     }`}
                   >
                     {/* Popular Badge */}
                     {isPopular && (
                       <div className="absolute -top-2.5 left-1/2 transform -translate-x-1/2 z-10">
-                        <span className="bg-blue-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1 whitespace-nowrap">
+                        <span className="bg-brand-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1 whitespace-nowrap">
                           <Crown className="w-2.5 h-2.5" />
                           <span>{t("subscription.planPopular") || "Most Popular"}</span>
                         </span>
@@ -578,7 +578,7 @@ export default function BillingPage() {
                     >
                       {isSelected ? (
                         <>
-                          <Check className="w-3.5 h-3.5 text-blue-400" />
+                          <Check className="w-3.5 h-3.5 text-brand-400" />
                           <span>Selected Tier</span>
                         </>
                       ) : (
@@ -599,7 +599,7 @@ export default function BillingPage() {
               <CardHeader className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <ShieldCheck className="w-4 h-4 text-brand-600" />
                     <span>Complete Subscription Checkout</span>
                   </CardTitle>
                   <p className="text-xs text-slate-500 mt-0.5">

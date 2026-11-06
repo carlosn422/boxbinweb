@@ -28,7 +28,7 @@ export const Step2 = ({ templates, selected, setTemplate, onNext, onBack }: Step
         {templates.map((template) => (
           <div 
             key={template.id} 
-            className={`p-4 border rounded cursor-pointer ${selected === template.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
+            className={`p-4 border rounded cursor-pointer ${selected === template.id ? 'border-brand-500 bg-brand-50' : 'border-gray-200'}`}
             onClick={() => setTemplate(template.id)}
           >
             {template.name}
@@ -46,7 +46,7 @@ export const Step2 = ({ templates, selected, setTemplate, onNext, onBack }: Step
         <button
           onClick={onNext}
           disabled={!selected}
-          className={`flex-1 py-2 px-4 rounded ${selected ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-500'}`}
+          className={`flex-1 py-2 px-4 rounded ${selected ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-500'}`}
         >
           Continue
         </button>

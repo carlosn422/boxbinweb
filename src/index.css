@@ -1,5 +1,33 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "./styles/brand-theme.css";
+
+/* Self-hosted Fredoka: variable weights with Spanish and extended Latin support. */
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/fredoka/fredoka-latin-ext-wght.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Fredoka";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/fredoka/fredoka-latin-wght.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  --font-sans: "Fredoka", ui-rounded, system-ui, sans-serif;
+  /* Existing numeric badges and identifiers share the platform typography. */
+  --font-mono: "Fredoka", ui-rounded, system-ui, sans-serif;
+  --font-weight-extrabold: 700;
+  --font-weight-black: 700;
+}
 
 @custom-variant dark (&:is(.dark *));
 
@@ -68,38 +96,38 @@
   --workspace-dialog-bottom: max(12px, var(--app-safe-bottom));
   --workspace-dialog-left: max(12px, var(--app-safe-left));
   --workspace-dialog-right: max(12px, var(--app-safe-right));
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --radius: 1rem;
+  --background: #fffaf1;
+  --foreground: #202027;
+  --card: #fffefd;
+  --card-foreground: #202027;
+  --popover: #fffefd;
+  --popover-foreground: #202027;
+  --primary: #ffc400;
+  --primary-foreground: #202027;
+  --secondary: #f5efe4;
+  --secondary-foreground: #37332d;
+  --muted: #f5efe4;
+  --muted-foreground: #746d62;
+  --accent: #fff1be;
+  --accent-foreground: #443919;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #ece3d4;
+  --input: #e3d7c4;
+  --ring: #b88000;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --sidebar: #fffefd;
+  --sidebar-foreground: #202027;
+  --sidebar-primary: #ffc400;
+  --sidebar-primary-foreground: #202027;
+  --sidebar-accent: #fff1be;
+  --sidebar-accent-foreground: #202027;
+  --sidebar-border: #ece3d4;
+  --sidebar-ring: #b88000;
 }
 
 .dark {

@@ -251,7 +251,7 @@ export default function SocialScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
       <div className="container mx-auto px-4 sm:px-6 py-5 max-w-5xl space-y-4">
         {/* Top Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -260,7 +260,7 @@ export default function SocialScreen() {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 {t("shareAccess.title", { defaultValue: "Shared Access" })}
               </h1>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
                 {t("shareAccess.teamBadge", { defaultValue: "Team" })}
               </span>
             </div>
@@ -287,7 +287,7 @@ export default function SocialScreen() {
           <div
             onClick={() => setActiveTab("withMe")}
             className={`rounded-xl border p-3 flex items-center justify-between shadow-2xs cursor-pointer transition-all ${activeTab === "withMe"
-              ? "bg-white border-blue-500 ring-2 ring-blue-500/15"
+              ? "bg-white border-brand-500 ring-2 ring-brand-500/15"
               : "bg-white border-slate-200/80 hover:border-slate-300"
               }`}
           >
@@ -313,12 +313,12 @@ export default function SocialScreen() {
           <div
             onClick={() => setActiveTab("byMe")}
             className={`rounded-xl border p-3 flex items-center justify-between shadow-2xs cursor-pointer transition-all ${activeTab === "byMe"
-              ? "bg-white border-blue-500 ring-2 ring-blue-500/15"
+              ? "bg-white border-brand-500 ring-2 ring-brand-500/15"
               : "bg-white border-slate-200/80 hover:border-slate-300"
               }`}
           >
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <Users className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -406,7 +406,7 @@ export default function SocialScreen() {
                     </Avatar>
 
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-slate-900 text-xs group-hover:text-blue-600 transition-colors truncate">
+                      <h3 className="font-semibold text-slate-900 text-xs group-hover:text-brand-600 transition-colors truncate">
                         {account.ownerDisplayName}
                       </h3>
                       <p className="text-[11px] text-slate-400 flex items-center gap-1 mt-0.5">
@@ -424,7 +424,7 @@ export default function SocialScreen() {
                       <Shield className="w-2.5 h-2.5 mr-1" />
                       <span>{t("shareAccess.active", { defaultValue: "Active Access" })}</span>
                     </Badge>
-                    <span className="text-xs font-semibold text-blue-600 group-hover:translate-x-0.5 transition-transform flex items-center">
+                    <span className="text-xs font-semibold text-brand-600 group-hover:translate-x-0.5 transition-transform flex items-center">
                       <span>{t("shareAccess.viewInventory", { defaultValue: "View Inventory" })}</span>
                       <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
                     </span>
@@ -459,7 +459,7 @@ export default function SocialScreen() {
               >
                 <div className="flex items-center space-x-3 min-w-0">
                   <Avatar className="w-9 h-9 shrink-0 border border-slate-200">
-                    <AvatarFallback className="bg-indigo-600 text-white font-bold text-xs">
+                    <AvatarFallback className="bg-brand-600 text-white font-bold text-xs">
                       {account.grantedDisplayName?.charAt(0).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -478,7 +478,7 @@ export default function SocialScreen() {
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge
                     variant="secondary"
-                    className="bg-blue-50 text-blue-700 border-blue-200/70 text-[10px] font-semibold h-5 px-2"
+                    className="bg-brand-50 text-brand-700 border-brand-200/70 text-[10px] font-semibold h-5 px-2"
                   >
                     <Shield className="w-2.5 h-2.5 mr-1" />
                     <span>{t("shareAccess.shared", { defaultValue: "Shared" })}</span>
@@ -535,7 +535,7 @@ export default function SocialScreen() {
         <DialogContent className="sm:max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-5">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Share2 className="w-4 h-4 text-blue-600" />
+              <Share2 className="w-4 h-4 text-brand-600" />
               <span>{t("shareAccess.title", { defaultValue: "Grant Shared Access" })}</span>
             </DialogTitle>
           </DialogHeader>

@@ -1,0 +1,88 @@
+/* BoxBin's warm paper, golden yellow and charcoal visual system. */
+@theme {
+  --color-brand-50: #fff9e6;
+  --color-brand-100: #fff1be;
+  --color-brand-200: #ffe494;
+  --color-brand-300: #ffd65b;
+  --color-brand-400: #ffcc26;
+  --color-brand-500: #e8ac00;
+  --color-brand-600: #8a6200;
+  --color-brand-700: #725000;
+  --color-brand-800: #594015;
+  --color-brand-900: #3e3018;
+  --color-brand-950: #292218;
+  --color-slate-50: #fffaf1;
+  --color-slate-100: #f5efe4;
+  --color-slate-200: #ece3d4;
+  --color-slate-300: #d7cbb7;
+  --color-slate-400: #9c9180;
+  --color-slate-500: #746d62;
+  --color-slate-600: #605a50;
+  --color-slate-700: #47433e;
+  --color-slate-800: #343238;
+  --color-slate-900: #202027;
+  --color-slate-950: #141419;
+}
+
+:root {
+  --brand-ink: #725000;
+  --brand-hover: #efb500;
+  --brand-shadow: 0 2px 4px #76501a0c, 0 6px 14px #76501a08;
+}
+
+/* Solid yellow actions keep dark lettering, including legacy custom buttons. */
+.bg-brand-600,
+button.bg-slate-900,
+[data-slot="button"].bg-slate-900 {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.bg-brand-600:hover,
+button.bg-slate-900:hover,
+[data-slot="button"].bg-slate-900:hover {
+  background-color: var(--brand-hover);
+  color: var(--primary-foreground);
+}
+
+.bg-brand-600 > svg,
+button.bg-slate-900 > svg {
+  color: inherit;
+}
+
+:where([data-slot="button"]) {
+  border-radius: 14px;
+  font-weight: 600;
+}
+
+:where([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]) {
+  border-radius: 14px;
+}
+
+[data-slot="tabs-trigger"][data-state="active"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+:where([data-slot="card"], [data-slot="dialog-content"], [data-slot="alert-dialog-content"]) {
+  border-color: var(--border);
+  border-radius: 16px;
+  box-shadow: var(--brand-shadow);
+}
+
+:where(h1, h2, h3, [data-slot="dialog-title"]) {
+  font-weight: 600;
+  letter-spacing: -.025em;
+}
+
+/* Keep the existing BoxBin mark, using the reference's charcoal treatment. */
+.boxbin-brand-logo,
+img[alt="BoxBin"] {
+  filter: grayscale(1) contrast(1.8);
+  mix-blend-mode: multiply;
+}
+
+::selection {
+  background: #ffe494;
+  color: #202027;
+}

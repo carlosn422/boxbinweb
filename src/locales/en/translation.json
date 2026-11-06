@@ -47,6 +47,8 @@
     "smartLabels": "Smart Labels"
   },
   "dashboard": {
+    "refresh": "Refresh",
+    "summaryHint": "A place for everything.",
     "loading": "Loading dashboard...",
     "title": "Inventory Overview",
     "subtitle": "Manage your containers and locations efficiently",
@@ -637,6 +639,7 @@
     }
   },
   "copilot": {
+    "callAction": "Voice chat",
     "registerItem": "Register item",
     "createBin": "Create bin",
     "moveItem": "Move item",

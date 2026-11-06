@@ -28,6 +28,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useTranslation } from "react-i18next";
+import { StorageBinIllustration } from "@/components/layout/StorageBinIllustration";
 import { AddBinModal, type BinData } from "@/components/layout/AddBin";
 import { toast } from "sonner";
 import { getStripePlanById } from "@/lib/stripe";
@@ -479,7 +480,7 @@ export default function HomeScreen() {
               <span>No QR</span>
             </span>
           )}
-          <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 transition-colors" />
+          <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-brand-600 transition-colors" />
         </div>
       </div>
 
@@ -530,7 +531,7 @@ export default function HomeScreen() {
           </div>
         </div>
 
-        <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 transition-colors shrink-0" />
+        <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-brand-600 transition-colors shrink-0" />
       </div>
 
       {/* Description */}
@@ -553,7 +554,7 @@ export default function HomeScreen() {
             <strong>{location.itemCount ?? 0}</strong> Items
           </span>
         </div>
-        <span className="text-[10px] text-blue-600 font-semibold">Filter →</span>
+        <span className="text-[10px] text-brand-600 font-semibold">Filter →</span>
       </div>
     </div>
   );
@@ -576,7 +577,7 @@ export default function HomeScreen() {
                 className={`w-7 h-7 rounded-md flex items-center justify-center shrink-0 ${
                   type === "bin"
                     ? "bg-slate-100 text-slate-700"
-                    : "bg-blue-50 text-blue-600"
+                    : "bg-brand-50 text-brand-600"
                 }`}
               >
                 {type === "bin" ? (
@@ -587,7 +588,7 @@ export default function HomeScreen() {
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-xs">
+                  <span className="font-semibold text-slate-900 group-hover:text-brand-600 transition-colors truncate text-xs">
                     {item.name}
                   </span>
                   {type === "bin" && item.qrcodeId && (
@@ -618,7 +619,7 @@ export default function HomeScreen() {
                   ? `${item?.itemCount ?? 0} items`
                   : `${item?.binCount ?? 0} bins`}
               </span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-blue-600 transition-colors" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-300 group-hover:text-brand-600 transition-colors" />
             </div>
           </div>
         ))}
@@ -648,7 +649,7 @@ export default function HomeScreen() {
       )}
 
       <div className="inventory-content">
-        {/* Compact Top Bar */}
+        {/* Page identity */}
         <div className="inventory-header">
           <div className="flex items-center space-x-3">
             <div>
@@ -657,7 +658,7 @@ export default function HomeScreen() {
                   {t("dashboard.title")}
                 </h1>
                 {subscription?.plan && subscription.plan !== "Unknown Plan" && (
-                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
                     {subscription.plan}
                   </span>
                 )}
@@ -668,7 +669,26 @@ export default function HomeScreen() {
             </div>
           </div>
 
-          <div className="inventory-header-actions">
+        </div>
+
+        {/* Primary inventory action and supporting controls share the reference's card hierarchy. */}
+        <div className="inventory-overview">
+          <section className="inventory-summary-card" aria-label={t("dashboard.totalBins")}>
+            <div className="inventory-summary-copy">
+              <span className="inventory-summary-label"><Package aria-hidden="true" />{t("dashboard.totalBins")}</span>
+              <strong className="inventory-summary-count">{stats.totalBins}</strong>
+              <span className="inventory-summary-note">{t("dashboard.summaryHint")}</span>
+            </div>
+            <StorageBinIllustration className="inventory-summary-art" />
+            <Button
+              onClick={() => setIsAddBinModalOpen(true)}
+              className="inventory-new"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{t("dashboard.new")}</span>
+            </Button>
+          </section>
+          <div className="inventory-quick-actions">
             <Button
               variant="outline"
               size="sm"
@@ -676,8 +696,8 @@ export default function HomeScreen() {
               className="inventory-copilot-action"
               title={ct('askCopilot')}
             >
-              <Sparkles className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
-              <span className="hidden sm:inline">{ct('aiCopilot')}</span>
+              <Sparkles className="w-3.5 h-3.5 text-brand-600" />
+              <span>{ct('aiCopilot')}</span>
             </Button>
 
             <Button
@@ -686,52 +706,23 @@ export default function HomeScreen() {
               onClick={handleRefresh}
               disabled={isRefreshing}
               className="inventory-refresh"
-              title="Refresh inventory data"
+              title={t("dashboard.refresh")}
             >
               <RefreshCw
                 className={`w-3.5 h-3.5 ${
-                  isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"
+                  isRefreshing ? "animate-spin text-brand-600" : "text-slate-500"
                 }`}
               />
-              <span className="ml-1.5 hidden sm:inline">Refresh</span>
-            </Button>
-
-            <Button
-              onClick={() => setIsAddBinModalOpen(true)}
-              className="inventory-new"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{t("dashboard.new")}</span>
+              <span>{t("dashboard.refresh")}</span>
             </Button>
           </div>
-        </div>
 
-        {/* Space-Optimized KPI Stat Ribbon (Compact 62px height!) */}
+        {/* Existing location and item totals remain visible beside the primary card. */}
         <div className="inventory-stats">
-          {/* Card 1: Total Bins */}
-          <div className="inventory-stat-card">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                <Package className="w-4.5 h-4.5" />
-              </div>
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  {t("dashboard.totalBins")}
-                </p>
-                <h3 className="text-lg font-black text-slate-900 leading-tight">
-                  {stats.totalBins}
-                </h3>
-              </div>
-            </div>
-            <span className="text-[11px] text-slate-400 hidden xl:inline">
-              In stock
-            </span>
-          </div>
-
           {/* Card 2: Locations */}
           <div className="inventory-stat-card">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <MapPin className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -751,7 +742,7 @@ export default function HomeScreen() {
           {/* Card 3: Total Items */}
           <div className="inventory-stat-card">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <TrendingUp className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -767,6 +758,8 @@ export default function HomeScreen() {
               Cataloged
             </span>
           </div>
+        </div>
+
         </div>
 
         {/* Integrated Unified Controls Row (Tabs + Search + Filter + View Toggle) */}
@@ -802,15 +795,15 @@ export default function HomeScreen() {
 
             {/* Filter location tag if active */}
             {filterLocation && (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900">
-                <Filter className="w-3 h-3 text-blue-600" />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-50 border border-brand-200 rounded-lg text-xs text-brand-900">
+                <Filter className="w-3 h-3 text-brand-600" />
                 <span className="text-[11px] text-slate-500">Location:</span>
-                <span className="font-semibold text-blue-800 text-[11px]">
+                <span className="font-semibold text-brand-800 text-[11px]">
                   {filterLocation.name}
                 </span>
                 <button
                   onClick={clearLocationFilter}
-                  className="ml-1 text-blue-500 hover:text-blue-800"
+                  className="ml-1 text-brand-500 hover:text-brand-800"
                 >
                   <X className="w-3 h-3" />
                 </button>

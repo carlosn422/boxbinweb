@@ -275,7 +275,7 @@ export const SmartLabelsPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
       <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
         {/* Compact Top Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -284,7 +284,7 @@ export const SmartLabelsPage = () => {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 {t("smartLabels.title")}
               </h1>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
                 v2.0
               </span>
             </div>
@@ -303,7 +303,7 @@ export const SmartLabelsPage = () => {
               title={t("smartLabels.refresh", { defaultValue: "Refresh" })}
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-brand-600" : "text-slate-500"
                   }`}
               />
               <span className="ml-1.5 hidden sm:inline">{t("smartLabels.refresh", { defaultValue: "Refresh" })}</span>
@@ -364,7 +364,7 @@ export const SmartLabelsPage = () => {
           {/* Used in Bins */}
           <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <Package className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -384,19 +384,19 @@ export const SmartLabelsPage = () => {
           {/* Selected for Printing */}
           <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <Layers className="w-4.5 h-4.5" />
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   {t("smartLabels.selected")}
                 </p>
-                <h3 className="text-lg font-black text-indigo-600 leading-tight">
+                <h3 className="text-lg font-black text-brand-600 leading-tight">
                   {stats.selected}
                 </h3>
               </div>
             </div>
-            <span className="text-[11px] text-indigo-600/70 hidden xl:inline">
+            <span className="text-[11px] text-brand-600/70 hidden xl:inline">
               {t("smartLabels.inSelection", { defaultValue: "In selection" })}
             </span>
           </div>
@@ -404,12 +404,12 @@ export const SmartLabelsPage = () => {
 
         {/* Selected Batch Action Banner */}
         {selectedLabels.length > 0 && (
-          <div className="bg-indigo-50/80 border border-indigo-200/80 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="bg-brand-50/80 border border-brand-200/80 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="flex items-center gap-3">
-              <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+              <div className="w-7 h-7 rounded-lg bg-brand-600 text-white flex items-center justify-center text-xs font-bold">
                 {selectedLabels.length}
               </div>
-              <div className="text-xs text-indigo-900">
+              <div className="text-xs text-brand-900">
                 <span className="font-semibold">
                   {selectedLabels.length}{" "}
                   {selectedLabels.length === 1
@@ -425,14 +425,14 @@ export const SmartLabelsPage = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => setSelectedLabels([])}
-                className="h-7 px-2.5 text-xs text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100/60"
+                className="h-7 px-2.5 text-xs text-brand-700 hover:text-brand-900 hover:bg-brand-100/60"
               >
                 {t("smartLabels.clearSelection", { defaultValue: "Clear selection" })}
               </Button>
               <Button
                 size="sm"
                 onClick={handleNavigateToTemplates}
-                className="h-8 px-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
+                className="h-8 px-3.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold shadow-2xs flex items-center space-x-1.5"
               >
                 <Printer className="w-3.5 h-3.5" />
                 <span>{t("smartLabels.generateTemplate")}</span>
@@ -449,7 +449,7 @@ export const SmartLabelsPage = () => {
             <button
               onClick={() => setStatusFilter("all")}
               className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${statusFilter === "all"
-                ? "bg-white text-slate-900 shadow-2xs"
+                ? "bg-primary text-primary-foreground shadow-2xs"
                 : "text-slate-500 hover:text-slate-800"
                 }`}
             >
@@ -461,7 +461,7 @@ export const SmartLabelsPage = () => {
             <button
               onClick={() => setStatusFilter("available")}
               className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${statusFilter === "available"
-                ? "bg-white text-slate-900 shadow-2xs"
+                ? "bg-primary text-primary-foreground shadow-2xs"
                 : "text-slate-500 hover:text-slate-800"
                 }`}
             >
@@ -473,7 +473,7 @@ export const SmartLabelsPage = () => {
             <button
               onClick={() => setStatusFilter("used")}
               className={`flex items-center justify-center gap-1.5 text-xs font-semibold rounded-md transition-all h-7 px-3 ${statusFilter === "used"
-                ? "bg-white text-slate-900 shadow-2xs"
+                ? "bg-primary text-primary-foreground shadow-2xs"
                 : "text-slate-500 hover:text-slate-800"
                 }`}
             >
@@ -524,7 +524,7 @@ export const SmartLabelsPage = () => {
                 size="sm"
                 onClick={() => setIsDateFilterOpen(!isDateFilterOpen)}
                 className={`h-8 px-2.5 text-xs border-slate-200 rounded-lg flex items-center gap-1.5 ${startDate || endDate
-                  ? "bg-blue-50 text-blue-700 border-blue-200 font-semibold"
+                  ? "bg-brand-50 text-brand-700 border-brand-200 font-semibold"
                   : "bg-white text-slate-700 hover:bg-slate-50"
                   }`}
               >
@@ -535,7 +535,7 @@ export const SmartLabelsPage = () => {
                     : t("smartLabels.filterByDate", { defaultValue: "Filter by Date" })}
                 </span>
                 {(startDate || endDate) && (
-                  <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                  <span className="w-2 h-2 rounded-full bg-brand-600"></span>
                 )}
               </Button>
 
@@ -624,7 +624,7 @@ export const SmartLabelsPage = () => {
               <button
                 onClick={() => setViewMode("grid")}
                 className={`p-1 rounded-md transition-colors ${viewMode === "grid"
-                  ? "bg-white text-slate-900 shadow-2xs"
+                  ? "bg-primary text-primary-foreground shadow-2xs"
                   : "text-slate-400 hover:text-slate-600"
                   }`}
                 title={t("smartLabels.gridView")}
@@ -634,7 +634,7 @@ export const SmartLabelsPage = () => {
               <button
                 onClick={() => setViewMode("list")}
                 className={`p-1 rounded-md transition-colors ${viewMode === "list"
-                  ? "bg-white text-slate-900 shadow-2xs"
+                  ? "bg-primary text-primary-foreground shadow-2xs"
                   : "text-slate-400 hover:text-slate-600"
                   }`}
                 title={t("smartLabels.listView")}
@@ -727,7 +727,7 @@ export const SmartLabelsPage = () => {
                       key={label.guid}
                       onClick={() => handleLabelSelect(label.guid)}
                       className={`group relative bg-white rounded-xl border p-3.5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[138px] ${isSelected
-                        ? "border-indigo-500 ring-2 ring-indigo-500/15 bg-indigo-50/20"
+                        ? "border-brand-500 ring-2 ring-brand-500/15 bg-brand-50/20"
                         : "border-slate-200/90 hover:border-slate-300"
                         }`}
                     >
@@ -740,7 +740,7 @@ export const SmartLabelsPage = () => {
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => handleLabelSelect(label.guid)}
-                            className="data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
+                            className="data-[state=checked]:bg-brand-600 data-[state=checked]:border-brand-600"
                           />
                         </div>
 
@@ -759,12 +759,12 @@ export const SmartLabelsPage = () => {
 
                       {/* Center: QR Icon & Mono Code */}
                       <div className="flex items-center space-x-2.5 my-auto">
-                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-700 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors shrink-0">
                           <QrCode className="w-4 h-4" />
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className="font-mono font-bold text-base tracking-wider text-slate-900 group-hover:text-indigo-600 transition-colors truncate">
+                            <span className="font-mono font-bold text-base tracking-wider text-slate-900 group-hover:text-brand-600 transition-colors truncate">
                               {label.qrcodeId}
                             </span>
                             <button
@@ -795,7 +795,7 @@ export const SmartLabelsPage = () => {
                             {new Date(label.dateCreated).toLocaleDateString()}
                           </span>
                         </span>
-                        <span className="text-[10px] text-slate-300 group-hover:text-indigo-500 font-medium transition-colors">
+                        <span className="text-[10px] text-slate-300 group-hover:text-brand-500 font-medium transition-colors">
                           {isSelected
                             ? t("smartLabels.selectedBadge", { defaultValue: "Selected" })
                             : t("smartLabels.select", { defaultValue: "Select" })}
@@ -819,7 +819,7 @@ export const SmartLabelsPage = () => {
                       <div
                         key={label.guid}
                         onClick={() => handleLabelSelect(label.guid)}
-                        className={`p-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-4 cursor-pointer ${isSelected ? "bg-indigo-50/20" : ""
+                        className={`p-3 hover:bg-slate-50 transition-colors flex items-center justify-between gap-4 cursor-pointer ${isSelected ? "bg-brand-50/20" : ""
                           }`}
                       >
                         <div className="flex items-center space-x-3 min-w-0">
@@ -829,7 +829,7 @@ export const SmartLabelsPage = () => {
                               onCheckedChange={() =>
                                 handleLabelSelect(label.guid)
                               }
-                              className="data-[state=checked]:bg-indigo-600 data-[state=checked]:border-indigo-600"
+                              className="data-[state=checked]:bg-brand-600 data-[state=checked]:border-brand-600"
                             />
                           </div>
 
@@ -898,7 +898,7 @@ export const SmartLabelsPage = () => {
             {/* Modal Header */}
             <div className="flex items-start justify-between">
               <div className="flex items-center space-x-2.5">
-                <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600">
                   <QrCode className="w-4 h-4" />
                 </div>
                 <div>

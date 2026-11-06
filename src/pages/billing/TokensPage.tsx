@@ -126,7 +126,7 @@ export default function TokensPurchasePage() {
   const currentPkg = tokenPackages.find((p) => p.id === selectedPackage);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
       {/* Mobile WebView Back Bar */}
       {isReactNative && (
         <div className="bg-white border-b border-slate-200 px-4 py-2 sticky top-0 z-20">
@@ -162,7 +162,7 @@ export default function TokensPurchasePage() {
               </h1>
               <Badge
                 variant="outline"
-                className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border-blue-200"
+                className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border-brand-200"
               >
                 {t("tokens.aiCreditsBadge", { defaultValue: "AI Credits" })}
               </Badge>
@@ -229,7 +229,7 @@ export default function TokensPurchasePage() {
                 {t("tokens.videoScanDesc", { defaultValue: "100 tokens / 30s warehouse clip" })}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
               <Video className="h-5 w-5" />
             </div>
           </div>
@@ -249,7 +249,7 @@ export default function TokensPurchasePage() {
                 })}
               </span>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
               <Bot className="h-5 w-5" />
             </div>
           </div>
@@ -328,7 +328,7 @@ export default function TokensPurchasePage() {
                   >
                     {isPopular && (
                       <div className="absolute -top-2.5 left-1/2 transform -translate-x-1/2">
-                        <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1">
+                        <span className="bg-brand-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1">
                           <Crown className="w-2.5 h-2.5" />
                           <span>{t("tokens.bestValue", { defaultValue: "Best Value" })}</span>
                         </span>
@@ -337,7 +337,7 @@ export default function TokensPurchasePage() {
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-blue-50 text-slate-700 group-hover:text-blue-600 flex items-center justify-center transition-colors">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-brand-50 text-slate-700 group-hover:text-brand-600 flex items-center justify-center transition-colors">
                           <Coins className="w-4 h-4" />
                         </div>
                         {isSelected && (
@@ -441,7 +441,7 @@ export default function TokensPurchasePage() {
               <CardHeader className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <ShieldCheck className="w-4 h-4 text-brand-600" />
                     {t("tokens.checkoutTitle", { defaultValue: "Secure Token Checkout" })}
                   </CardTitle>
                   <p className="text-xs text-slate-500 mt-0.5">
@@ -459,7 +459,7 @@ export default function TokensPurchasePage() {
               <CardContent className="p-5">
                 {currentPkg?.unit_amount === 0 ? (
                   <div className="space-y-4 text-center py-4">
-                    <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+                    <div className="w-10 h-10 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mx-auto">
                       <Sparkles className="w-5 h-5" />
                     </div>
                     <p className="text-xs text-slate-600 max-w-md mx-auto">

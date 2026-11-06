@@ -350,7 +350,7 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
       </div>
 
       {/* Price summary */}
-      <div className="p-4 border rounded-lg bg-blue-50">
+      <div className="p-4 border rounded-lg bg-brand-50">
         <h3 className="font-semibold text-lg mb-3">Order Summary</h3>
         
         <div className="space-y-2">

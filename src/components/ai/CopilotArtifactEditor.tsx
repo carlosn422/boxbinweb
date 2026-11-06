@@ -412,7 +412,7 @@ export function CopilotArtifactEditor({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              {mode === "image" ? <ImageIcon className="size-5 text-orange-400" /> : <FileText className="size-5 text-blue-400" />}
+              {mode === "image" ? <ImageIcon className="size-5 text-orange-400" /> : <FileText className="size-5 text-brand-400" />}
             </div>
             <div>
               <DialogTitle className="text-base sm:text-lg font-bold text-slate-900">
@@ -442,7 +442,7 @@ export function CopilotArtifactEditor({
                       {ct('previewReady')}
                     </span>
                   ) : busy ? (
-                    <span className="text-indigo-600 font-medium inline-flex items-center gap-1">
+                    <span className="text-brand-600 font-medium inline-flex items-center gap-1">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       {ct('previewGenerating')}
                     </span>
@@ -591,7 +591,7 @@ export function CopilotArtifactEditor({
                     onClick={() => setMode("pdf")}
                     className="h-8.5 px-4 rounded-xl text-xs font-semibold border-slate-200"
                   >
-                    <FileText className="size-3.5 mr-1.5 text-blue-500" /> {ct('includePdf')}
+                    <FileText className="size-3.5 mr-1.5 text-brand-500" /> {ct('includePdf')}
                   </Button>
                 </div>
               </div>
@@ -762,7 +762,7 @@ export function CopilotArtifactEditor({
                       title={ct('insertTable')}
                       className="p-1 px-2 hover:bg-white rounded text-slate-700 font-semibold text-[11px] inline-flex items-center gap-1 bg-white/70 shadow-2xs"
                     >
-                      <TableIcon className="w-3 h-3 text-blue-600" />
+                      <TableIcon className="w-3 h-3 text-brand-600" />
                       <span>{ct('insertTable')}</span>
                     </button>
                     <button
@@ -846,7 +846,7 @@ export function CopilotArtifactEditor({
                         {draft.pageSize || "LETTER"} • {draft.orientation || "portrait"}
                       </span>
                       <a
-                        className="text-xs text-blue-600 hover:text-blue-800 underline font-semibold flex items-center gap-1"
+                        className="text-xs text-brand-600 hover:text-brand-800 underline font-semibold flex items-center gap-1"
                         href={preview.url}
                         target="_blank"
                         rel="noreferrer"
@@ -859,7 +859,7 @@ export function CopilotArtifactEditor({
                 ) : (
                   <div className="m-auto p-8 text-center space-y-3">
                     <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center mx-auto text-slate-400 shadow-2xs">
-                      {busy ? <Loader2 className="w-6 h-6 animate-spin text-indigo-600" /> : <FileSpreadsheet className="w-6 h-6" />}
+                      {busy ? <Loader2 className="w-6 h-6 animate-spin text-brand-600" /> : <FileSpreadsheet className="w-6 h-6" />}
                     </div>
                     <div>
                       <p className="text-xs text-slate-700 font-bold">
@@ -894,7 +894,7 @@ export function CopilotArtifactEditor({
               >
                 {busy ? (
                   <>
-                    <Loader2 className="size-3.5 animate-spin text-indigo-600" />
+                    <Loader2 className="size-3.5 animate-spin text-brand-600" />
                     <span>{ct('preparingPdf')}</span>
                   </>
                 ) : (
@@ -922,7 +922,7 @@ export function CopilotArtifactEditor({
                   onClick={downloadPdf}
                   className="bg-slate-900 hover:bg-slate-800 text-white h-8.5 px-4 text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5"
                 >
-                  <Download className="size-3.5 text-blue-400" />
+                  <Download className="size-3.5 text-brand-400" />
                   <span>{ct('downloadPdf')}</span>
                 </Button>
 

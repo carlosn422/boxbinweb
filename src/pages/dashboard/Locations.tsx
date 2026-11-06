@@ -431,7 +431,7 @@ export const LocationsManager = () => {
   const totalPages = Math.ceil(totalLocations / itemsPerPage);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
       {/* Impersonation Banner */}
       {userImpersonated && (
         <div className="bg-amber-50 border-b border-amber-200/80 px-4 py-1.5">
@@ -461,7 +461,7 @@ export const LocationsManager = () => {
                 {t("locations.title")}
               </h1>
               {subscription?.plan && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
                   {subscription.plan}
                 </span>
               )}
@@ -480,7 +480,7 @@ export const LocationsManager = () => {
               className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${pageLoading ? "animate-spin text-blue-600" : "text-slate-500"
+                className={`w-3.5 h-3.5 ${pageLoading ? "animate-spin text-brand-600" : "text-slate-500"
                   }`}
               />
               <span className="ml-1.5 hidden sm:inline">{t("locations.refresh")}</span>
@@ -506,7 +506,7 @@ export const LocationsManager = () => {
           {/* Total Locations */}
           <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <Building className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -559,7 +559,7 @@ export const LocationsManager = () => {
           {/* Search match stats */}
           <div className="bg-white rounded-xl border border-slate-200/80 px-4 py-2.5 flex items-center justify-between shadow-2xs hover:border-slate-300 transition-colors">
             <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <MapPin className="w-4.5 h-4.5" />
               </div>
               <div>
@@ -696,18 +696,18 @@ export const LocationsManager = () => {
                     setSelectedLocation(isSelected ? null : loc)
                   }
                   className={`group relative bg-white rounded-xl border p-3.5 shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between h-[152px] ${isSelected
-                    ? "border-blue-500 ring-2 ring-blue-500/15 bg-blue-50/15"
+                    ? "border-brand-500 ring-2 ring-brand-500/15 bg-brand-50/15"
                     : "border-slate-200/90 hover:border-slate-300"
                     }`}
                 >
                   {/* Top Row: Icon, Name & Actions Dropdown */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-colors shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 group-hover:bg-brand-600 group-hover:text-white transition-colors shrink-0">
                         <MapPin className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-tight">
+                        <h3 className="font-semibold text-slate-900 group-hover:text-brand-600 transition-colors truncate text-sm leading-tight">
                           {loc.name}
                         </h3>
                         {loc.address && (
@@ -771,7 +771,7 @@ export const LocationsManager = () => {
                       <span>{formatDate(loc.createdAt)}</span>
                     </span>
 
-                    <span className="text-[10px] font-medium text-slate-300 group-hover:text-blue-600 transition-colors flex items-center">
+                    <span className="text-[10px] font-medium text-slate-300 group-hover:text-brand-600 transition-colors flex items-center">
                       <span>
                         {isSelected
                           ? t("locations.selected", { defaultValue: "Selected" })
@@ -839,7 +839,7 @@ export const LocationsManager = () => {
         <DialogContent className="sm:max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-5">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Building className="w-4 h-4 text-blue-600" />
+              <Building className="w-4 h-4 text-brand-600" />
               <span>{t("locations.modal.newTitle")}</span>
             </DialogTitle>
           </DialogHeader>
@@ -920,7 +920,7 @@ export const LocationsManager = () => {
         <DialogContent className="sm:max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-5">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Edit className="w-4 h-4 text-blue-600" />
+              <Edit className="w-4 h-4 text-brand-600" />
               <span>{t("locations.modal.editTitle")}</span>
             </DialogTitle>
           </DialogHeader>

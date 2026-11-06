@@ -103,7 +103,7 @@ export function Sidebar({ className }: SidebarProps) {
   const brand = (compact = false) => (
     <button className="boxbin-brand" onClick={() => goTo("/home")} aria-label="BoxBin">
       <img className="boxbin-brand-logo" src={LogoIcon} alt="" />
-      {!compact && <span>BoxBin</span>}
+      {!compact && <span>BoxBin<span className="text-brand-500">.io</span></span>}
     </button>
   );
   const navigation = (compact: boolean) => (

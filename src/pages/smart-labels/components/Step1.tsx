@@ -63,7 +63,7 @@ export const Step1 = ({ qrCount, setQrCount, onGenerate }: Step1Props) => {
     <div className="relative">
       {isGenerating && (
         <div className="absolute inset-0 bg-white bg-opacity-80 flex items-center justify-center z-10 rounded-lg">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-brand-500"></div>
         </div>
       )}
       {isModalOpen && (
@@ -87,7 +87,7 @@ export const Step1 = ({ qrCount, setQrCount, onGenerate }: Step1Props) => {
       />
       <button
             onClick={handleGenerateClick}
-            className={`w-full py-2 px-4 rounded ${isValid ? 'bg-blue-600 text-white' : 'bg-gray-300 text-gray-500'} flex items-center justify-center`}
+            className={`w-full py-2 px-4 rounded ${isValid ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-500'} flex items-center justify-center`}
             disabled={!isValid || isGenerating}
           >
             {isGenerating ? (
@@ -105,7 +105,7 @@ export const Step1 = ({ qrCount, setQrCount, onGenerate }: Step1Props) => {
 )}
 
 <button 
-  className="fixed top-4 right-4 z-50 bg-blue-600 text-white py-2 px-4 rounded shadow-md hover:bg-blue-700 transition-colors"
+  className="fixed top-4 right-4 z-50 bg-brand-600 text-white py-2 px-4 rounded shadow-md hover:bg-brand-700 transition-colors"
   onClick={() => setIsModalOpen(true)}
 >
   Generate QR Codes

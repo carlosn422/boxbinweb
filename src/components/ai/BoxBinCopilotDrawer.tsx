@@ -677,8 +677,8 @@ export function BoxBinCopilotDrawer() {
         className={`boxbin-copilot-float fixed z-40 touch-none ${position ? '' : 'bottom-6 right-6'}`}
       >
         {callActive && (
-          <div className="absolute -top-9 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-blue-400/40 bg-slate-950/90 px-3 py-1 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm pointer-events-none whitespace-nowrap">
-            <span className={`size-2 rounded-full ${liveState === 'responding' ? 'bg-blue-400 animate-ping' : 'bg-emerald-400'}`} />
+          <div className="absolute -top-9 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-brand-400/40 bg-slate-950/90 px-3 py-1 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm pointer-events-none whitespace-nowrap">
+            <span className={`size-2 rounded-full ${liveState === 'responding' ? 'bg-brand-400 animate-ping' : 'bg-emerald-400'}`} />
             <span>{ct(liveState === 'connecting' ? 'connecting' : liveState === 'reconnecting' ? 'reconnecting' : liveState === 'responding' ? 'speaking' : micMuted ? 'micMuted' : 'listening')}</span>
           </div>
         )}
@@ -692,18 +692,18 @@ export function BoxBinCopilotDrawer() {
           onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setIsOpen(true); }}
           className={`boxbin-copilot-launcher relative size-14 rounded-2xl flex items-center justify-center text-white transition-all shadow-xl cursor-pointer ${
             callActive
-              ? 'bg-gradient-to-br from-blue-600 to-indigo-600 shadow-[0_0_30px_rgba(59,130,246,0.65)] ring-4 ring-blue-400/40'
+              ? 'bg-primary shadow-[0_0_30px_rgba(255,196,0,0.35)] ring-4 ring-brand-400/40'
               : 'bg-slate-900 shadow-lg hover:bg-slate-800'
           }`}
         >
           {callActive && (
-            <span className="absolute -inset-1 rounded-2xl bg-blue-500 opacity-40 animate-ping pointer-events-none" />
+            <span className="absolute -inset-1 rounded-2xl bg-brand-500 opacity-40 animate-ping pointer-events-none" />
           )}
           {callActive ? (
             micMuted ? (
-              <MicOff className="size-6 text-red-200" />
+              <MicOff className="size-6 text-red-800" />
             ) : (
-              <AudioLines className="size-6 text-white animate-pulse" />
+              <AudioLines className="size-6 text-primary-foreground animate-pulse" />
             )
           ) : (
             <Bot className="size-6" />
@@ -716,26 +716,26 @@ export function BoxBinCopilotDrawer() {
       <DialogContent showCloseButton={false} style={viewport} onOpenAutoFocus={event => { event.preventDefault(); scrollToBottom(false); if (window.innerWidth >= 640) composer.current?.focus(); }}
         className="copilot-drawer">
         <header className="copilot-header">
-          <div className="flex min-w-0 items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="copilot-brand-icon"><Sparkles className="size-5 text-blue-200" /></div>
-              <div className="min-w-0"><DialogTitle className="truncate text-base font-semibold tracking-tight text-white">BoxBin Copilot</DialogTitle><DialogDescription className="mt-0.5 truncate text-xs text-slate-400">{ct('assistantSubtitle')}</DialogDescription></div>
+          <div className="copilot-header-row">
+            <div className="copilot-header-identity">
+              <div className="copilot-brand-icon"><Sparkles className="size-5 text-brand-200" /></div>
+              <div className="min-w-0"><DialogTitle className="truncate text-base font-semibold tracking-tight">BoxBin Copilot</DialogTitle><DialogDescription className="mt-0.5 truncate text-xs text-slate-400">{ct('assistantSubtitle')}</DialogDescription></div>
             </div>
-            <div className="flex shrink-0 items-center">
-              <Button size="icon" variant="ghost" className="size-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-label={historyOpen ? ct('returnChat') : ct('history')} disabled={locked} onClick={() => { setHistoryOpen(!historyOpen); void refreshSessions().catch(e => setSavingError(errorText(e))); }}>{historyOpen ? <ArrowLeft className="size-4" /> : <History className="size-4" />}</Button>
-              <Button size="icon" variant="ghost" className="size-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-label={ct('newGlobalChat')} disabled={locked} onClick={() => void newSession()}><Plus className="size-5" /></Button>
-              <Button size="icon" variant="ghost" className="size-11 rounded-xl text-slate-300 hover:bg-white/10 hover:text-white" aria-label={ct('close')} title={callActive ? 'Minimizar (llamada activa en segundo plano)' : ct('close')} onClick={() => setIsOpen(false)}>{callActive ? <ChevronDown className="size-5" /> : <X className="size-5" />}</Button>
+            <div className="copilot-header-actions">
+              <Button size="icon" variant="ghost" className="copilot-header-action" aria-label={historyOpen ? ct('returnChat') : ct('history')} title={historyOpen ? ct('returnChat') : ct('history')} disabled={locked} onClick={() => { setHistoryOpen(!historyOpen); void refreshSessions().catch(e => setSavingError(errorText(e))); }}>{historyOpen ? <ArrowLeft className="size-4" /> : <History className="size-4" />}</Button>
+              <Button size="icon" variant="ghost" className="copilot-header-action" aria-label={ct('newGlobalChat')} title={ct('newGlobalChat')} disabled={locked} onClick={() => void newSession()}><Plus className="size-5" /></Button>
+              <Button size="icon" variant="ghost" className="copilot-header-action" aria-label={ct('close')} title={callActive ? 'Minimizar (llamada activa en segundo plano)' : ct('close')} onClick={() => setIsOpen(false)}>{callActive ? <ChevronDown className="size-5" /> : <X className="size-5" />}</Button>
             </div>
           </div>
           <div aria-label={ct('contextLabel')} className="copilot-context">
-            <span className="flex min-w-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5"><Box className="size-3.5 shrink-0 text-blue-200" /><span className="truncate">{binId ? context?.activeBin?.name || ct('selectedBin') : ct('globalInventory')}</span></span>
-            {binId ? <button disabled={locked} className="ml-auto min-h-9 shrink-0 text-blue-200 underline-offset-4 hover:underline disabled:opacity-50" onClick={() => void newSession()}>{ct('openGlobalChat')}</button> : context && <span className="ml-auto shrink-0 text-slate-400">{ct('itemsCount', { count: context.inventoryMetrics.totalItems })}</span>}
+            <span className="flex min-w-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5"><Box className="size-3.5 shrink-0 text-brand-200" /><span className="truncate">{binId ? context?.activeBin?.name || ct('selectedBin') : ct('globalInventory')}</span></span>
+            {binId ? <button disabled={locked} className="ml-auto min-h-9 shrink-0 text-brand-200 underline-offset-4 hover:underline disabled:opacity-50" onClick={() => void newSession()}>{ct('openGlobalChat')}</button> : context && <span className="ml-auto shrink-0 text-slate-400">{ct('itemsCount', { count: context.inventoryMetrics.totalItems })}</span>}
           </div>
         </header>
         {historyOpen ? <div className="copilot-history min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
           <div className="mb-4 flex items-center gap-2"><MessageSquare className="size-4 text-slate-400" /><h3 className="text-sm font-semibold text-slate-800">{ct('conversations', { count: sessions.length, max: MAX_CHATS_PER_USER })}</h3></div>
           {!sessions.length && <p className="py-12 text-center text-sm text-slate-500">{ct('historyEmpty')}</p>}
-          <div className="space-y-2">{sessions.map(s => <div key={s.id} className={`flex min-w-0 items-center gap-1 rounded-2xl border bg-white p-2 ${s.id === sessionId ? 'border-blue-300 ring-2 ring-blue-50' : 'border-slate-200'}`}>
+          <div className="space-y-2">{sessions.map(s => <div key={s.id} className={`flex min-w-0 items-center gap-1 rounded-2xl border bg-white p-2 ${s.id === sessionId ? 'border-brand-300 ring-2 ring-brand-50' : 'border-slate-200'}`}>
             <button disabled={locked} onClick={() => selectSession(s)} className="min-w-0 flex-1 rounded-xl p-2 text-left"><span className="block truncate text-sm font-medium text-slate-800">{s.title}</span><span className="mt-1 block text-xs text-slate-500">{ct('chatCount', { count: s.messageCount })}</span></button>
             <Button aria-label={ct('deleteChat', { title: s.title })} size="icon" variant="ghost" className="size-11 shrink-0 rounded-xl text-slate-400 hover:text-red-600" disabled={locked} onClick={() => void removeSession(s.id)}><Trash2 className="size-4" /></Button>
           </div>)}</div>
@@ -758,7 +758,7 @@ export function BoxBinCopilotDrawer() {
                   {voiceProposal.type === 'focus_bin_chat' ? (
                     <Button
                       type="button"
-                      className="min-h-10 rounded-xl bg-blue-600 px-4 text-xs font-semibold text-white hover:bg-blue-700 shadow-md flex items-center gap-1.5"
+                      className="min-h-10 rounded-xl bg-brand-600 px-4 text-xs font-semibold text-white hover:bg-brand-700 shadow-md flex items-center gap-1.5"
                       onClick={() => {
                         if (voiceProposalMessage) void execute(voiceProposalMessage);
                       }}
@@ -781,18 +781,21 @@ export function BoxBinCopilotDrawer() {
             )}
             </div>
           </section> : <div ref={messagesContainer} data-testid="copilot-messages" className="copilot-messages min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-            {binId && <p className="mb-3 flex items-center gap-2 text-xs text-blue-700"><ShieldCheck className="size-3.5 shrink-0" />{ct('binScope')}</p>}
+            {binId && <p className="mb-3 flex items-center gap-2 text-xs text-brand-700"><ShieldCheck className="size-3.5 shrink-0" />{ct('binScope')}</p>}
             {contextError && <p role="alert" className="mb-3 rounded-xl bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">{contextError}</p>}
             {savingError && <div role="alert" className="mb-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">{savingError}<button disabled={locked} className="ml-2 min-h-9 underline" onClick={() => void persist(messages)}>{ct('retrySave')}</button></div>}
-            <div className="space-y-5">{messages.map(msg => msg.id.startsWith('welcome-') ? <article key={msg.id} className="copilot-welcome min-w-0">
+            <div className="copilot-thread">{messages.map(msg => msg.id.startsWith('welcome-') ? <article key={msg.id} className="copilot-welcome min-w-0">
               {messages.length === 1 && <>
                 <div className="copilot-welcome-icon"><Sparkles /></div>
                 <h3>{ct('welcomeTitle')}</h3>
                 <p className="copilot-welcome-subtitle">{ct('welcomeShort')}</p>
               </>}
-              <ResponsiveDisclosure label={t('workspaceDesign.aboutCopilot')} className="copilot-about">
+              {messages.length === 1 ? <ResponsiveDisclosure label={t('workspaceDesign.aboutCopilot')} className="copilot-about">
                 <div className="text-sm leading-relaxed text-stone-500"><SafeMarkdown text={ct('welcome')} /></div>
-              </ResponsiveDisclosure>
+              </ResponsiveDisclosure> : <details className="copilot-about-inline">
+                <summary><Sparkles aria-hidden="true" /><span>{t('workspaceDesign.aboutCopilot')}</span><ChevronDown aria-hidden="true" /></summary>
+                <div><SafeMarkdown text={ct('welcome')} /></div>
+              </details>}
               {messages.length === 1 && <>
                 <div className="copilot-starters">{starterActions.slice(0, 2).map(renderStarter)}</div>
                 <ResponsiveDisclosure label={t('workspaceDesign.moreActions')} className="copilot-more-actions">
@@ -802,26 +805,26 @@ export function BoxBinCopilotDrawer() {
                   <div className="flex flex-wrap gap-2">{welcomeMessage().suggestedQuestions?.slice(0, 2).map(q => <button key={q} disabled={locked || limitReached} onClick={() => void send(q)} className="copilot-suggestion">{q}</button>)}</div>
                 </ResponsiveDisclosure>
               </>}
-            </article> : <article key={msg.id} className={`min-w-0 ${msg.sender === 'user' ? 'ml-auto max-w-[90%]' : 'w-full'}`}>
-              <div className={`mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-slate-400 ${msg.sender === 'user' ? 'justify-end' : ''}`}>{msg.sender === 'copilot' && <Sparkles className="size-3 text-blue-500" />}{ct(msg.sender === 'user' ? 'you' : 'assistant')}</div>
+            </article> : <article key={msg.id} className={`copilot-turn ${msg.sender === 'user' ? 'copilot-turn-user' : 'copilot-turn-assistant'} ${msg.actionProposal ? 'copilot-turn-proposal' : ''}`}>
+              <div className="copilot-message-meta">{msg.sender === 'copilot' && <span className="copilot-message-avatar"><Sparkles aria-hidden="true" /></span>}<span>{ct(msg.sender === 'user' ? 'you' : 'assistant')}</span></div>
               <div className={msg.sender === 'user' ? 'copilot-message-user' : 'copilot-message-assistant'}>
                 {msg.attachedFile && <div className="mb-2 break-words text-xs">{msg.attachedFile.previewUrl && <img src={msg.attachedFile.previewUrl} alt={ct('attachedPhoto')} className="mb-1 max-h-32 rounded-xl" />}{msg.attachedFile.name}{!msg.attachedFile.previewUrl && ct('photoNotStored')}</div>}
                 {msg.isStreaming && !msg.text ? <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-500"><Loader2 className="size-4 shrink-0 animate-spin" />{ct('thinking')}</div> : <SafeMarkdown text={msg.text} />}
               </div>
-              {!!msg.sources?.length && <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><p className="mb-2 font-semibold text-slate-700">{ct('webSources')}</p>{msg.sources.map((s, i) => <a key={i} href={s.url.startsWith('https://') ? s.url : undefined} target="_blank" rel="noopener noreferrer" className="block truncate py-1 text-blue-700 underline">{s.title}</a>)}<p className="mt-2 text-slate-500">{ct('priceNotice')}</p></div>}
+              {!!msg.sources?.length && <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs"><p className="mb-2 font-semibold text-slate-700">{ct('webSources')}</p>{msg.sources.map((s, i) => <a key={i} href={s.url.startsWith('https://') ? s.url : undefined} target="_blank" rel="noopener noreferrer" className="block truncate py-1 text-brand-700 underline">{s.title}</a>)}<p className="mt-2 text-slate-500">{ct('priceNotice')}</p></div>}
               {msg.searchSuggestions?.map((html, i) => <SearchSuggestions key={i} html={html} />)}
               {msg.actionProposal && <div className="copilot-proposal mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-3 py-3 sm:px-4"><div className="flex items-center gap-2 text-sm font-semibold text-slate-800"><PencilLine className="size-4 shrink-0 text-blue-600" /><span>{titles()[msg.actionProposal.type] || ct('proposal')}</span></div><span className={`rounded-full px-2 py-1 text-[10px] font-medium ${msg.actionProposal.status === 'executed' ? 'bg-emerald-50 text-emerald-700' : msg.actionProposal.status === 'cancelled' ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-700'}`}>{ct(msg.actionProposal.status === 'executed' ? 'savedStatus' : msg.actionProposal.status === 'cancelled' ? 'discardedStatus' : 'readyReview')}</span></div>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/70 px-3 py-3 sm:px-4"><div className="flex items-center gap-2 text-sm font-semibold text-slate-800"><PencilLine className="size-4 shrink-0 text-brand-600" /><span>{titles()[msg.actionProposal.type] || ct('proposal')}</span></div><span className={`rounded-full px-2 py-1 text-[10px] font-medium ${msg.actionProposal.status === 'executed' ? 'bg-emerald-50 text-emerald-700' : msg.actionProposal.status === 'cancelled' ? 'bg-slate-100 text-slate-500' : 'bg-brand-50 text-brand-700'}`}>{ct(msg.actionProposal.status === 'executed' ? 'savedStatus' : msg.actionProposal.status === 'cancelled' ? 'discardedStatus' : 'readyReview')}</span></div>
                 <div className="space-y-4 p-3 sm:p-4">{msg.actionProposal.status === 'executed' || msg.actionProposal.status === 'cancelled' ? <>
                   <p className="break-words text-sm text-slate-600">{msg.actionProposal.resultMessage}</p>{['generate_inventory_pdf', 'generate_image'].includes(msg.actionProposal.type) && msg.actionProposal.status === 'executed' && <Button variant="outline" className="min-h-11 rounded-xl" disabled={locked} onClick={() => setArtifact({ msgId: msg.id, proposal: msg.actionProposal! })}>{ct('reopenFile')}</Button>}
                 </> : <>
                   <CopilotProposalFields proposal={msg.actionProposal} disabled={locked} update={patch => updateProposal(msg.id, patch)} />
                   {proposalError?.id === msg.id && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{proposalError.text}</p>}
-                  <div className="flex flex-wrap gap-2"><Button disabled={busy || !!artifact} onClick={() => void execute(msg)} className="min-h-11 flex-1 rounded-xl bg-blue-600 px-3 text-sm text-white hover:bg-blue-700"><Check className="mr-1 size-4 shrink-0" />{ct(['generate_inventory_pdf', 'generate_image'].includes(msg.actionProposal.type) ? 'reviewFile' : 'confirmAction')}</Button><Button variant="outline" className="min-h-11 rounded-xl" disabled={busy || !!artifact} onClick={() => void completeProposal(msg.id, msg.actionProposal!, ct('discarded'), 'cancelled')}>{ct('discard')}</Button></div>
+                  <div className="flex flex-wrap gap-2"><Button disabled={busy || !!artifact} onClick={() => void execute(msg)} className="min-h-11 flex-1 rounded-xl bg-brand-600 px-3 text-sm text-white hover:bg-brand-700"><Check className="mr-1 size-4 shrink-0" />{ct(['generate_inventory_pdf', 'generate_image'].includes(msg.actionProposal.type) ? 'reviewFile' : 'confirmAction')}</Button><Button variant="outline" className="min-h-11 rounded-xl" disabled={busy || !!artifact} onClick={() => void completeProposal(msg.id, msg.actionProposal!, ct('discarded'), 'cancelled')}>{ct('discard')}</Button></div>
                 </>}</div>
               </div>}
               {!!msg.actions?.length && <div className="mt-3 flex flex-wrap gap-2">{msg.actions.filter(a => /^\/(home|locations|bin-details\/[a-zA-Z0-9_-]+)$/.test(a.path)).map((a, i) => <Button key={i} variant="outline" className="min-h-11 max-w-full rounded-xl whitespace-normal text-xs" disabled={locked} onClick={() => { navigate(a.path); setIsOpen(false); }}>{a.label}<ChevronRight className="ml-1 size-3" /></Button>)}</div>}
-              {!!msg.suggestedQuestions?.length && msg.id === messages[messages.length - 1]?.id && <div className="mt-3 flex flex-wrap gap-2">{msg.suggestedQuestions.map((q, i) => <button key={i} disabled={locked || limitReached} onClick={() => void send(q)} className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-left text-xs text-blue-700 disabled:opacity-50">{q}</button>)}</div>}
+              {!!msg.suggestedQuestions?.length && msg.id === messages[messages.length - 1]?.id && <div className="mt-3 flex flex-wrap gap-2">{msg.suggestedQuestions.map((q, i) => <button key={i} disabled={locked || limitReached} onClick={() => void send(q)} className="min-h-11 rounded-xl border border-slate-200 px-3 py-2 text-left text-xs text-brand-700 disabled:opacity-50">{q}</button>)}</div>}
             </article>)}</div><div ref={bottom} />
           </div>}
           <footer className="copilot-footer">
@@ -843,18 +846,18 @@ export function BoxBinCopilotDrawer() {
             {limitReached && <p className="mb-2 text-xs text-amber-800">{ct('maxMessages')}</p>}
             <form className={callActive && voiceMode === 'voice' ? 'hidden' : 'copilot-composer'} onSubmit={e => { e.preventDefault(); if (callActive) sendLiveText(); else void send(); }}>
               {attached && <div className="mb-2 flex min-w-0 items-center gap-2 rounded-xl border bg-white p-2 text-xs"><img src={attached.previewUrl} className="size-10 shrink-0 rounded-lg object-cover" alt={ct('photoToSend')} /><span className="min-w-0 flex-1 truncate">{attached.name}</span><Button type="button" size="icon" variant="ghost" className="size-11" aria-label={ct('removePhoto')} disabled={locked} onClick={() => setAttached(undefined)}><X className="size-4" /></Button></div>}
-              <textarea ref={composer} rows={2} aria-label={ct('queryLabel')} value={query} maxLength={6000}
+              <textarea ref={composer} rows={1} aria-label={ct('queryLabel')} value={query} maxLength={6000}
                 onChange={e => { setQuery(e.target.value); scrollToBottom(false); }}
                 onFocus={() => scrollToBottom(false)}
                 disabled={(callActive ? voiceMode === 'voice' : locked) || limitReached} placeholder={ct(callActive ? 'textCallPlaceholder' : listening ? 'listeningDictation' : 'queryPlaceholder')}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(pointer:fine)').matches) { e.preventDefault(); if (callActive) sendLiveText(); else void send(); } }}
                 className="block max-h-28 min-h-12 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-base leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50 sm:text-sm" />
-              <div className="flex items-center justify-between gap-1">
-                <div className="flex min-w-0 items-center"><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ''; }} /><Button type="button" size="icon" variant="ghost" className="size-11 shrink-0 rounded-xl text-slate-500" aria-label={ct('attachPhoto')} disabled={locked || limitReached || filesCount >= MAX_FILES_PER_USER} onClick={() => fileInput.current?.click()}><Paperclip className="size-4" /></Button><Button type="button" size="icon" variant="ghost" className="size-11 shrink-0 rounded-xl text-slate-500" aria-label={ct(listening ? 'stopDictation' : 'dictateQuery')} disabled={locked || limitReached} onClick={() => { if (!voiceService.isSupported()) { toast.error(ct('unsupportedDictation')); return; } voiceService.toggleListening(t => setQuery(t), setListening, language); }}>{listening ? <MicOff className="size-4 text-red-600" /> : <Mic className="size-4" />}</Button><button type="button" aria-label={ct('startCall')} disabled={busy || !!artifact || limitReached || !!attached} className="copilot-call-button flex min-h-11 min-w-0 items-center gap-1.5 rounded-xl px-2 text-xs font-medium disabled:opacity-50" onClick={() => void startCall()}><Phone className="size-4 shrink-0" /><span>{ct('talkGemini')}</span></button></div>
-                <Button type="submit" size="icon" aria-label={ct('sendQuery')} disabled={limitReached || (callActive ? !query.trim() : locked || !query.trim() && !attached)} className="copilot-send size-11 shrink-0 rounded-xl text-white">{busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}</Button>
+              <div className="copilot-composer-toolbar">
+                <div className="copilot-composer-tools"><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ''; }} /><Button type="button" size="icon" variant="ghost" className="copilot-tool-button" aria-label={ct('attachPhoto')} title={ct('attachPhoto')} disabled={locked || limitReached || filesCount >= MAX_FILES_PER_USER} onClick={() => fileInput.current?.click()}><Paperclip className="size-4" /></Button><Button type="button" size="icon" variant="ghost" className="copilot-tool-button" aria-label={ct(listening ? 'stopDictation' : 'dictateQuery')} title={ct(listening ? 'stopDictation' : 'dictateQuery')} aria-pressed={listening} disabled={locked || limitReached} onClick={() => { if (!voiceService.isSupported()) { toast.error(ct('unsupportedDictation')); return; } voiceService.toggleListening(t => setQuery(t), setListening, language); }}>{listening ? <MicOff className="size-4 text-red-600" /> : <Mic className="size-4" />}</Button><button type="button" aria-label={ct('startCall')} disabled={busy || !!artifact || limitReached || !!attached} className="copilot-call-button flex min-h-11 min-w-0 items-center gap-1.5 rounded-xl px-2 text-xs font-medium disabled:opacity-50" onClick={() => void startCall()}><Phone className="size-4 shrink-0" /><span>{ct('callAction')}</span></button></div>
+                <Button type="submit" size="icon" aria-label={ct('sendQuery')} disabled={limitReached || (callActive ? !query.trim() : locked || !query.trim() && !attached)} className="copilot-send">{busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}</Button>
               </div>
             </form>
-            <p className="mt-2 flex items-center justify-center gap-1.5 text-center text-[10px] leading-relaxed text-slate-400"><ShieldCheck className="size-3 shrink-0" />{ct('confirmHint')}</p>
+            <p className="copilot-confirm-hint"><ShieldCheck className="size-3 shrink-0" />{ct('confirmHint')}</p>
             {location.pathname.startsWith('/bin-details/') && !binId && <p className="mt-1 text-center text-[10px] text-slate-400">{ct('focusHint')}</p>}
           </footer>
         </>}

@@ -119,7 +119,7 @@ export default function TokenCheckoutForm({
         />
       </div>
 
-      <div className="p-3.5 border border-blue-100 rounded-xl bg-blue-50/60 text-xs">
+      <div className="p-3.5 border border-brand-100 rounded-xl bg-brand-50/60 text-xs">
         <h4 className="font-bold text-slate-900 mb-2">
           {t("aiModals.orderSummary", { defaultValue: "Order Summary" })}
         </h4>
@@ -127,9 +127,9 @@ export default function TokenCheckoutForm({
           <span>{t("aiModals.tokensToBuy", { defaultValue: "Tokens to Buy:" })}</span>
           <span className="font-bold text-slate-900">{tokens.toLocaleString()}</span>
         </div>
-        <div className="flex justify-between font-bold text-sm text-slate-900 pt-1.5 border-t border-blue-200/60 mt-1.5">
+        <div className="flex justify-between font-bold text-sm text-slate-900 pt-1.5 border-t border-brand-200/60 mt-1.5">
           <span>{t("aiModals.totalToPay", { defaultValue: "Total to Pay:" })}</span>
-          <span className="text-blue-700 font-mono">{formatPrice(price)}</span>
+          <span className="text-brand-700 font-mono">{formatPrice(price)}</span>
         </div>
       </div>
 

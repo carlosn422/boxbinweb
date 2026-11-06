@@ -400,9 +400,9 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
       </div>
 
       {/* Balance Card */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-md flex items-center justify-between border border-slate-800">
+      <div className="bg-gradient-to-r from-slate-900 via-brand-950 to-slate-900 rounded-2xl p-4 text-white shadow-md flex items-center justify-between border border-slate-800">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-brand-300">
             {t("aiModals.currentBalance", { defaultValue: "Current Balance" })}
           </span>
           <p className="text-xs text-slate-300 mt-0.5">
@@ -444,21 +444,21 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
 
               <Card
                 className={`relative h-full transition-all duration-200 rounded-2xl ${isSelected
-                    ? "border-2 border-indigo-600 shadow-md bg-indigo-50/40"
+                    ? "border-2 border-brand-600 shadow-md bg-brand-50/40"
                     : isHovered
                       ? "border-slate-300 shadow-xs bg-slate-50/50"
                       : "border border-slate-200/80 bg-white"
                   }`}
               >
                 {isSelected && (
-                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-indigo-600 rounded-full flex items-center justify-center shadow z-10">
+                  <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-brand-600 rounded-full flex items-center justify-center shadow z-10">
                     <Check className="w-3 h-3 text-white" />
                   </div>
                 )}
 
                 <CardHeader className="p-3.5 pb-2 text-center">
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-1.5 transition-colors ${isSelected ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700"
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-1.5 transition-colors ${isSelected ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-700"
                       }`}
                   >
                     <IconComponent className="w-4 h-4" />
@@ -485,7 +485,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
 
                   <div className="space-y-1 text-[11px] text-slate-600 pt-2 border-t border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <Bot className="w-3 h-3 text-indigo-500 shrink-0" />
+                      <Bot className="w-3 h-3 text-brand-500 shrink-0" />
                       <span className="truncate">{t("aiModals.featureDetection", { defaultValue: "AI item detection" })}</span>
                     </div>
                     {pkg.metadata?.bonus && (
@@ -499,7 +499,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
                   <Button
                     size="sm"
                     className={`w-full h-7.5 text-xs font-semibold rounded-xl ${isSelected
-                        ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                        ? "bg-brand-600 hover:bg-brand-700 text-white"
                         : "bg-slate-900 hover:bg-slate-800 text-white"
                       }`}
                   >
@@ -655,7 +655,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
               size="sm"
               className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs h-8.5 font-bold flex items-center gap-1.5"
             >
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+              <Sparkles className="w-3.5 h-3.5 text-brand-400" />
               <span>{t("aiModals.confirmAndProcess", { defaultValue: "Confirm and Process" })}</span>
             </Button>
           )}
@@ -669,7 +669,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
     <div className="space-y-4">
       {isUploading || isPolling ? (
         <div className="flex flex-col items-center justify-center py-12 space-y-3">
-          <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+          <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
           <p className="text-xs font-bold text-slate-800">{t("aiModals.processingVideoWithAI", { defaultValue: "Processing video with AI..." })}</p>
           <p className="text-[11px] text-slate-400">{t("aiModals.mayTakeUpTo2Min", { defaultValue: "This may take up to 2 minutes" })}</p>
         </div>
@@ -762,7 +762,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
                         </>
                       ) : (
                         <>
-                          <Plus className="w-3.5 h-3.5 text-blue-400" />
+                          <Plus className="w-3.5 h-3.5 text-brand-400" />
                           <span>{t("aiModals.addToContainer", { defaultValue: "Add to Container" })}</span>
                         </>
                       )}
@@ -828,7 +828,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${isDragging
-            ? "border-indigo-500 bg-indigo-50/50"
+            ? "border-brand-500 bg-brand-50/50"
             : "border-slate-200 hover:border-slate-300 bg-slate-50/50 hover:bg-slate-50"
           }`}
       >
@@ -862,7 +862,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
             </div>
             <div>
               <label className="cursor-pointer">
-                <span className="text-xs font-bold text-slate-900 hover:text-indigo-600 transition-colors">
+                <span className="text-xs font-bold text-slate-900 hover:text-brand-600 transition-colors">
                   {t("aiModals.dropVideoPrompt", { defaultValue: "Click or drag a video to upload" })}
                 </span>
                 <input
@@ -883,7 +883,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
 
       {isUploading && (
         <div className="flex items-center justify-center space-x-2 py-3 bg-slate-50 rounded-xl border border-slate-200/80">
-          <Loader2 className="w-4 h-4 text-indigo-600 animate-spin" />
+          <Loader2 className="w-4 h-4 text-brand-600 animate-spin" />
           <span className="text-xs text-slate-600 font-medium">
             {t("aiModals.analyzingVideoRequirements", { defaultValue: "Analyzing video requirements..." })}
           </span>
@@ -909,7 +909,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
           size="sm"
           className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs h-8.5 font-bold shadow-xs flex items-center gap-1.5"
         >
-          <Sparkles className="w-3.5 h-3.5 text-blue-400" />
+          <Sparkles className="w-3.5 h-3.5 text-brand-400" />
           <span>{isUploading ? t("aiModals.processing", { defaultValue: "Analyzing..." }) : t("aiModals.analyzeVideo", { defaultValue: "Analyze Video" })}</span>
         </Button>
       </div>
@@ -927,7 +927,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
       {!hideTrigger && (
         <DialogTrigger asChild>
           <Button className="rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-xs">
-            <Video className="h-4 w-4 mr-2 text-purple-400" />
+            <Video className="h-4 w-4 mr-2 text-brand-400" />
             <span>Video AI</span>
           </Button>
         </DialogTrigger>
@@ -936,7 +936,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/80 shadow-2xl p-5 sm:p-6 bg-white">
         <DialogHeader className="pb-3 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-purple-600 shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
               <Video className="w-5 h-5" />
             </div>
             <div>

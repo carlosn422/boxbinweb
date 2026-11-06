@@ -98,7 +98,7 @@ const LoginByToken = () => {
   }, [navigate, searchParams]);
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 flex flex-col justify-between items-center font-sans p-6 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen w-full bg-slate-50 flex flex-col justify-between items-center font-sans p-6 selection:bg-brand-100 selection:text-brand-900">
       {/* Header */}
       <div className="w-full max-w-5xl py-4 flex items-center justify-center">
         <div className="flex items-center space-x-2.5">
@@ -113,7 +113,7 @@ const LoginByToken = () => {
             <span className="font-bold text-lg text-slate-900 tracking-tight">
               BoxBin
             </span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
               App
             </span>
           </div>
@@ -148,7 +148,7 @@ const LoginByToken = () => {
             <div className="space-y-6">
               <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
                 <div className="absolute inset-0 rounded-full border-2 border-slate-200 border-t-blue-600 animate-spin" />
-                <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                <div className="w-10 h-10 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600">
                   <Lock className="w-5 h-5" />
                 </div>
               </div>

@@ -802,9 +802,9 @@ const BinDetailsScreen: React.FC = () => {
       <div className="min-h-screen bg-slate-50/60 flex flex-col items-center justify-center p-4 font-sans">
         <div className="text-center space-y-3 bg-white p-8 rounded-3xl border border-slate-200/80 shadow-sm">
           <div className="relative w-12 h-12 mx-auto">
-            <div className="absolute inset-0 rounded-2xl bg-blue-500/20 blur-md animate-pulse" />
+            <div className="absolute inset-0 rounded-2xl bg-brand-500/20 blur-md animate-pulse" />
             <div className="relative w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-400" />
+              <Loader2 className="w-6 h-6 animate-spin text-brand-400" />
             </div>
           </div>
           <p className="text-xs text-slate-600 font-semibold tracking-wide">
@@ -864,7 +864,7 @@ const BinDetailsScreen: React.FC = () => {
         <Label className="text-xs font-bold text-slate-700 block mb-1.5">
           {t("containers.photo", { defaultValue: "Photo" })}
         </Label>
-        <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 transition-colors rounded-2xl p-3.5 bg-slate-50/60 text-center">
+        <div className="border-2 border-dashed border-slate-200 hover:border-brand-400 transition-colors rounded-2xl p-3.5 bg-slate-50/60 text-center">
           {selectedImage ? (
             <div className="flex items-center gap-3.5">
               <div className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
@@ -879,7 +879,7 @@ const BinDetailsScreen: React.FC = () => {
                   {t("containers.selectedPhoto", { defaultValue: "Selected photo" })}
                 </p>
                 <div className="flex items-center gap-2 mt-1">
-                  <label className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer">
+                  <label className="text-[11px] font-semibold text-brand-600 hover:text-brand-700 hover:underline cursor-pointer">
                     {t("containers.changePhoto", { defaultValue: "Change photo" })}
                     <input
                       type="file"
@@ -904,10 +904,10 @@ const BinDetailsScreen: React.FC = () => {
             </div>
           ) : (
             <label className="cursor-pointer flex flex-col items-center justify-center py-3 px-2 group">
-              <div className="w-10 h-10 rounded-xl bg-white text-slate-400 group-hover:text-blue-600 flex items-center justify-center shadow-2xs border border-slate-200/80 mb-2 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-white text-slate-400 group-hover:text-brand-600 flex items-center justify-center shadow-2xs border border-slate-200/80 mb-2 transition-colors">
                 <UploadCloud className="w-5 h-5" />
               </div>
-              <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors">
+              <span className="text-xs font-bold text-slate-800 group-hover:text-brand-600 transition-colors">
                 {t("containers.selectPhoto", { defaultValue: "Select photo" })}
               </span>
               <span className="text-[10px] text-slate-400 mt-0.5">
@@ -934,7 +934,7 @@ const BinDetailsScreen: React.FC = () => {
           value={itemName}
           onChange={(e) => setItemName(e.target.value)}
           placeholder={t("containers.itemNamePlaceholder", { defaultValue: "Item name" })}
-          className="h-9 text-xs rounded-xl border-slate-200 bg-white focus:bg-white focus:border-blue-500 shadow-2xs"
+          className="h-9 text-xs rounded-xl border-slate-200 bg-white focus:bg-white focus:border-brand-500 shadow-2xs"
           autoFocus={!isEdit}
         />
       </div>
@@ -1052,13 +1052,13 @@ const BinDetailsScreen: React.FC = () => {
             {itemTags.map((tag, idx) => (
               <span
                 key={idx}
-                className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg border border-blue-200/60"
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold bg-brand-50 text-brand-700 px-2.5 py-1 rounded-lg border border-brand-200/60"
               >
                 #{tag}
                 <button
                   type="button"
                   onClick={() => handleRemoveTag(tag)}
-                  className="text-blue-400 hover:text-blue-800 transition-colors"
+                  className="text-brand-400 hover:text-brand-800 transition-colors"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -1114,7 +1114,7 @@ const BinDetailsScreen: React.FC = () => {
             </Button>
 
             <div className="bin-detail-icon">
-              <Box className="w-6 h-6 text-blue-400" />
+              <Box className="w-6 h-6 text-brand-400" />
             </div>
 
             <div className="min-w-0 flex-1">
@@ -1123,8 +1123,8 @@ const BinDetailsScreen: React.FC = () => {
                   {bin.name}
                 </h1>
                 {bin.location?.name && (
-                  <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80 inline-flex items-center gap-1.5 shadow-2xs shrink-0">
-                    <MapPin className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-brand-50 text-brand-700 border border-brand-200/80 inline-flex items-center gap-1.5 shadow-2xs shrink-0">
+                    <MapPin className="w-3.5 h-3.5 text-brand-500" />
                     <span>{bin.location.name}</span>
                   </span>
                 )}
@@ -1160,7 +1160,7 @@ const BinDetailsScreen: React.FC = () => {
               className="bin-detail-copilot"
               title={t("containers.askBinCopilot", { defaultValue: "Ask BoxBin AI Copilot about this bin" })}
             >
-              <Sparkles className="w-3.5 h-3.5 text-blue-200 animate-pulse" />
+              <Sparkles className="w-3.5 h-3.5 text-brand-200 animate-pulse" />
               <span>{t("containers.aiCopilot", { defaultValue: "AI Copilot" })}</span>
             </Button>
 
@@ -1173,7 +1173,7 @@ const BinDetailsScreen: React.FC = () => {
                   size="sm"
                   className="h-9 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
                 >
-                  <ScanLine className="w-3.5 h-3.5 text-indigo-600" />
+                  <ScanLine className="w-3.5 h-3.5 text-brand-600" />
                   <span>{t("containers.aiTools", { defaultValue: "AI Tools" })}</span>
                   <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
                 </Button>
@@ -1198,7 +1198,7 @@ const BinDetailsScreen: React.FC = () => {
                   onClick={() => setIsVideoUploadOpen(true)}
                   className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50 transition-colors"
                 >
-                  <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                  <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
                     <Video className="w-4 h-4" />
                   </div>
                   <div>
@@ -1216,7 +1216,7 @@ const BinDetailsScreen: React.FC = () => {
               onClick={() => setIsBulkUploadOpen(true)}
               className="h-9 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
             >
-              <UploadCloud className="w-3.5 h-3.5 text-blue-600" />
+              <UploadCloud className="w-3.5 h-3.5 text-brand-600" />
               <span>{t("containers.bulkUpload", { defaultValue: "Bulk Upload" })}</span>
             </Button>
 
@@ -1230,7 +1230,7 @@ const BinDetailsScreen: React.FC = () => {
               title={t("containers.refreshTooltip", { defaultValue: "Refresh container" })}
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-600" : "text-slate-500"}`}
+                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-brand-600" : "text-slate-500"}`}
               />
             </Button>
 
@@ -1306,7 +1306,7 @@ const BinDetailsScreen: React.FC = () => {
               }}
               className="bin-detail-add"
             >
-              <Plus className="w-4 h-4 text-blue-400" />
+              <Plus className="w-4 h-4 text-brand-400" />
               <span>{t("containers.addItem", { defaultValue: "Add Item" })}</span>
             </Button>
           </div>
@@ -1337,7 +1337,7 @@ const BinDetailsScreen: React.FC = () => {
           {/* Card 2: Total Units */}
           <div className="bin-detail-stat">
             <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0 shadow-2xs">
+              <div className="w-11 h-11 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0 shadow-2xs">
                 <Layers className="w-5 h-5" />
               </div>
               <div>
@@ -1357,7 +1357,7 @@ const BinDetailsScreen: React.FC = () => {
           {/* Card 3: Total Valuation */}
           <div className="bin-detail-stat">
             <div className="flex items-center gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0 shadow-2xs">
+              <div className="w-11 h-11 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0 shadow-2xs">
                 <TrendingUp className="w-5 h-5" />
               </div>
               <div>
@@ -1385,7 +1385,7 @@ const BinDetailsScreen: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("containers.searchPlaceholder", { defaultValue: "Search items by name, tag, or description..." })}
-              className="pl-10 pr-9 h-9 bg-slate-50/90 border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:bg-white focus:border-blue-400 transition-all shadow-2xs"
+              className="pl-10 pr-9 h-9 bg-slate-50/90 border-slate-200 rounded-xl text-xs placeholder:text-slate-400 focus:bg-white focus:border-brand-400 transition-all shadow-2xs"
             />
             {searchQuery && (
               <button
@@ -1511,7 +1511,7 @@ const BinDetailsScreen: React.FC = () => {
                   onClick={() => setSelectedTag(isSelected ? null : tag)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shadow-2xs ${
                     isSelected
-                      ? "bg-blue-600 text-white shadow-sm font-bold"
+                      ? "bg-brand-600 text-white shadow-sm font-bold"
                       : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
                   }`}
                 >
@@ -1565,7 +1565,7 @@ const BinDetailsScreen: React.FC = () => {
                 }}
                 className="h-9 px-5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-sm"
               >
-                <Plus className="w-4 h-4 mr-1.5 text-blue-400" />
+                <Plus className="w-4 h-4 mr-1.5 text-brand-400" />
                 <span>{t("containers.addFirstItem", { defaultValue: "Add First Item" })}</span>
               </Button>
             )}
@@ -1643,7 +1643,7 @@ const BinDetailsScreen: React.FC = () => {
                     <div>
                       {/* Item Title */}
                       <h3
-                        className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate text-sm leading-snug"
+                        className="font-bold text-slate-900 group-hover:text-brand-600 transition-colors truncate text-sm leading-snug"
                         title={item.name}
                       >
                         {item.name}
@@ -1666,7 +1666,7 @@ const BinDetailsScreen: React.FC = () => {
                                 e.stopPropagation();
                                 setSelectedTag(tg);
                               }}
-                              className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 border border-slate-200/50 transition-colors cursor-pointer truncate max-w-[120px]"
+                              className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-100 hover:bg-brand-50 hover:text-brand-700 text-slate-600 border border-slate-200/50 transition-colors cursor-pointer truncate max-w-[120px]"
                             >
                               #{tg}
                             </span>
@@ -1780,7 +1780,7 @@ const BinDetailsScreen: React.FC = () => {
 
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-600 transition-colors">
+                        <span className="font-bold text-slate-900 text-sm truncate group-hover:text-brand-600 transition-colors">
                           {item.name}
                         </span>
                         {val > 0 && (
@@ -1800,7 +1800,7 @@ const BinDetailsScreen: React.FC = () => {
                             <span
                               key={idx}
                               onClick={() => setSelectedTag(tg)}
-                              className="text-[10px] font-semibold text-slate-500 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 px-1.5 py-0.2 rounded border border-slate-200/50 cursor-pointer"
+                              className="text-[10px] font-semibold text-slate-500 bg-slate-100 hover:bg-brand-50 hover:text-brand-700 px-1.5 py-0.2 rounded border border-slate-200/50 cursor-pointer"
                             >
                               #{tg}
                             </span>
@@ -1878,7 +1878,7 @@ const BinDetailsScreen: React.FC = () => {
         <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-blue-600" />
+              <Plus className="w-5 h-5 text-brand-600" />
               <span>{t("containers.addNewItem", { defaultValue: "Add New Item" })}</span>
             </DialogTitle>
           </DialogHeader>
@@ -1914,7 +1914,7 @@ const BinDetailsScreen: React.FC = () => {
         <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Edit3 className="w-5 h-5 text-blue-600" />
+              <Edit3 className="w-5 h-5 text-brand-600" />
               <span>{t("containers.editItemTitle", { defaultValue: "Edit Item" })}</span>
             </DialogTitle>
           </DialogHeader>
@@ -1950,7 +1950,7 @@ const BinDetailsScreen: React.FC = () => {
         <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
-              <Box className="w-5 h-5 text-blue-600" />
+              <Box className="w-5 h-5 text-brand-600" />
               <span>{t("containers.editBinTitle", { defaultValue: "Edit Container" })}</span>
             </DialogTitle>
           </DialogHeader>
@@ -2030,13 +2030,13 @@ const BinDetailsScreen: React.FC = () => {
         <DialogContent className="workspace-safe-dialog bin-detail-dialog max-w-md rounded-3xl border border-slate-200 shadow-2xl p-6 bg-white">
           <DialogHeader className="pb-3 border-b border-slate-100">
             <DialogTitle className="text-base font-black text-slate-900 flex items-center gap-2">
-              <UploadCloud className="w-5 h-5 text-blue-600" />
+              <UploadCloud className="w-5 h-5 text-brand-600" />
               <span>{t("containers.bulkUploadTitle", { defaultValue: "Bulk Upload Photos" })}</span>
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 pt-1">
-            <div className="border-2 border-dashed border-slate-200 rounded-3xl p-7 text-center bg-slate-50/60 hover:border-blue-400 transition-colors">
+            <div className="border-2 border-dashed border-slate-200 rounded-3xl p-7 text-center bg-slate-50/60 hover:border-brand-400 transition-colors">
               <input
                 type="file"
                 id="bulkUploadInput"
@@ -2051,7 +2051,7 @@ const BinDetailsScreen: React.FC = () => {
                 className="cursor-pointer flex flex-col items-center justify-center space-y-2.5"
               >
                 <div className="w-12 h-12 rounded-2xl bg-white text-slate-400 border border-slate-200/80 shadow-2xs flex items-center justify-center">
-                  <UploadCloud className="w-6 h-6 text-blue-600" />
+                  <UploadCloud className="w-6 h-6 text-brand-600" />
                 </div>
                 <span className="text-xs font-bold text-slate-900">
                   {t("containers.selectMultiplePhotos", { defaultValue: "Select multiple photos" })}
@@ -2070,7 +2070,7 @@ const BinDetailsScreen: React.FC = () => {
                 </div>
                 <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
                   <div
-                    className="bg-blue-600 h-full rounded-full transition-all duration-200"
+                    className="bg-brand-600 h-full rounded-full transition-all duration-200"
                     style={{
                       width: `${(bulkProgress.done / bulkProgress.total) * 100}%`,
                     }}

@@ -49,7 +49,7 @@ export const Step3 = ({ qrCount, onBack, requestId }: Step3Props) => {
           <div className="flex justify-center">
             <button
               onClick={onBack}
-              className="py-2 px-6 bg-blue-600 text-white rounded"
+              className="py-2 px-6 bg-brand-600 text-white rounded"
             >
               Done
             </button>

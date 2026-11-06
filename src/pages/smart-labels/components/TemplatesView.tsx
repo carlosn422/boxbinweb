@@ -146,7 +146,7 @@ export const TemplatesView = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-blue-100 selection:text-blue-900 pb-12 font-sans">
+    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
       <div className="container mx-auto px-4 sm:px-6 py-5 max-w-7xl space-y-4">
         {/* Navigation & Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -162,7 +162,7 @@ export const TemplatesView = () => {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 Print Templates
               </h1>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
                 Avery Compatible
               </span>
             </div>
@@ -181,7 +181,7 @@ export const TemplatesView = () => {
               className="h-8 px-2.5 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-lg text-xs shadow-2xs"
             >
               <RefreshCw
-                className={`w-3.5 h-3.5 ${loading ? "animate-spin text-blue-600" : "text-slate-500"
+                className={`w-3.5 h-3.5 ${loading ? "animate-spin text-brand-600" : "text-slate-500"
                   }`}
               />
               <span className="ml-1.5 hidden sm:inline">Refresh</span>
@@ -191,9 +191,9 @@ export const TemplatesView = () => {
 
         {/* Selected QR Codes Context Banner */}
         {selectedQRCodes.length > 0 ? (
-          <div className="bg-white rounded-xl border border-indigo-200/80 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+          <div className="bg-white rounded-xl border border-brand-200/80 p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <div className="w-8 h-8 rounded-lg bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shrink-0">
                 <Printer className="w-4 h-4" />
               </div>
               <div>
@@ -224,7 +224,7 @@ export const TemplatesView = () => {
               variant="outline"
               size="sm"
               onClick={() => navigate("/smart-labels")}
-              className="h-7 text-xs border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+              className="h-7 text-xs border-brand-200 text-brand-700 hover:bg-brand-50"
             >
               Change selection
             </Button>
@@ -313,7 +313,7 @@ export const TemplatesView = () => {
                     {/* Top Header */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <h3 className="font-bold text-sm text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                        <h3 className="font-bold text-sm text-slate-900 group-hover:text-brand-600 transition-colors truncate">
                           {template.name}
                         </h3>
                         {template.description && (
@@ -324,7 +324,7 @@ export const TemplatesView = () => {
                       </div>
                       <Badge
                         variant="secondary"
-                        className="bg-blue-50 text-blue-700 border-blue-200/70 text-[10px] font-semibold shrink-0"
+                        className="bg-brand-50 text-brand-700 border-brand-200/70 text-[10px] font-semibold shrink-0"
                       >
                         {totalLabels} / sheet
                       </Badge>
@@ -333,7 +333,7 @@ export const TemplatesView = () => {
                     {/* Sheet Miniature Visual Graphic */}
                     <div className="relative p-2 bg-slate-50 rounded-lg border border-slate-100 flex items-center justify-center overflow-hidden h-36">
                       {/* Interactive CSS Sheet Preview */}
-                      <div className="w-24 h-32 bg-white rounded shadow-xs border border-slate-200 p-1 flex flex-col justify-between group-hover:border-blue-400 group-hover:shadow-sm transition-all">
+                      <div className="w-24 h-32 bg-white rounded shadow-xs border border-slate-200 p-1 flex flex-col justify-between group-hover:border-brand-400 group-hover:shadow-sm transition-all">
                         {/* Mini Label Grid simulation */}
                         <div
                           className="w-full h-full grid gap-0.5"

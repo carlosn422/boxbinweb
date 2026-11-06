@@ -85,7 +85,7 @@ const LoginPage = () => {
   ];
 
   return (
-    <div className="min-h-screen w-full bg-slate-50 flex flex-col justify-between font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen w-full bg-slate-50 flex flex-col justify-between font-sans selection:bg-brand-100 selection:text-brand-900">
       {/* Top Header */}
       <header className="w-full max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
         <a
@@ -94,7 +94,7 @@ const LoginPage = () => {
           rel="noopener noreferrer"
           className="flex items-center space-x-2.5 group"
         >
-          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center p-1 group-hover:border-blue-300 transition-colors">
+          <div className="w-8 h-8 rounded-lg bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center p-1 group-hover:border-brand-300 transition-colors">
             <img
               src={LogoIcon}
               alt="BoxBin"
@@ -102,10 +102,10 @@ const LoginPage = () => {
             />
           </div>
           <div className="flex items-center space-x-2">
-            <span className="font-bold text-lg text-slate-900 group-hover:text-blue-600 transition-colors tracking-tight">
+            <span className="font-bold text-lg text-slate-900 group-hover:text-brand-600 transition-colors tracking-tight">
               BoxBin
             </span>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70">
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-200/70">
               App
             </span>
           </div>
@@ -123,8 +123,8 @@ const LoginPage = () => {
           {/* Left Hero / Brand Statement (Desktop) */}
           <div className="hidden lg:flex lg:col-span-7 flex-col justify-center space-y-8 pr-4">
             <div className="space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 border border-blue-200/70 text-blue-700 text-xs font-semibold">
-                <Box className="w-3.5 h-3.5 text-blue-600" />
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-50 border border-brand-200/70 text-brand-700 text-xs font-semibold">
+                <Box className="w-3.5 h-3.5 text-brand-600" />
                 <span>Smart Storage & Inventory Management</span>
               </div>
 
@@ -148,7 +148,7 @@ const LoginPage = () => {
                     className="flex items-start space-x-4 p-4 rounded-xl bg-white border border-slate-200/80 shadow-2xs"
                   >
                     <div className="w-9 h-9 rounded-lg bg-slate-50 border border-slate-200/70 flex items-center justify-center text-slate-700 shrink-0 mt-0.5">
-                      <Icon className="w-4 h-4 text-blue-600" />
+                      <Icon className="w-4 h-4 text-brand-600" />
                     </div>
                     <div className="space-y-1">
                       <h4 className="text-sm font-semibold text-slate-900">
@@ -273,7 +273,7 @@ const LoginPage = () => {
                   href="https://boxbin.io/terms-of-service/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-blue-600 transition-colors"
+                  className="hover:text-brand-600 transition-colors"
                 >
                   Terms
                 </a>
@@ -282,7 +282,7 @@ const LoginPage = () => {
                   href="https://boxbin.io/privacy-policy/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-blue-600 transition-colors"
+                  className="hover:text-brand-600 transition-colors"
                 >
                   Privacy
                 </a>
@@ -291,7 +291,7 @@ const LoginPage = () => {
                   href="https://boxbin.io/support/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-blue-600 transition-colors inline-flex items-center gap-1"
+                  className="hover:text-brand-600 transition-colors inline-flex items-center gap-1"
                 >
                   Support
                   <ExternalLink className="w-3 h-3" />

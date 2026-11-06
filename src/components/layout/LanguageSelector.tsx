@@ -79,7 +79,7 @@ export function LanguageSelector({ collapsed = false, className }: LanguageSelec
               <span className="font-medium">{language.name}</span>
             </div>
             {code === language.code && (
-              <Check className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <Check className="h-4 w-4 text-brand-600 dark:text-brand-400" />
             )}
           </DropdownMenuItem>
         ))}

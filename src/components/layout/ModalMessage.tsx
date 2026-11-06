@@ -43,19 +43,19 @@ const getModalConfig = (type: ModalType) => {
     case 'info':
       return {
         icon: Info,
-        iconColor: 'text-blue-500',
-        bgColor: 'bg-blue-50',
-        borderColor: 'border-blue-200',
-        buttonColor: 'bg-blue-600 hover:bg-blue-700',
+        iconColor: 'text-brand-500',
+        bgColor: 'bg-brand-50',
+        borderColor: 'border-brand-200',
+        buttonColor: 'bg-brand-600 hover:bg-brand-700',
         defaultTitle: 'Information'
       };
     default:
       return {
         icon: Info,
-        iconColor: 'text-blue-500',
-        bgColor: 'bg-blue-50',
-        borderColor: 'border-blue-200',
-        buttonColor: 'bg-blue-600 hover:bg-blue-700',
+        iconColor: 'text-brand-500',
+        bgColor: 'bg-brand-50',
+        borderColor: 'border-brand-200',
+        buttonColor: 'bg-brand-600 hover:bg-brand-700',
         defaultTitle: 'Information'
       };
   }
