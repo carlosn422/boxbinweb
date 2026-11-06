@@ -787,7 +787,7 @@
 /* Mobile app navigation: persistent destinations and an account/action sheet. */
 @media (max-width: 767px) {
   .boxbin-mobile-header .boxbin-brand { font-size: 22px; gap: 4px; }
-  .boxbin-mobile-header .boxbin-brand-logo { width: 36px; height: 36px; mix-blend-mode: multiply; }
+  .boxbin-mobile-header .boxbin-brand-logo { width: 36px; height: 36px; object-fit: contain; }
   .boxbin-mobile-account { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; }
   .boxbin-mobile-account .boxbin-avatar { width: 34px; height: 34px; border: 3px solid white; box-shadow: 0 2px 8px #27231c0a; font-size: 10px; }
   .boxbin-mobile-tabs { position: fixed; inset: auto 0 0; z-index: 30; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: start; gap: 4px; min-height: var(--mobile-navigation-height); padding: 8px max(12px, var(--app-safe-right)) calc(8px + var(--app-safe-bottom)) max(12px, var(--app-safe-left)); background: #ffffffed; border-top: 1px solid var(--border); box-shadow: 0 -8px 24px #39312204; backdrop-filter: blur(18px); }

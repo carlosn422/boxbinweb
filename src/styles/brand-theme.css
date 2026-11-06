@@ -75,11 +75,9 @@ button.bg-slate-900 > svg {
   letter-spacing: -.025em;
 }
 
-/* Keep the existing BoxBin mark, using the reference's charcoal treatment. */
 .boxbin-brand-logo,
 img[alt="BoxBin"] {
-  filter: grayscale(1) contrast(1.8);
-  mix-blend-mode: multiply;
+  object-fit: contain;
 }
 
 ::selection {
