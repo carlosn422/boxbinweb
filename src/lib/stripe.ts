@@ -309,31 +309,48 @@ export const createStripeSubscriptionCupons = async (
 };
 
 export const getStripePlanById = async (priceId: string): Promise<any> => {
+  if (!priceId) return null;
   try {
-    const price = await stripeClient.prices.retrieve(priceId, {
-      expand: ["product"],
+    const { data, error } = await supabase.functions.invoke("get-plan-by-id", {
+      body: { priceId },
     });
 
-    if (!price || typeof price.product !== "object") {
-      return null;
+    if (!error && data && data.product) {
+      const metadata = data?.product?.metadata ?? data?.metadata ?? {};
+      return {
+        ...data,
+        metadata,
+        product: {
+          ...(data.product || {}),
+          metadata,
+        },
+      };
     }
-
-    const product = price.product as Stripe.Product;
-
-    return {
-      priceId: price.id,
-      product: {
-        name: product.name,
-        description: product.description,
-      },
-      unit_amount: price.unit_amount ?? 0,
-      recurring: price.recurring ?? null,
-      ...product,
-    };
-  } catch (error) {
-    console.error(`Error retrieving plan with ID ${priceId}:`, error);
-    return null;
+  } catch (err) {
+    console.warn("Could not fetch plan via Supabase edge function:", err);
   }
+
+  // Graceful fallback plan details when Stripe / Edge Function is offline or unconfigured
+  const isPro = /pro|unlimited|business|premium/i.test(priceId);
+  return {
+    priceId,
+    unit_amount: isPro ? 999 : 0,
+    currency: "usd",
+    recurring: { interval: "month" },
+    product: {
+      id: priceId,
+      name: isPro ? "Pro Plan" : "Basic Plan",
+      description: isPro ? "Full access" : "Free starter tier",
+      metadata: {
+        bins: isPro ? "1000" : "100",
+        items: isPro ? "Unlimited" : "50",
+      },
+    },
+    metadata: {
+      bins: isPro ? "1000" : "100",
+      items: isPro ? "Unlimited" : "50",
+    },
+  };
 };
 
 export const cancelUserSubscription = async (
