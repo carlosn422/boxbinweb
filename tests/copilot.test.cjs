@@ -76,6 +76,7 @@ async function fixture() {
   await db.exec(`create role anon;create role authenticated;create role service_role bypassrls;
     create schema auth;create table auth.users(id uuid primary key,raw_app_meta_data jsonb default '{}',raw_user_meta_data jsonb default '{}');
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+    create function auth.jwt() returns jsonb language sql stable as $$select jsonb_build_object('sub', auth.uid())$$;
     grant usage on schema auth, public to authenticated, anon, service_role;grant execute on function auth.uid() to authenticated;
     create table public.bins(id text primary key default gen_random_uuid()::text,name text,description text,location jsonb,"userId" text,"createdAt" timestamptz);
     create table public.locations(id text primary key default gen_random_uuid()::text,name text,description text,address text,"userId" text,"createdAt" timestamptz);
@@ -437,4 +438,50 @@ test('Canonical edits attach trusted snapshots and reject records outside the fo
   assert.equal(proposal.data.expectedVersion,'a'.repeat(32));assert.equal(proposal.data.before.value,'100');assert.equal(proposal.data.name,undefined);
   await assert.rejects(()=>canonicalProposal(ctx,{type:'update_item',data:{itemId:'foreign-scope',name:'New'}},'a-box'),/COPILOT_INVALID/);
   await assert.rejects(()=>canonicalProposal(ctx,{type:'update_location',data:{locationId:'other-loc',name:'New'}},'a-box'),/COPILOT_INVALID/);
+});
+
+test('Quota failures distinguish BoxBin daily usage from provider capacity for chat, images and streams', async () => {
+  const replacements = {'https://esm.sh/@supabase/supabase-js@2.109.0': {createClient(){}}};
+  const server = loadTS('supabase/functions/_shared/copilot-server.ts', replacements, {
+    Deno: {env: {get: name => name === 'GEMINI_API_KEY' ? 'test-key' : undefined}},
+    fetch: async () => new Response('{}', {status: 429}),
+  });
+  const db = {rpc: async () => ({error: {message: 'COPILOT_QUOTA'}})};
+  for (const [kind, code] of [['chat', 'COPILOT_DAILY_QUOTA'], ['live_connections', 'COPILOT_VOICE_QUOTA'], ['image', 'COPILOT_IMAGE_QUOTA']]) {
+    await assert.rejects(() => server.rpc(db, 'copilot_take_quota', {p_kind: kind}), e => e.code === code && e.status === 429);
+  }
+  await assert.rejects(() => server.rpc(db, 'copilot_claim_image', {}), e => e.code === 'COPILOT_IMAGE_QUOTA');
+  await assert.rejects(() => server.gemini({}), e => e.code === 'COPILOT_PROVIDER_QUOTA' && e.status === 429);
+  for (const status of [402, 429]) {
+    const stream = loadTS('supabase/functions/_shared/copilot-stream.ts', {}, {
+      Deno: {env: {get: name => name === 'GEMINI_API_KEY' ? 'test-key' : undefined}},
+      fetch: async () => new Response('{}', {status}),
+    });
+    await assert.rejects(() => stream.streamReply({}, () => {}, new AbortController().signal, 1000), e => e.code === 'COPILOT_PROVIDER_QUOTA');
+  }
+});
+
+test('Live provider quota ends the call with a provider-specific error instead of a daily limit', async () => {
+  let provider;
+  const frames = [];
+  class WS {
+    static OPEN = 1; readyState = 1; bufferedAmount = 0;
+    constructor(){ provider = this; }
+    send(){} close(){this.readyState = 3; this.onclose?.();}
+  }
+  const {attachSession} = loadTS('supabase/functions/boxbin-copilot-voice/index.ts', {
+    '../_shared/copilot-server.ts': {
+      inventory: async () => ({}), rpc: async () => {},
+      failure: error => new Response(JSON.stringify({code: error.code, error: error.message})),
+    },
+    '../_shared/copilot-live.ts': {LiveTurnTools: class {}, liveSetup: () => ({})},
+  }, {WebSocket: WS, setTimeout: () => 1, clearTimeout(){}, setInterval: () => 1, clearInterval(){}});
+  const client = {readyState: 1, bufferedAmount: 0, send: data => frames.push(JSON.parse(data)), close(){this.readyState = 3;}};
+  attachSession(client, {actor: A, owner: A, db: {}}, 'test-key');
+  await client.onmessage({data: JSON.stringify({type: 'start'})});
+  provider.onmessage({data: JSON.stringify({error: {code: 429, status: 'RESOURCE_EXHAUSTED'}})});
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(frames.at(-1).code, 'COPILOT_PROVIDER_QUOTA');
+  assert.equal(client.readyState, 3);
+  assert.equal(provider.readyState, 3);
 });

@@ -113,7 +113,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
         if (!bytes.length || bytes.length > 6400 || bytes.length % 2) throw new CopilotError('COPILOT_INVALID');
         const now = Date.now(); audioCredit = Math.min(64000, audioCredit + (now - lastPcm) * 35); lastPcm = now;
         audioCredit -= bytes.length;
-        if (audioCredit < 0) throw new CopilotError('COPILOT_QUOTA', 429);
+        if (audioCredit < 0) throw new CopilotError('COPILOT_AUDIO_RATE', 429);
         upstream({ realtimeInput: { audio: { data: btoa(String.fromCharCode(...bytes)), mimeType: 'audio/pcm;rate=16000' } } });
         return;
       }
@@ -164,7 +164,10 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
   };
   async function receive(value: any) {
     if (closed || !turn) return;
-    if (value.error) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
+    if (value.error) {
+      const quota = value.error.code === 429 || value.error.code === 402 || value.error.status === 'RESOURCE_EXHAUSTED';
+      throw new CopilotError(quota ? 'COPILOT_PROVIDER_QUOTA' : 'COPILOT_UNAVAILABLE', quota ? 429 : 503);
+    }
     if (value.setupComplete) { ready = true; clearTimeout(setupTimer); send({ type: 'ready' }); }
     if (value.goAway) rotate();
     const content = value.serverContent;

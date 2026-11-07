@@ -34,7 +34,7 @@ export async function streamReply(body: Record<string, unknown>, onText: (delta:
     const detail = (await response.text()).slice(0, 500).replace(/[\r\n]+/g, ' ');
     console.error('Gemini streaming API rejected request', { model, status: response.status, detail });
     const quota = response.status === 429 || response.status === 402;
-    throw new CopilotError(quota ? 'COPILOT_QUOTA' : response.status === 401 || response.status === 403 || response.status === 404 ? 'COPILOT_CONFIGURATION' : 'COPILOT_UNAVAILABLE', quota ? 429 : 503);
+    throw new CopilotError(quota ? 'COPILOT_PROVIDER_QUOTA' : response.status === 401 || response.status === 403 || response.status === 404 ? 'COPILOT_CONFIGURATION' : 'COPILOT_UNAVAILABLE', quota ? 429 : 503);
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

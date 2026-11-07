@@ -17,7 +17,12 @@ const messages: Record<string, string> = {
   COPILOT_UNAUTHORIZED: 'Inicia sesión para usar el copiloto.',
   COPILOT_INVALID: 'Revisa los datos de la solicitud.',
   COPILOT_NOT_FOUND: 'El registro no existe o no pertenece a tu cuenta.',
-  COPILOT_QUOTA: 'Alcanzaste el límite diario de solicitudes. Intenta mañana.',
+  COPILOT_QUOTA: 'Se alcanzó un límite de uso del asistente. Intenta más tarde.',
+  COPILOT_DAILY_QUOTA: 'Alcanzaste el límite diario de BoxBin para chat y voz. Se renueva a las 00:00 UTC.',
+  COPILOT_VOICE_QUOTA: 'Alcanzaste el límite diario de conexiones de voz. Se renueva a las 00:00 UTC. Puedes usar el chat si aún tienes consultas disponibles.',
+  COPILOT_IMAGE_QUOTA: 'Alcanzaste el límite diario de imágenes. Se renueva a las 00:00 UTC.',
+  COPILOT_PROVIDER_QUOTA: 'El proveedor de IA alcanzó su cuota o límite de solicitudes. Intenta más tarde; si continúa, el administrador debe revisar la cuota del servicio.',
+  COPILOT_AUDIO_RATE: 'Se interrumpió la llamada porque el audio llegó demasiado rápido. Inicia una nueva llamada.',
   COPILOT_PLAN_LIMIT: 'Tu plan no permite agregar más registros en este destino.',
   COPILOT_SUBSCRIPTION: 'Necesitas una suscripción activa para usar el copiloto.',
   COPILOT_STALE_ITEM: 'El ítem cambió de caja. Actualiza la consulta antes de moverlo.',
@@ -106,6 +111,13 @@ export async function rpc(db: any, name: string, args: Record<string, unknown>):
   if (error) {
     console.error('RPC error in ' + name, error);
     const code = Object.keys(messages).find(c => error.message?.includes(c));
+    if (code === 'COPILOT_QUOTA') {
+      const kind = args.p_kind;
+      const quotaCode = name === 'copilot_claim_image' || kind === 'image' ? 'COPILOT_IMAGE_QUOTA'
+        : kind === 'live_connections' ? 'COPILOT_VOICE_QUOTA'
+        : kind === 'chat' ? 'COPILOT_DAILY_QUOTA' : 'COPILOT_QUOTA';
+      throw new CopilotError(quotaCode, 429);
+    }
     throw new CopilotError(code || 'COPILOT_UNAVAILABLE', code === 'COPILOT_QUOTA' || code === 'COPILOT_BUSY' ? 429 : code ? 400 : 503);
   }
   return data;
@@ -208,7 +220,7 @@ export async function gemini(body: Record<string, unknown>, image = false, timeo
     const detail = (await response.text()).slice(0, 500).replace(/[\r\n]+/g, ' ');
     console.error('Gemini API rejected request', { model, status: response.status, detail });
     const quota = response.status === 429 || response.status === 402;
-    throw new CopilotError(quota ? 'COPILOT_QUOTA' : response.status === 401 || response.status === 403 || response.status === 404 ? 'COPILOT_CONFIGURATION' : 'COPILOT_UNAVAILABLE', quota ? 429 : 503);
+    throw new CopilotError(quota ? 'COPILOT_PROVIDER_QUOTA' : response.status === 401 || response.status === 403 || response.status === 404 ? 'COPILOT_CONFIGURATION' : 'COPILOT_UNAVAILABLE', quota ? 429 : 503);
   }
   const value = await response.json();
   const candidate = value.candidates?.[0];
