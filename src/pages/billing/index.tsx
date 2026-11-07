@@ -42,7 +42,12 @@ const planVisuals = [
 ];
 
 export default function BillingPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = i18n.resolvedLanguage?.split("-")[0] || "en";
+  const formatPrice = (amount: number) => new Intl.NumberFormat(i18n.resolvedLanguage, { style: "currency", currency: "USD" }).format(amount / 100);
+  const planName = (plan: any) => plan.metadata?.[`name_${language}`] || plan.product?.name || t("subscription.defaultPlan");
+  const planDescription = (plan: any) => plan.metadata?.[`description_${language}`] || plan.product?.description;
+  const planInterval = (plan: any) => ["day", "week", "month", "year"].includes(plan.recurring?.interval) ? plan.recurring.interval : "month";
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
@@ -72,7 +77,7 @@ export default function BillingPage() {
       window.location.href = "/login";
     } catch (err) {
       console.error("Error signing out:", err);
-      toast.error("Failed to sign out");
+      toast.error(t("subscription.logoutError"));
     }
   };
 
@@ -119,7 +124,7 @@ export default function BillingPage() {
       setPlans(filteredPlans);
     } catch (err) {
       console.error("Error fetching plans:", err);
-      setError("Failed to load subscription plans. Please try again later.");
+      setError("subscription.loadError");
     } finally {
       setIsLoadingPlans(false);
     }
@@ -156,7 +161,7 @@ export default function BillingPage() {
 
       if (insertError) throw insertError;
 
-      toast.success(t("subscription.activatedSuccess") || "Free plan activated successfully!");
+      toast.success(t("subscription.activatedSuccess"));
 
       if ((window as any).ReactNativeWebView) {
         (window as any).ReactNativeWebView.postMessage(
@@ -169,7 +174,7 @@ export default function BillingPage() {
       }
     } catch (err) {
       console.error("Error creating free subscription:", err);
-      toast.error(t("subscription.errorActivation") || "Error activating free plan. Please try again.");
+      toast.error(t("subscription.errorActivation"));
     } finally {
       setActivatingFree(false);
     }
@@ -187,7 +192,7 @@ export default function BillingPage() {
         <div className="text-center space-y-3">
           <Loader2 className="w-8 h-8 animate-spin text-slate-700 mx-auto" />
           <p className="text-xs font-medium text-slate-500">
-            {t("messages.loadingAccount") || "Loading your account..."}
+            {t("messages.loadingAccount")}
           </p>
         </div>
       </div>
@@ -198,49 +203,27 @@ export default function BillingPage() {
   const selectedPlanObj = availablePlans.find((p) => p.id === selectedPlan);
 
   return (
-    <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-16 font-sans">
-      {/* Mobile WebView Sticky Bar */}
-      {isReactNative && (
-        <div className="bg-white border-b border-slate-200 px-4 py-2 sticky top-0 z-20">
-          <div className="max-w-5xl mx-auto flex items-center justify-between">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                (window as any).ReactNativeWebView.postMessage(
-                  JSON.stringify({ type: "SUBSCRIPTION_SUCCESS" })
-                );
-              }}
-              className="h-8 text-xs font-medium text-slate-700"
-            >
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              {t("subscription.back") || "Back"}
-            </Button>
-            <span className="text-xs font-semibold text-slate-700">BoxBin Billing</span>
-          </div>
-        </div>
-      )}
-
+    <div className="min-h-screen min-w-0 break-words bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-16 font-sans">
       {/* Main Top Header Bar */}
       <header className="bg-white border-b border-slate-200/80 sticky top-0 z-10 backdrop-blur-sm bg-white/95">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <img src={LogoIcon} alt="BoxBin" className="h-8 w-auto object-contain" />
             <div className="h-4 w-px bg-slate-200" />
             <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              {t("subscription.title") || "Plans & Billing"}
+              {t("subscription.billingTitle")}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate("/tokensai")}
-              className="h-8 text-xs font-medium border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
+              className="min-h-10 h-auto whitespace-normal py-2 text-xs font-medium border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
             >
               <Coins className="w-3.5 h-3.5 mr-1.5 text-amber-600" />
-              Tokens Store
+              {t("subscription.tokensStore")}
             </Button>
 
             {isReactNative ? (
@@ -252,20 +235,20 @@ export default function BillingPage() {
                     JSON.stringify({ type: "SUBSCRIPTION_SUCCESS" })
                   );
                 }}
-                className="h-8 text-xs font-medium border-slate-200 text-slate-700"
+                className="min-h-10 h-auto whitespace-normal py-2 text-xs font-medium border-slate-200 text-slate-700"
               >
                 <ChevronLeft className="w-3.5 h-3.5 mr-1" />
-                {t("subscription.back") || "Back"}
+                {t("subscription.back")}
               </Button>
             ) : (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleLogout}
-                className="h-8 text-xs font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors"
+                className="min-h-10 h-auto whitespace-normal py-2 text-xs font-medium text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors"
               >
                 <LogOut className="w-3.5 h-3.5 mr-1.5" />
-                Logout
+                {t("subscription.logout")}
               </Button>
             )}
           </div>
@@ -277,11 +260,11 @@ export default function BillingPage() {
         {/* Hero Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 {subscription
-                  ? t("subscription.upgradeTitle") || "Upgrade Your Subscription Tier"
-                  : t("subscription.choosePlan") || "Choose Your Perfect Plan"}
+                  ? t("subscription.upgradeTitle")
+                  : t("subscription.choosePlan")}
               </h1>
               <Badge
                 variant="outline"
@@ -291,77 +274,76 @@ export default function BillingPage() {
               </Badge>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              {t("subscription.heroSubtitle") ||
-                "Unlock high-capacity QR bins, multi-location inventory, and smart automated container scanning."}
+              {t("subscription.heroSubtitle")}
             </p>
           </div>
 
           {subscription && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Badge
                 variant="outline"
                 className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-semibold px-2.5 py-1"
               >
-                {t("subscription.statusActive") || "Current Subscription Active"}
+                {t("subscription.statusActive")}
               </Badge>
             </div>
           )}
         </div>
 
         {/* Compact KPI Stats / Highlights Ribbon */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
+        <div className="grid grid-cols-1 min-[380px]:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs min-w-0 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
               <Package className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Smart QR Bins
+                {t("subscription.smartBins")}
               </div>
-              <div className="text-xs font-bold text-slate-900 truncate">
-                Printable Smart Labels
+              <div className="text-xs font-bold text-slate-900">
+                {t("subscription.smartLabels")}
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
+          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs min-w-0 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center shrink-0">
               <Zap className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Item Catalog
+                {t("subscription.itemCatalog")}
               </div>
-              <div className="text-xs font-bold text-slate-900 truncate">
-                Item Photo & Tagging
+              <div className="text-xs font-bold text-slate-900">
+                {t("subscription.itemPhotos")}
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
+          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs min-w-0 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
               <MapPin className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Multi-Site
+                {t("subscription.multiSite")}
               </div>
-              <div className="text-xs font-bold text-slate-900 truncate">
-                Garages & Warehouses
+              <div className="text-xs font-bold text-slate-900">
+                {t("subscription.warehouses")}
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs flex items-center gap-3">
+          <div className="bg-white rounded-xl border border-slate-200/80 p-3 shadow-2xs min-w-0 flex items-start gap-3">
             <div className="w-9 h-9 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
               <ShieldCheck className="h-4 w-4" />
             </div>
             <div className="min-w-0">
               <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                Security
+                {t("subscription.security")}
               </div>
-              <div className="text-xs font-bold text-slate-900 truncate">
-                PCI-DSS & SSL Encrypted
+              <div className="text-xs font-bold text-slate-900">
+                {t("subscription.securitySummary")}
               </div>
             </div>
           </div>
@@ -369,12 +351,12 @@ export default function BillingPage() {
 
         {/* Plans Grid Section */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">
-              {t("subscription.availableTiers") || "Available Subscription Tiers"}
+              {t("subscription.availableTiers")}
             </h2>
             <span className="text-xs text-slate-500">
-              {t("subscription.cancelAnytime") || "Cancel or change tier at any time"}
+              {t("subscription.cancelAnytime")}
             </span>
           </div>
 
@@ -382,33 +364,33 @@ export default function BillingPage() {
             <div className="flex flex-col items-center justify-center py-16 space-y-3 bg-white rounded-xl border border-slate-200/80">
               <Loader2 className="w-7 h-7 text-slate-700 animate-spin" />
               <p className="text-xs font-medium text-slate-500">
-                {t("messages.loadingPlans") || "Loading available plans..."}
+                {t("messages.loadingPlans")}
               </p>
             </div>
           ) : error ? (
             <div className="text-center py-12 bg-white rounded-xl border border-slate-200/80 p-6 space-y-3">
               <AlertTriangle className="w-8 h-8 text-red-500 mx-auto" />
               <h3 className="text-sm font-semibold text-slate-900">
-                {t("subscription.errorTitle") || "Failed to load plans"}
+                {t("subscription.errorTitle")}
               </h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">{error}</p>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">{t(error)}</p>
               <Button
                 onClick={fetchPlans}
                 size="sm"
                 variant="outline"
-                className="h-8 text-xs border-slate-200 text-slate-700"
+                className="min-h-10 h-auto whitespace-normal py-2 text-xs border-slate-200 text-slate-700"
               >
-                {t("subscription.tryAgain") || "Try Again"}
+                {t("subscription.tryAgain")}
               </Button>
             </div>
           ) : availablePlans.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border border-slate-200/80 p-6 space-y-3">
               <Package className="w-8 h-8 text-slate-400 mx-auto" />
               <h3 className="text-sm font-semibold text-slate-900">
-                {t("subscription.noPlansTitle") || "No Plans Available"}
+                {t("subscription.noPlansTitle")}
               </h3>
               <p className="text-xs text-slate-500">
-                {t("subscription.noPlansSubtitle") || "Check back later for available subscription tiers."}
+                {t("subscription.noPlansSubtitle")}
               </p>
             </div>
           ) : (
@@ -419,8 +401,8 @@ export default function BillingPage() {
                   : availablePlans.length === 2
                   ? "sm:grid-cols-2 max-w-3xl mx-auto"
                   : availablePlans.length === 3
-                  ? "sm:grid-cols-3"
-                  : "sm:grid-cols-2 lg:grid-cols-4"
+                  ? "sm:grid-cols-2 lg:grid-cols-3"
+                  : "sm:grid-cols-2"
               }`}
             >
               {availablePlans.map((plan, index) => {
@@ -431,14 +413,14 @@ export default function BillingPage() {
                   plan.popular ||
                   plan.metadata?.popular === "true" ||
                   (availablePlans.length > 2 && index === Math.floor(availablePlans.length / 2));
-                const priceFormatted = ((plan.unit_amount || 0) / 100).toFixed(2);
+                const priceFormatted = formatPrice(plan.unit_amount || 0);
                 const hasTrial = plan.metadata?.trial === "true";
 
                 return (
                   <div
                     key={plan.id}
                     onClick={() => setSelectedPlan(plan.id)}
-                    className={`group relative rounded-xl border p-4 sm:p-5 cursor-pointer transition-all flex flex-col justify-between ${
+                    className={`group relative min-w-0 rounded-xl border p-4 sm:p-5 cursor-pointer transition-all flex flex-col justify-between ${
                       isSelected
                         ? "border-slate-900 ring-2 ring-slate-900 bg-slate-50/40 shadow-sm"
                         : isPopular
@@ -451,14 +433,14 @@ export default function BillingPage() {
                       <div className="absolute -top-2.5 left-1/2 transform -translate-x-1/2 z-10">
                         <span className="bg-brand-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider shadow-2xs flex items-center gap-1 whitespace-nowrap">
                           <Crown className="w-2.5 h-2.5" />
-                          <span>{t("subscription.planPopular") || "Most Popular"}</span>
+                          <span>{t("subscription.planPopular")}</span>
                         </span>
                       </div>
                     )}
 
                     <div className="space-y-4">
                       {/* Card Header Row */}
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
                         <div
                           className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${visual.bg}`}
                         >
@@ -467,7 +449,7 @@ export default function BillingPage() {
                         {isSelected && (
                           <Badge className="bg-slate-900 text-white text-[10px] h-5 px-1.5 flex items-center gap-1">
                             <Check className="w-3 h-3" />
-                            <span>Selected</span>
+                            <span>{t("subscription.selected")}</span>
                           </Badge>
                         )}
                       </div>
@@ -475,27 +457,27 @@ export default function BillingPage() {
                       {/* Tier Name & Description */}
                       <div>
                         <h3 className="text-base font-bold text-slate-900">
-                          {plan.product?.name || "BoxBin Plan"}
+                          {planName(plan)}
                         </h3>
-                        {plan.product?.description && (
-                          <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                            {plan.product.description}
+                        {planDescription(plan) && (
+                          <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                            {planDescription(plan)}
                           </p>
                         )}
                       </div>
 
                       {/* Pricing */}
                       <div>
-                        <div className="flex items-baseline gap-1">
+                        <div className="flex flex-wrap items-baseline gap-1">
                           <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                            ${priceFormatted}
+                            {priceFormatted}
                           </span>
                           <span className="text-xs text-slate-500 font-medium">
-                            /{plan.recurring?.interval || "mo"}
+                            /{t(`subscription.interval.${planInterval(plan)}`)}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 mt-0.5">
-                          Billed {plan.recurring?.interval || "month"}ly
+                          {t(`subscription.billed.${planInterval(plan)}`)}
                         </p>
                       </div>
 
@@ -503,44 +485,44 @@ export default function BillingPage() {
                       {hasTrial && (
                         <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/60 text-[11px] font-semibold">
                           <Sparkles className="w-3 h-3 text-emerald-600" />
-                          <span>30 Days Free Trial Included</span>
+                          <span>{t("subscription.trialIncluded")}</span>
                         </div>
                       )}
 
                       {/* Quotas & Limits */}
                       <div className="pt-3 border-t border-slate-100 space-y-2 text-xs text-slate-600">
                         {plan.metadata?.bins && (
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 text-slate-500">
                               <Package className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Storage Bins</span>
+                              <span>{t("subscription.storageBins")}</span>
                             </span>
                             <span className="font-semibold text-slate-900">
-                              {plan.metadata.bins} Bins
+                              {t("subscription.binsCount", { count: Number(plan.metadata.bins) })}
                             </span>
                           </div>
                         )}
 
                         {plan.metadata?.items && (
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 text-slate-500">
                               <Zap className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Items per Bin</span>
+                              <span>{t("subscription.itemsPerBin")}</span>
                             </span>
                             <span className="font-semibold text-slate-900">
-                              {plan.metadata.items} Items
+                              {t("subscription.itemsCount", { count: Number(plan.metadata.items) })}
                             </span>
                           </div>
                         )}
 
                         {plan.metadata?.locations && (
-                          <div className="flex items-center justify-between">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
                             <span className="flex items-center gap-1.5 text-slate-500">
                               <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                              <span>Locations</span>
+                              <span>{t("subscription.locations")}</span>
                             </span>
                             <span className="font-semibold text-slate-900">
-                              {plan.metadata.locations} Sites
+                              {t("subscription.sitesCount", { count: Number(plan.metadata.locations) })}
                             </span>
                           </div>
                         )}
@@ -550,15 +532,15 @@ export default function BillingPage() {
                       <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
                         <div className="flex items-center gap-1.5">
                           <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>Custom QR Smart Labels</span>
+                          <span>{t("subscription.qrLabels")}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>PDF & CSV Inventory Export</span>
+                          <span>{t("subscription.inventoryExport")}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
                           <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>Auto Cloud Data Backup</span>
+                          <span>{t("subscription.cloudBackup")}</span>
                         </div>
                       </div>
                     </div>
@@ -570,7 +552,7 @@ export default function BillingPage() {
                         e.stopPropagation();
                         setSelectedPlan(plan.id);
                       }}
-                      className={`w-full mt-5 h-8 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
+                      className={`w-full mt-5 min-h-10 h-auto whitespace-normal py-2 text-xs font-semibold rounded-lg transition-colors flex items-center justify-center gap-1.5 ${
                         isSelected
                           ? "bg-slate-900 text-white hover:bg-slate-800 shadow-2xs"
                           : "bg-white border border-slate-200 text-slate-900 hover:bg-slate-50"
@@ -579,10 +561,10 @@ export default function BillingPage() {
                       {isSelected ? (
                         <>
                           <Check className="w-3.5 h-3.5 text-brand-400" />
-                          <span>Selected Tier</span>
+                          <span>{t("subscription.selectedTier")}</span>
                         </>
                       ) : (
-                        <span>Select Plan</span>
+                        <span>{t("subscription.selectPlan")}</span>
                       )}
                     </Button>
                   </div>
@@ -594,54 +576,53 @@ export default function BillingPage() {
 
         {/* Embedded Checkout Panel */}
         {selectedPlan && selectedPlanObj && (
-          <div ref={checkoutRef} className="pt-4 max-w-2xl mx-auto">
+          <div ref={checkoutRef} className="pt-4 max-w-2xl mx-auto scroll-mt-36 sm:scroll-mt-20">
             <Card className="border-slate-200/80 shadow-2xs bg-white rounded-xl overflow-hidden">
-              <CardHeader className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-row items-center justify-between">
+              <CardHeader className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
                 <div>
                   <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                     <ShieldCheck className="w-4 h-4 text-brand-600" />
-                    <span>Complete Subscription Checkout</span>
+                    <span>{t("subscription.checkoutTitle")}</span>
                   </CardTitle>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Encrypted payment processing handled securely via Stripe.
+                    {t("subscription.securePayment")}
                   </p>
                 </div>
                 <Badge
                   variant="outline"
-                  className="text-xs font-semibold bg-white border-slate-200 text-slate-700"
+                  className="max-w-full whitespace-normal break-words text-xs font-semibold bg-white border-slate-200 text-slate-700"
                 >
-                  {selectedPlanObj.product?.name || "Selected Plan"}
+                  {planName(selectedPlanObj)}
                 </Badge>
               </CardHeader>
 
-              <CardContent className="p-5">
+              <CardContent className="p-4 sm:p-5">
                 {/* Selected Plan Summary Banner */}
-                <div className="p-3.5 rounded-lg border border-slate-200/80 bg-slate-50/50 mb-5 flex items-center justify-between">
+                <div className="p-3.5 rounded-lg border border-slate-200/80 bg-slate-50/50 mb-5 flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
                   <div className="space-y-0.5">
                     <div className="text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                      Selected Plan
+                      {t("subscription.selectedPlan")}
                     </div>
                     <div className="text-sm font-bold text-slate-900">
-                      {selectedPlanObj.product?.name}
+                      {planName(selectedPlanObj)}
                     </div>
                     {selectedPlanObj.metadata?.bins && (
                       <div className="text-xs text-slate-500">
-                        {selectedPlanObj.metadata.bins} Bins ·{" "}
-                        {selectedPlanObj.metadata.items || "—"} Items per bin
+                        {t("subscription.planSummary", { bins: selectedPlanObj.metadata.bins, items: selectedPlanObj.metadata.items || "—" })}
                       </div>
                     )}
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <div className="text-base font-extrabold text-slate-900">
-                      ${((selectedPlanObj.unit_amount || 0) / 100).toFixed(2)}
+                      {formatPrice(selectedPlanObj.unit_amount || 0)}
                       <span className="text-xs font-normal text-slate-500">
-                        /{selectedPlanObj.recurring?.interval || "mo"}
+                        /{t(`subscription.interval.${planInterval(selectedPlanObj)}`)}
                       </span>
                     </div>
                     <div className="text-[11px] text-emerald-600 font-medium mt-0.5">
                       {selectedPlanObj.metadata?.trial === "true"
-                        ? "🎉 30 Days Free Trial"
-                        : "Billed Recurring"}
+                        ? t("subscription.trial")
+                        : t("subscription.billedRecurring")}
                     </div>
                   </div>
                 </div>
@@ -654,33 +635,33 @@ export default function BillingPage() {
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-slate-900">
-                        Zero Payment Required
+                        {t("subscription.noPayment")}
                       </h4>
                       <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-                        This plan is free of charge. Click below to activate your BoxBin tier immediately.
+                        {t("subscription.freeDescription")}
                       </p>
                     </div>
 
                     <Button
                       onClick={handleActivateFreePlan}
                       disabled={activatingFree}
-                      className="w-full h-9 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs"
+                      className="w-full min-h-11 h-auto whitespace-normal py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs"
                     >
                       {activatingFree ? (
                         <span className="flex items-center gap-1.5">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Activating Free Plan...</span>
+                          <span>{t("subscription.activatingFree")}</span>
                         </span>
                       ) : (
                         <span className="flex items-center gap-1.5">
-                          <span>Activate Free Plan</span>
+                          <span>{t("subscription.activateFree")}</span>
                           <ArrowRight className="w-3.5 h-3.5" />
                         </span>
                       )}
                     </Button>
                   </div>
                 ) : (
-                  <Elements stripe={stripePromise}>
+                  <Elements stripe={stripePromise} options={{ locale: language === "es" ? "es" : "en" }}>
                     <CheckoutForm
                       userId={currentUser?.uid}
                       planId={selectedPlan}
@@ -694,15 +675,15 @@ export default function BillingPage() {
                 <div className="mt-5 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-center gap-4 text-[11px] text-slate-500">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>PCI-DSS Level 1 Encrypted</span>
+                    <span>{t("subscription.pciSecurity")}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <Lock className="w-3.5 h-3.5 text-slate-400" />
-                    <span>256-bit SSL Security</span>
+                    <span>{t("subscription.sslSecurity")}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <CreditCard className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Processed via Stripe</span>
+                    <span>{t("subscription.stripeProcessing")}</span>
                   </div>
                 </div>
               </CardContent>

@@ -1,5 +1,6 @@
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { useState, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
@@ -28,6 +29,7 @@ interface CouponValidation {
 }
 
 export default function CheckoutForm({ userId, planId, originalPrice, currency = 'usd' }: CheckoutFormProps) {
+  const { t, i18n } = useTranslation();
   const stripe = useStripe();
   const elements = useElements();
   const { currentUser } = useAuth();
@@ -49,7 +51,6 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
 
   // Calculate final price with coupon discount
   const finalPrice = useMemo(() => {
-    console.log(currency);
     if (!appliedCoupon?.coupon) return originalPrice;
     
     const coupon = appliedCoupon.coupon;
@@ -68,13 +69,13 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
 
   // Format price for display
   const formatPrice = (priceInCents: number) => {
-    return `$${(priceInCents / 100).toFixed(2)}`;
+    return new Intl.NumberFormat(i18n.resolvedLanguage, { style: "currency", currency }).format(priceInCents / 100);
   };
 
   // Validate the coupon through the Supabase Edge Function.
   const validateCoupon = async () => {
     if (!couponCode.trim()) {
-      setCouponError('Please enter a coupon code');
+      setCouponError('subscription.checkout.couponRequired');
       return;
     }
 
@@ -98,12 +99,12 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         setAppliedCoupon(couponRes);
         setCouponError(null);
       } else {
-        setCouponError(couponRes?.error || 'Invalid coupon code');
+        setCouponError('subscription.checkout.couponInvalid');
         setAppliedCoupon(null);
       }
     } catch (err: any) {
       console.error('Error validating coupon:', err);
-      setCouponError(err.message || 'Error validating coupon');
+      setCouponError('subscription.checkout.couponError');
       setAppliedCoupon(null);
     } finally {
       setCouponLoading(false);
@@ -145,7 +146,7 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
       });
 
       if (stripeError) {
-        setError(stripeError.message || 'Payment failed');
+        setError(stripeError.message || 'subscription.checkout.paymentFailed');
         return;
       }
 
@@ -207,7 +208,7 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         window.location.href = '/home';
       }
     } catch (err) {
-      setError('An unexpected error occurred');
+      setError('subscription.checkout.unexpectedError');
       console.error(err);
     } finally {
       setLoading(false);
@@ -215,11 +216,11 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="min-w-0 space-y-6 break-words">
       {/* Personal information fields */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="firstName">First Name</Label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="firstName">{t("subscription.checkout.firstName")}</Label>
           <Input
             id="firstName"
             value={firstName}
@@ -227,8 +228,8 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
             required
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="lastName">Last Name</Label>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="lastName">{t("subscription.checkout.lastName")}</Label>
           <Input
             id="lastName"
             value={lastName}
@@ -238,8 +239,8 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="address">Billing Address</Label>
+      <div className="min-w-0 space-y-2">
+        <Label htmlFor="address">{t("subscription.checkout.address")}</Label>
         <Input
           id="address"
           value={address}
@@ -248,9 +249,9 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         />
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="city">City</Label>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="city">{t("subscription.checkout.city")}</Label>
           <Input
             id="city"
             value={city}
@@ -258,8 +259,8 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
             required
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="state">State</Label>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="state">{t("subscription.checkout.state")}</Label>
           <Input
             id="state"
             value={state}
@@ -267,8 +268,8 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
             required
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="zipCode">ZIP Code</Label>
+        <div className="min-w-0 space-y-2">
+          <Label htmlFor="zipCode">{t("subscription.checkout.zipCode")}</Label>
           <Input
             id="zipCode"
             value={zipCode}
@@ -278,8 +279,8 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="nameOnCard">Name on Card</Label>
+      <div className="min-w-0 space-y-2">
+        <Label htmlFor="nameOnCard">{t("subscription.checkout.nameOnCard")}</Label>
         <Input
           id="nameOnCard"
           value={nameOnCard}
@@ -290,15 +291,16 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
 
       {/* Coupon section */}
       <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
-        <Label className="text-base font-semibold">Discount Code</Label>
+        <Label htmlFor="couponCode" className="text-base font-semibold">{t("subscription.checkout.discountCode")}</Label>
         
         {!appliedCoupon ? (
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Input
-              placeholder="Enter your coupon code"
+              id="couponCode"
+              placeholder={t("subscription.checkout.couponPlaceholder")}
               value={couponCode}
               onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-              className="flex-1"
+              className="min-w-0 flex-1"
             />
             <Button
               type="button"
@@ -306,29 +308,27 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
               onClick={validateCoupon}
               disabled={couponLoading || !couponCode.trim()}
             >
-              {couponLoading ? 'Validating...' : 'Apply'}
+              {couponLoading ? t("subscription.checkout.validating") : t("subscription.checkout.apply")}
             </Button>
           </div>
         ) : (
           <div className="p-3 bg-green-50 border border-green-200 rounded-md">
-            <div className="flex justify-between items-start">
+            <div className="flex flex-wrap gap-2 justify-between items-start">
               <div>
                 <p className="font-medium text-green-800">
-                  ✅ Coupon applied: {appliedCoupon.coupon?.name || couponCode}
+                  {t("subscription.checkout.couponApplied", { name: appliedCoupon.coupon?.name || couponCode })}
                 </p>
                 <p className="text-sm text-green-600">
-                  Discount: {
+                  {t("subscription.checkout.discount")} {
                     appliedCoupon.coupon?.percent_off 
                       ? `${appliedCoupon.coupon.percent_off}%`
                       : appliedCoupon.coupon?.amount_off 
                         ? `$${(appliedCoupon.coupon.amount_off / 100).toFixed(2)} ${appliedCoupon.coupon.currency?.toUpperCase()}`
-                        : 'Applied'
+                        : t("subscription.checkout.applied")
                   }
                 </p>
                 <p className="text-xs text-gray-600">
-                  Duration: {appliedCoupon.coupon?.duration === 'once' ? 'One time' : 
-                             appliedCoupon.coupon?.duration === 'forever' ? 'Forever' : 
-                             'Limited time'}
+                  {t("subscription.checkout.duration")} {t(`subscription.checkout.${appliedCoupon.coupon?.duration === "once" ? "once" : appliedCoupon.coupon?.duration === "forever" ? "forever" : "limited"}`)}
                 </p>
               </div>
               <Button
@@ -338,24 +338,24 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
                 onClick={removeCoupon}
                 className="text-red-600 hover:text-red-800"
               >
-                Remove
+                {t("subscription.checkout.remove")}
               </Button>
             </div>
           </div>
         )}
 
         {couponError && (
-          <p className="text-red-500 text-sm">❌ {couponError}</p>
+          <p className="text-red-500 text-sm">❌ {t(couponError)}</p>
         )}
       </div>
 
       {/* Price summary */}
       <div className="p-4 border rounded-lg bg-brand-50">
-        <h3 className="font-semibold text-lg mb-3">Order Summary</h3>
+        <h3 className="font-semibold text-lg mb-3">{t("subscription.checkout.summary")}</h3>
         
-        <div className="space-y-2">
-          <div className="flex justify-between">
-            <span>Plan Price:</span>
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap gap-2 justify-between">
+            <span>{t("subscription.checkout.planPrice")}</span>
             <span className={appliedCoupon ? 'line-through text-gray-500' : 'font-semibold'}>
               {formatPrice(originalPrice)}
             </span>
@@ -363,36 +363,36 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
           
           {appliedCoupon && (
             <>
-              <div className="flex justify-between text-green-600">
-                <span>Discount:</span>
+              <div className="flex flex-wrap gap-2 justify-between text-green-600">
+                <span>{t("subscription.checkout.discount")}</span>
                 <span>-{formatPrice(discountAmount)}</span>
               </div>
               <hr className="border-gray-300" />
-              <div className="flex justify-between text-lg font-bold">
-                <span>Total to Pay:</span>
+              <div className="flex flex-wrap gap-2 justify-between text-lg font-bold">
+                <span>{t("subscription.checkout.total")}</span>
                 <span className="text-green-600">{formatPrice(finalPrice)}</span>
               </div>
             </>
           )}
           
           {!appliedCoupon && (
-            <div className="flex justify-between text-lg font-bold">
-              <span>Total to Pay:</span>
+            <div className="flex flex-wrap gap-2 justify-between text-lg font-bold">
+              <span>{t("subscription.checkout.total")}</span>
               <span>{formatPrice(finalPrice)}</span>
             </div>
           )}
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Card Information</Label>
+      <div className="min-w-0 space-y-2">
+        <Label>{t("subscription.checkout.cardInformation")}</Label>
         <CardElement className="p-3 border rounded-md" />
       </div>
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && <p className="text-red-500 text-sm">{t(error)}</p>}
       
-      <Button type="submit" className="w-full" disabled={!stripe || loading}>
-        {loading ? 'Processing...' : `Subscribe - ${formatPrice(finalPrice)}`}
+      <Button type="submit" className="w-full min-h-11 h-auto whitespace-normal" disabled={!stripe || loading}>
+        {loading ? t("subscription.checkout.processing") : t("subscription.checkout.subscribe", { price: formatPrice(finalPrice) })}
       </Button>
     </form>
   );
