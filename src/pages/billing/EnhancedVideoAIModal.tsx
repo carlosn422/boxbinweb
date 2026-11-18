@@ -98,8 +98,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
     try {
       const stripePackages = await getStripePlans();
       const filteredPackages = stripePackages.filter((pkg) => {
-        const keys = pkg.metadata ? Object.keys(pkg.metadata) : [];
-        return keys.includes("tokens") && keys.length === 1;
+        return !pkg.recurring && Number(pkg.metadata?.tokens) > 0;
       });
       const sortedPackages = filteredPackages.sort((a, b) => {
         const tokensA = parseInt(a.metadata?.tokens || "0", 10);
@@ -502,6 +501,8 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
 
             <Elements stripe={stripePromise}>
               <TokenCheckoutForm
+                packageId={selectedPackage}
+                currency={tokenPackages.find((p) => p.id === selectedPackage)?.currency || "usd"}
                 userId={currentUser?.uid ?? ""}
                 tokens={parseInt(tokenPackages.find((p) => p.id === selectedPackage)?.metadata?.tokens || "0", 10)}
                 price={tokenPackages.find((p) => p.id === selectedPackage)?.unit_amount || 0}

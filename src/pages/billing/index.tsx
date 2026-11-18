@@ -1,3 +1,4 @@
+import { activateFreePlan } from '@/lib/stripe';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ const planVisuals = [
 export default function BillingPage() {
   const { t, i18n } = useTranslation();
   const language = i18n.resolvedLanguage?.split("-")[0] || "en";
-  const formatPrice = (amount: number) => new Intl.NumberFormat(i18n.resolvedLanguage, { style: "currency", currency: "USD" }).format(amount / 100);
+  const formatPrice = (amount: number, currency = "USD") => new Intl.NumberFormat(i18n.resolvedLanguage, { style: "currency", currency }).format(amount / 100);
   const planName = (plan: any) => plan.metadata?.[`name_${language}`] || plan.product?.name || t("subscription.defaultPlan");
   const planDescription = (plan: any) => plan.metadata?.[`description_${language}`] || plan.product?.description;
   const planInterval = (plan: any) => ["day", "week", "month", "year"].includes(plan.recurring?.interval) ? plan.recurring.interval : "month";
@@ -117,8 +118,7 @@ export default function BillingPage() {
       const stripePlans = await getStripePlans();
 
       const filteredPlans = stripePlans.filter((plan: any) => {
-        const keys = plan.metadata ? Object.keys(plan.metadata) : [];
-        return keys.includes("tokens") && keys.length > 1;
+        return !!plan.recurring && (plan.metadata?.bins !== undefined || plan.metadata?.items !== undefined);
       });
 
       setPlans(filteredPlans);
@@ -151,15 +151,7 @@ export default function BillingPage() {
     if (!selectedPlan || !currentUser?.uid) return;
     try {
       setActivatingFree(true);
-      const { error: insertError } = await supabase.from("subscriptions").insert({
-        userId: currentUser.uid,
-        planId: selectedPlan,
-        status: "active",
-        createdAt: new Date().toISOString(),
-        userEmail: currentUser.email,
-      });
-
-      if (insertError) throw insertError;
+      await activateFreePlan(selectedPlan);
 
       toast.success(t("subscription.activatedSuccess"));
 
@@ -413,7 +405,7 @@ export default function BillingPage() {
                   plan.popular ||
                   plan.metadata?.popular === "true" ||
                   (availablePlans.length > 2 && index === Math.floor(availablePlans.length / 2));
-                const priceFormatted = formatPrice(plan.unit_amount || 0);
+                const priceFormatted = formatPrice(plan.unit_amount || 0, plan.currency);
                 const hasTrial = plan.metadata?.trial === "true";
 
                 return (
@@ -614,7 +606,7 @@ export default function BillingPage() {
                   </div>
                   <div className="sm:text-right">
                     <div className="text-base font-extrabold text-slate-900">
-                      {formatPrice(selectedPlanObj.unit_amount || 0)}
+                      {formatPrice(selectedPlanObj.unit_amount || 0, selectedPlanObj.currency)}
                       <span className="text-xs font-normal text-slate-500">
                         /{t(`subscription.interval.${planInterval(selectedPlanObj)}`)}
                       </span>
@@ -665,7 +657,7 @@ export default function BillingPage() {
                     <CheckoutForm
                       userId={currentUser?.uid}
                       planId={selectedPlan}
-                      currency="usd"
+                      currency={selectedPlanObj.currency || "usd"}
                       originalPrice={selectedPlanObj.unit_amount || 0}
                     />
                   </Elements>

@@ -1,398 +1,48 @@
-import { loadStripe, type StripeConstructor } from "@stripe/stripe-js";
-import Stripe from "stripe";
-import { supabase } from "@/lib/supabase";
-
-declare global {
-  interface Window {
-    Stripe?: StripeConstructor;
-  }
-}
-
-interface StripeProduct {
-  id: string;
-  name: string;
-  description?: string;
-  default_price?: {
-    id: string;
-    unit_amount: number;
-    recurring: {
-      interval: string;
-    };
-  };
-  metadata: any;
-}
-
-interface Plan {
-  id: string;
-  product: {
-    name: string;
-    description?: string;
-  };
-  unit_amount: number;
-  recurring: {
-    interval: string;
-  };
-  metadata: any;
-}
-
-import { STRIPE_PUBLISHABLE_KEY } from "../config/stripe";
-
+import { loadStripe } from '@stripe/stripe-js';
+import { v4 as uuid } from 'uuid';
+import i18n from 'i18next';
+import { supabase } from '@/lib/supabase';
+import { STRIPE_PUBLISHABLE_KEY } from '@/config/stripe';
 export const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
-import { STRIPE_SECRET_KEY } from "../config/stripe";
 
-const stripeClient = new Stripe(
-  STRIPE_SECRET_KEY || "sk_test_placeholder",
-  {
-    apiVersion: "2025-07-30.basil" as const,
+export async function billingRequest(operation: string, fields: Record<string, unknown> = {}): Promise<any> {
+  const { data, error } = await supabase.functions.invoke('boxbin-billing', { body: { ...fields, operation } });
+  if (error || data?.error) {
+    let code = data?.code;
+    if (!code && error && 'context' in error && error.context instanceof Response) {
+      try { code = (await error.context.clone().json()).code; } catch { /* Generic localized error below. */ }
+    }
+    throw Object.assign(new Error(String(i18n.t(code === 'BILLING_PAYMENT_PENDING' ? 'records.paymentPending' : 'records.billingFailed'))), { code });
   }
-);
-
-export const getStripePlans = async (): Promise<Plan[]> => {
-  try {
-    // Fetch active products with their prices from Stripe
-    const { data: products } = (await stripeClient.products.list({
-      active: true,
-      expand: ["data.default_price"],
-    })) as { data: StripeProduct[] };
-
-    return products.map((product: StripeProduct) => ({
-      id: product.default_price?.id || "",
-      product: {
-        name: product.name,
-        description: product.description,
-      },
-      unit_amount: product.default_price?.unit_amount || 0,
-      recurring: product.default_price?.recurring || { interval: "month" },
-      metadata: product?.metadata,
-    }));
-  } catch (error) {
-    console.error("Error fetching Stripe plans:", error);
-    throw error;
-  }
-};
-
-export const createStripeSubscription = async (
-  paymentMethodId: string,
-  planId: string,
-  customerId?: string,
-  userEmail?: string,
-  userName?: string,
-  userId?: string,
-  billingDetails?: {
-    firstName: string;
-    lastName: string;
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    nameOnCard: string;
-  }
-) => {
-  try {
-    let customer;
-
-    if (customerId) {
-      customer = await stripeClient.customers.update(customerId, {
-        metadata: {
-          userId: userId || "",
-        },
-      });
-    } else {
-      // Create customer first
-      customer = await stripeClient.customers.create({
-        email: userEmail || undefined,
-        name: billingDetails?.nameOnCard || userName,
-        metadata: {
-          userId: userId || "",
-          name: `${billingDetails?.firstName} ${billingDetails?.lastName}`,
-        },
-        address: billingDetails
-          ? {
-              line1: billingDetails.address,
-              city: billingDetails.city,
-              state: billingDetails.state,
-              postal_code: billingDetails.zipCode,
-              country: "US",
-            }
-          : undefined,
-      });
-
-      // Then attach the payment method to the customer
-      if (paymentMethodId) {
-        await stripeClient.paymentMethods.attach(paymentMethodId, {
-          customer: customer.id,
-        });
-
-        // Set it as the default payment method
-        await stripeClient.customers.update(customer.id, {
-          invoice_settings: {
-            default_payment_method: paymentMethodId,
-          },
-        });
-      }
-    }
-
-    /*const subscription = await stripeClient.subscriptions.create({
-      customer: customer.id,
-      items: [{ price: planId }],
-      expand: ['latest_invoice.payment_intent'],
-      default_payment_method: paymentMethodId,
-    });*/
-
-    //const trialDays = planId === 'price_1RmGukFRvBExIzdOuM8cy2uE' ? 30 : 0;
-
-    const subscription = await stripeClient.subscriptions.create({
-      customer: customer.id,
-      items: [{ price: planId }],
-      expand: ["latest_invoice.payment_intent"],
-      default_payment_method: paymentMethodId,
-      //trial_period_days: trialDays > 0 ? trialDays : undefined,
-    });
-
-    return {
-      status: subscription.status,
-      subscriptionId: subscription.id,
-      customerId: customer.id,
-      latestInvoice: subscription.latest_invoice,
-    };
-  } catch (error) {
-    console.error("Error creating subscription:", error);
-    throw error;
-  }
-};
-
-export const createStripeSubscriptionCupons = async (
-  paymentMethodId: string,
-  planId: string,
-  couponId?: string, // Nuevo parámetro para el cupón
-  customerId?: string,
-  userEmail?: string,
-  userName?: string,
-  userId?: string,
-  billingDetails?: {
-    firstName: string;
-    lastName: string;
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    nameOnCard: string;
-  }
-) => {
-  try {
-    let customer;
-
-    if (customerId) {
-      customer = await stripeClient.customers.update(customerId, {
-        metadata: {
-          userId: userId || "",
-        },
-      });
-    } else {
-      // Create customer first
-      customer = await stripeClient.customers.create({
-        email: userEmail || undefined,
-        name: billingDetails?.nameOnCard || userName,
-        metadata: {
-          userId: userId || "",
-          name: `${billingDetails?.firstName} ${billingDetails?.lastName}`,
-        },
-        address: billingDetails
-          ? {
-              line1: billingDetails.address,
-              city: billingDetails.city,
-              state: billingDetails.state,
-              postal_code: billingDetails.zipCode,
-              country: "US",
-            }
-          : undefined,
-      });
-
-      // Then attach the payment method to the customer
-      if (paymentMethodId) {
-        await stripeClient.paymentMethods.attach(paymentMethodId, {
-          customer: customer.id,
-        });
-
-        // Set it as the default payment method
-        await stripeClient.customers.update(customer.id, {
-          invoice_settings: {
-            default_payment_method: paymentMethodId,
-          },
-        });
-      }
-    }
-
-    // Preparar parámetros de la suscripción
-    const subscriptionParams: any = {
-      customer: customer.id,
-      items: [{ price: planId }],
-      expand: ["latest_invoice.payment_intent"],
-      default_payment_method: paymentMethodId,
-      metadata: {
-        userId: userId || "",
-        planId: planId,
-      },
-    };
-
-    // Agregar cupón si está presente
-    if (couponId) {
-      subscriptionParams.coupon = couponId;
-
-      // Opcional: Agregar información del cupón a metadata para tracking
-      try {
-        const coupon = await stripeClient.coupons.retrieve(couponId);
-        subscriptionParams.metadata.coupon_used = couponId;
-        subscriptionParams.metadata.coupon_discount = coupon.percent_off
-          ? `${coupon.percent_off}%`
-          : `$${(coupon.amount_off || 0) / 100}`;
-        subscriptionParams.metadata.coupon_name = coupon.name || couponId;
-      } catch (couponError) {
-        console.warn(
-          `Could not retrieve coupon details for ${couponId}:`,
-          couponError
-        );
-        // Continuar sin metadata del cupón si hay error
-      }
-    }
-
-    // Lógica de trial period (mantener tu lógica existente si la necesitas)
-    // const trialDays = planId === 'price_1RmGukFRvBExIzdOuM8cy2uE' ? 30 : 0;
-    // if (trialDays > 0) {
-    //   subscriptionParams.trial_period_days = trialDays;
-    // }
-
-    // Crear la suscripción con todos los parámetros
-    const subscription: any = await stripeClient.subscriptions.create(
-      subscriptionParams
-    );
-
-    // Preparar información del cupón aplicado para la respuesta
-    let appliedCoupon = null;
-    if (couponId && subscription?.discount) {
-      appliedCoupon = {
-        id: subscription.discount.coupon.id,
-        percent_off: subscription.discount.coupon.percent_off,
-        amount_off: subscription.discount.coupon.amount_off,
-        currency: subscription.discount.coupon.currency,
-        name: subscription.discount.coupon.name,
-        duration: subscription.discount.coupon.duration,
-        duration_in_months: subscription.discount.coupon.duration_in_months,
-      };
-    }
-
-    return {
-      status: subscription.status,
-      subscriptionId: subscription.id,
-      customerId: customer.id,
-      latestInvoice: subscription.latest_invoice,
-      appliedCoupon: appliedCoupon,
-    };
-  } catch (error: any) {
-    console.error("Error creating subscription:", error);
-
-    // Manejar errores específicos de cupones
-    if (error.code === "coupon_expired") {
-      throw new Error("El cupón ha expirado");
-    }
-
-    if (error.code === "resource_missing" && error.param === "coupon") {
-      throw new Error("El cupón no es válido o no existe");
-    }
-
-    if (error.code === "coupon_not_valid") {
-      throw new Error("El cupón no es válido para esta suscripción");
-    }
-
-    throw error;
-  }
-};
-
-export const getStripePlanById = async (priceId: string): Promise<any> => {
-  if (!priceId) return null;
-  try {
-    const { data, error } = await supabase.functions.invoke("get-plan-by-id", {
-      body: { priceId },
-    });
-
-    if (!error && data && data.product) {
-      const metadata = data?.product?.metadata ?? data?.metadata ?? {};
-      return {
-        ...data,
-        metadata,
-        product: {
-          ...(data.product || {}),
-          metadata,
-        },
-      };
-    }
-  } catch (err) {
-    console.warn("Could not fetch plan via Supabase edge function:", err);
-  }
-
-  // Graceful fallback plan details when Stripe / Edge Function is offline or unconfigured
-  const isPro = /pro|unlimited|business|premium/i.test(priceId);
-  return {
-    priceId,
-    unit_amount: isPro ? 999 : 0,
-    currency: "usd",
-    recurring: { interval: "month" },
-    product: {
-      id: priceId,
-      name: isPro ? "Pro Plan" : "Basic Plan",
-      description: isPro ? "Full access" : "Free starter tier",
-      metadata: {
-        bins: isPro ? "1000" : "100",
-        items: isPro ? "Unlimited" : "50",
-      },
-    },
-    metadata: {
-      bins: isPro ? "1000" : "100",
-      items: isPro ? "Unlimited" : "50",
-    },
-  };
-};
-
-export const cancelUserSubscription = async (
-  subscriptionId: string,
-  userId: string
-) => {
-  const { data, error } = await supabase.functions.invoke("cancel-subscription", {
-    body: { subscriptionId, userId },
-  });
-  if (error) throw error;
   return data;
-};
-
-export const upgradeSubscription = async ({
-  subscriptionId,
-  newPriceId,
-  userId,
-}: {
-  subscriptionId: string;
-  newPriceId: string;
-  userId: string;
-}) => {
-  const { data, error } = await supabase.functions.invoke("upgrade-subscription", {
-    body: { subscriptionId, newPriceId, userId },
-  });
-  if (error) throw error;
-  return data;
-};
-
-export async function createStripePaymentIntent(
-  amount: number,
-  currency: string = "usd",
-  email?: string,
-  name?: string
-): Promise<{ clientSecret: string }> {
-  const paymentIntent = await stripeClient.paymentIntents.create({
-    amount,
-    currency,
-    receipt_email: email,
-    description: `One-time purchase by ${name || email || "Unknown"}`,
-    automatic_payment_methods: { enabled: true },
-  });
-
-  return { clientSecret: paymentIntent.client_secret! };
 }
+export const getStripePlans = (): Promise<any[]> => billingRequest('plans');
+export const activateFreePlan = (planId: string) => billingRequest('activate_free', { planId });
+export const claimFreeTokens = (packageId: string) => billingRequest('claim_free_tokens', { packageId });
+export const syncStripeSubscription = (subscriptionId: string) => billingRequest('sync_subscription', { subscriptionId });
+export const createStripeSubscriptionCupons = (planId: string, couponId: string | undefined, billingDetails: Record<string, string>, paymentMethodId: string) =>
+  billingRequest('create_subscription', { planId, couponId, billingDetails, paymentMethodId });
+
+export async function getStripePlanById(priceId: string): Promise<any> {
+  if (!priceId) return null;
+  const { data, error } = await supabase.functions.invoke('get-plan-by-id', { body: { priceId } });
+  if (error || !data?.product) throw new Error(String(i18n.t('subscription.loadError')));
+  const metadata = data.product.metadata ?? data.metadata ?? {};
+  return { ...data, metadata, product: { ...data.product, metadata } };
+}
+export const cancelUserSubscription = async (_subscriptionId: string, _userId: string) => billingRequest('cancel_subscription');
+export async function upgradeSubscription({ subscriptionId, newPriceId }: { subscriptionId: string; newPriceId: string; userId: string }) {
+  let result = await billingRequest('upgrade_subscription', { subscriptionId, newPriceId, requestId: `req_${uuid().replace(/-/g, '')}` });
+  if (result.clientSecret && result.paymentStatus !== 'succeeded') {
+    const stripe = await stripePromise;
+    if (!stripe) throw new Error(String(i18n.t('records.billingFailed')));
+    const { error } = await stripe.confirmCardPayment(result.clientSecret);
+    if (error) throw error;
+  }
+  result = await syncStripeSubscription(subscriptionId);
+  if (!['active', 'trialing'].includes(result.status) || result.planId !== newPriceId) throw new Error(String(i18n.t('records.paymentPending')));
+  return result;
+}
+export const createStripePaymentIntent = (packageId: string, requestId: string): Promise<{ clientSecret: string; paymentIntentId: string }> =>
+  billingRequest('create_token_payment', { packageId, requestId });
+export const creditPurchasedTokens = (paymentIntentId: string) => billingRequest('credit_tokens', { paymentIntentId });

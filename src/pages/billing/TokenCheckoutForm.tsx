@@ -3,14 +3,15 @@ import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { v4 as uuid } from "uuid";
 import { useAuth } from "@/context/AuthContext";
-import { createStripePaymentIntent } from "@/lib/stripe";
+import { createStripePaymentIntent, creditPurchasedTokens } from "@/lib/stripe";
 import { useTranslation } from "react-i18next";
 import { Loader2 } from "lucide-react";
 
 type TokenCheckoutFormProps = {
   userId: string;
+  packageId: string;
   tokens: number;
   price: number;
   currency?: string;
@@ -18,6 +19,7 @@ type TokenCheckoutFormProps = {
 
 export default function TokenCheckoutForm({
   userId,
+  packageId,
   tokens,
   price,
   currency = "usd",
@@ -32,7 +34,7 @@ export default function TokenCheckoutForm({
   const [nameOnCard, setNameOnCard] = useState("");
 
   const formatPrice = (priceInCents: number) =>
-    `$${(priceInCents / 100).toFixed(2)}`;
+    new Intl.NumberFormat(undefined, { style: "currency", currency }).format(priceInCents / 100);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,59 +44,36 @@ export default function TokenCheckoutForm({
     setError(null);
 
     try {
-      const { clientSecret } = await createStripePaymentIntent(
-        price,
-        currency,
-        currentUser?.email ?? "",
-        nameOnCard
-      );
-
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement)!,
-          billing_details: {
-            email: currentUser?.email || "",
-            name: nameOnCard || currentUser?.displayName || "Anonymous",
-          },
-        },
-      });
-
-      if (result.error) {
-        setError(result.error.message || "Payment failed");
-        return;
+      if (!currentUser || currentUser.uid !== userId) throw new Error(t('inventory.sessionRequired'));
+      const storageKey = `boxbin-token-payment:${currentUser.id}:${packageId}`;
+      let pending: { requestId: string; paymentIntentId?: string; clientSecret?: string };
+      try { pending = JSON.parse(localStorage.getItem(storageKey) || 'null') || { requestId: `req_${uuid().replace(/-/g, '')}` }; }
+      catch { pending = { requestId: `req_${uuid().replace(/-/g, '')}` }; }
+      localStorage.setItem(storageKey, JSON.stringify(pending));
+      if (!pending.paymentIntentId || !pending.clientSecret) {
+        const intent = await createStripePaymentIntent(packageId, pending.requestId);
+        pending = { ...pending, ...intent };
+        localStorage.setItem(storageKey, JSON.stringify(pending));
       }
-
-      if (result.paymentIntent?.status === "succeeded") {
-        const { data: existing } = await supabase
-          .from("user_tokens")
-          .select("tokens")
-          .eq("id", userId)
-          .maybeSingle();
-
-        const currentTokens = (existing?.tokens as number) || 0;
-        const newTokens = currentTokens + tokens;
-
-        await supabase.from("user_tokens").upsert({
-          id: userId,
-          tokens: newTokens,
-          updatedAt: new Date().toISOString(),
-        });
-
-        await supabase.from("users").update({
-          tokens: newTokens,
-        }).eq("id", userId);
-
-        if ((window as any).ReactNativeWebView) {
-          (window as any).ReactNativeWebView.postMessage(
-            JSON.stringify({
-              type: "TOKENS_PURCHASE_SUCCESS",
-              tokens,
-            })
-          );
-        } else {
-          window.location.href = "/home";
+      const previous = await stripe.retrievePaymentIntent(pending.clientSecret!);
+      if (previous.error) throw previous.error;
+      if (previous.paymentIntent?.status !== 'succeeded') {
+        if (previous.paymentIntent?.status === 'canceled') {
+          localStorage.removeItem(storageKey);
+          throw new Error(t('records.billingFailed'));
         }
+        const result = await stripe.confirmCardPayment(pending.clientSecret!, {
+          payment_method: { card: elements.getElement(CardElement)!, billing_details: { email: currentUser.email || '', name: nameOnCard || currentUser.displayName || '' } },
+        });
+        if (result.error) throw result.error;
+        if (result.paymentIntent?.status !== 'succeeded') throw new Error(t('records.paymentPending'));
       }
+      try { await creditPurchasedTokens(pending.paymentIntentId!); }
+      catch { throw new Error(t('records.creditPending')); }
+      localStorage.removeItem(storageKey);
+      if ((window as any).ReactNativeWebView) {
+        (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'TOKENS_PURCHASE_SUCCESS', tokens }));
+      } else { window.location.href = '/home'; }
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Unexpected error");
@@ -115,7 +94,6 @@ export default function TokenCheckoutForm({
           onChange={(e) => setNameOnCard(e.target.value)}
           placeholder="Jane Doe"
           className="h-9 text-xs rounded-xl border-slate-200"
-          required
         />
       </div>
 

@@ -5,8 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
-import { createStripeSubscriptionCupons } from '@/lib/stripe';
+import { createStripeSubscriptionCupons, syncStripeSubscription, billingRequest } from '@/lib/stripe';
 
 type CheckoutFormProps = {
   userId: string | undefined;
@@ -83,15 +82,7 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
     setCouponError(null);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('validate-coupon', {
-        body: {
-          couponCode: couponCode.trim(),
-          planId,
-          userId,
-        },
-      });
-
-      if (fnError) throw fnError;
+      const data = await billingRequest('validate_coupon', { couponCode: couponCode.trim(), planId });
 
       const couponRes = data as CouponValidation;
 
@@ -150,55 +141,15 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         return;
       }
 
-      // Get user information
-      const userEmail = currentUser?.email;
-      const userName = currentUser?.displayName;
-
-      // Create Stripe subscription with coupon using your local function
-      const { subscriptionId, customerId, appliedCoupon: finalAppliedCoupon } = await createStripeSubscriptionCupons(
-        paymentMethod.id,
-        planId,
-        appliedCoupon?.coupon?.id, // Pass coupon ID as third parameter
-        undefined, // customerId
-        userEmail || undefined,
-        userName || undefined,
-        currentUser?.uid ?? "",
-        {
-          firstName,
-          lastName,
-          address,
-          city,
-          state,
-          zipCode,
-          nameOnCard
-        }
-      );
-
-      await supabase.from("subscriptions").delete().eq("userId", userId);
-
-      await supabase.from("subscriptions").insert({
-        userId,
-        planId,
-        status: 'active',
-        paymentMethod: paymentMethod.id,
-        stripeSubscriptionId: subscriptionId,
-        stripeCustomerId: customerId,
-        couponUsed: finalAppliedCoupon || appliedCoupon?.coupon || null,
-        originalPrice,
-        finalPrice,
-        discountAmount,
-        billingDetails: {
-          firstName,
-          lastName,
-          address,
-          city,
-          state,
-          zipCode,
-          nameOnCard
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      const result = await createStripeSubscriptionCupons(planId, appliedCoupon?.coupon?.id, {
+        firstName, lastName, address, city, state, zipCode, nameOnCard,
+      }, paymentMethod.id);
+      if (result.clientSecret && result.paymentStatus !== 'succeeded') {
+        const confirmation = await stripe.confirmCardPayment(result.clientSecret, { payment_method: paymentMethod.id });
+        if (confirmation.error) throw confirmation.error;
+      }
+      const saved = await syncStripeSubscription(result.subscriptionId);
+      if (!['active', 'trialing'].includes(saved.status)) throw new Error(t('records.paymentIncomplete'));
 
       if ((window as any).ReactNativeWebView) {
         (window as any).ReactNativeWebView.postMessage(JSON.stringify({

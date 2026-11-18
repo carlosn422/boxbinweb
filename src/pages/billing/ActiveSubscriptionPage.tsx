@@ -89,22 +89,12 @@ export default function ActiveSubscriptionPage() {
 
   const handleCancelSubscription = async () => {
     setUpgradingToPlan(null);
-    if (!subscription?.stripeSubscriptionId || !subscription?.userId) {
-      if (subscription?.plan === "Trial" && subscription?.status === "active") {
-        await supabase
-          .from("subscriptions")
-          .delete()
-          .eq("userId", currentUser?.uid);
-        navigate("/billing");
-        return;
-      }
-      return;
-    }
+    if (!subscription?.userId) return;
     setRedirecting(true);
 
     try {
       await cancelUserSubscription(
-        subscription.stripeSubscriptionId,
+        subscription.stripeSubscriptionId || "",
         subscription.userId
       );
       setSubscription(null);
@@ -134,8 +124,7 @@ export default function ActiveSubscriptionPage() {
       });
 
       const filteredPlans = superiorPlans.filter((plan: any) => {
-        const keys = plan.metadata ? Object.keys(plan.metadata) : [];
-        return keys.includes("tokens") && keys.length > 1;
+        return !!plan.recurring && (plan.metadata?.bins !== undefined || plan.metadata?.items !== undefined);
       });
 
       const sortedPlans = filteredPlans.sort(
@@ -159,7 +148,6 @@ export default function ActiveSubscriptionPage() {
   const handleUpgradeToPlan = async (newPriceId: string) => {
     if (
       !subscription?.stripeSubscriptionId &&
-      subscription?.plan === "Free Trial" &&
       subscription?.status === "active"
     ) {
       setSelectedPlan(newPriceId);
@@ -197,6 +185,7 @@ export default function ActiveSubscriptionPage() {
           .from("subscriptions")
           .select("*")
           .eq("userId", currentUser.uid)
+          .in("status", ["active", "trialing"])
           .maybeSingle();
 
         if (sub) {
@@ -760,7 +749,7 @@ export default function ActiveSubscriptionPage() {
                       <CheckoutForm
                         userId={currentUser?.uid}
                         planId={selectedPlan}
-                        currency="usd"
+                        currency={plans.find((p: any) => p.id === selectedPlan)?.currency || "usd"}
                         originalPrice={
                           plans.find((p: any) => p.id === selectedPlan)?.unit_amount || 0
                         }

@@ -14,6 +14,7 @@
     "test:inventory:browser": "playwright test --config=playwright.copilot.config.ts tests/browser/inventory.spec.ts",
     "test:records": "node --test tests/records.test.cjs",
     "test:records:browser": "playwright test --config=playwright.copilot.config.ts tests/browser/records.spec.ts",
+    "test:billing": "node --test tests/billing.test.cjs",
     "test:processing": "node --test tests/processing.test.cjs"
   },
   "dependencies": {

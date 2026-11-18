@@ -20,6 +20,11 @@
     "supabase/functions/boxbin-image/*.ts",
     "supabase/functions/boxbin-copilot-voice/*.ts",
     "tests/edge-globals.d.ts",
+    "supabase/functions/boxbin-billing/*.ts",
+    "supabase/functions/boxbin-billing-webhook/*.ts",
+    "supabase/functions/cancel-subscription/*.ts",
+    "supabase/functions/upgrade-subscription/*.ts",
+    "supabase/functions/validate-coupon/*.ts",
     "supabase/functions/move-image-to-final/**/*.ts",
     "supabase/functions/move-image-to-final-images/**/*.ts"
   ]

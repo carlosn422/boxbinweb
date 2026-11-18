@@ -1,9 +1,11 @@
+import { readTokenBalance } from '@/services/recordService';
+import { claimFreeTokens } from '@/lib/stripe';
+import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { getStripePlans } from "../../lib/stripe";
 import { STRIPE_PUBLISHABLE_KEY } from "../../config/stripe";
@@ -52,22 +54,8 @@ export default function TokensPurchasePage() {
   useEffect(() => {
     const checkUserTokens = async () => {
       if (currentUser?.uid) {
-        const { data: userData } = await supabase
-          .from("users")
-          .select("tokens")
-          .eq("id", currentUser.uid)
-          .maybeSingle();
-
-        let tokens = userData?.tokens;
-        if (tokens === undefined || tokens === null) {
-          const { data: userTokensData } = await supabase
-            .from("user_tokens")
-            .select("tokens")
-            .eq("id", currentUser.uid)
-            .maybeSingle();
-          tokens = userTokensData?.tokens;
-        }
-        setUserTokens(tokens || 0);
+      try { setUserTokens(await readTokenBalance()); }
+      catch { toast.error(t('records.loadFailed')); }
         setLoading(false);
       }
     };
@@ -85,8 +73,7 @@ export default function TokensPurchasePage() {
       const stripePackages = await getStripePlans();
 
       const filteredPackages = stripePackages.filter((pkg: any) => {
-        const keys = pkg.metadata ? Object.keys(pkg.metadata) : [];
-        return keys.includes("tokens") && keys.length === 1;
+        return !pkg.recurring && Number(pkg.metadata?.tokens) > 0;
       });
 
       // Sort packages by token amount (ascending)
@@ -471,15 +458,7 @@ export default function TokensPurchasePage() {
                     <Button
                       onClick={async () => {
                         try {
-                          const tokenAmount = parseInt(currentPkg?.metadata?.tokens || "0");
-                          await supabase.from("token_purchases").insert({
-                            userId: currentUser?.uid,
-                            packageId: selectedPackage,
-                            tokenAmount: tokenAmount,
-                            status: "completed",
-                            createdAt: new Date().toISOString(),
-                            userEmail: currentUser?.email,
-                          });
+                          await claimFreeTokens(selectedPackage);
 
                           if (isReactNative) {
                             (window as any).ReactNativeWebView.postMessage(
@@ -490,6 +469,7 @@ export default function TokensPurchasePage() {
                           }
                         } catch (error) {
                           console.error("Error processing free tokens:", error);
+                          toast.error(t("records.billingFailed"));
                         }
                       }}
                       className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold h-9 px-6 rounded-lg"
@@ -515,6 +495,8 @@ export default function TokensPurchasePage() {
 
                     <Elements stripe={stripePromise}>
                       <TokenCheckoutForm
+                        packageId={selectedPackage}
+                        currency={currentPkg?.currency || "usd"}
                         userId={currentUser?.uid ?? ""}
                         tokens={parseInt(currentPkg?.metadata?.tokens || "0")}
                         price={currentPkg?.unit_amount || 0}

@@ -3,8 +3,22 @@
 [functions.boxbin-copilot-voice]
 verify_jwt = false
 
-# The handlers validate the user token with Supabase Auth.
+# The handler validates the Supabase user token itself.
+[functions.boxbin-billing]
+verify_jwt = false
+
+# Stripe authenticates events with its webhook signature, not a Supabase JWT.
+[functions.boxbin-billing-webhook]
+verify_jwt = false
+
+# Each handler validates the bearer token using Supabase Auth.
 [functions.move-image-to-final]
 verify_jwt = false
 [functions.move-image-to-final-images]
+verify_jwt = false
+[functions.cancel-subscription]
+verify_jwt = false
+[functions.upgrade-subscription]
+verify_jwt = false
+[functions.validate-coupon]
 verify_jwt = false
