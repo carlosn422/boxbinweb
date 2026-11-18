@@ -1,3 +1,4 @@
+import { readTokenBalance } from '@/services/recordService';
 import { createInventoryRecord } from '@/services/inventoryService';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -116,22 +117,8 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
 
   const checkUserTokens = useCallback(async () => {
     if (currentUser?.uid) {
-      const { data: userData } = await supabase
-        .from("users")
-        .select("tokens")
-        .eq("id", currentUser.uid)
-        .maybeSingle();
-
-      let tokens = userData?.tokens;
-      if (tokens === undefined || tokens === null) {
-        const { data: userTokensData } = await supabase
-          .from("user_tokens")
-          .select("tokens")
-          .eq("id", currentUser.uid)
-          .maybeSingle();
-        tokens = userTokensData?.tokens;
-      }
-      setUserTokens(tokens || 0);
+      try { setUserTokens(await readTokenBalance()); }
+      catch { toast.error(t('records.loadFailed')); }
     }
   }, [currentUser]);
 
@@ -280,23 +267,11 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
   const handleAddDetectedItem = async (item: any) => {
     try {
       setAddingItemId(item.id);
-      let finalUrl = item?.image_url;
-      try {
-        const { data: moveResult, error: moveError } = await supabase.functions.invoke(
-          "move-image-to-final-images",
-          {
-            body: {
-              imageUrl: item?.image_url,
-              newFolder: "items",
-            },
-          }
-        );
-        if (!moveError && moveResult?.newUrl) {
-          finalUrl = moveResult.newUrl;
-        }
-      } catch (e) {
-        console.warn("Could not move image, using original url:", e);
-      }
+      const { data: moveResult, error: moveError } = await supabase.functions.invoke('move-image-to-final-images', {
+        body: { imageUrl: item?.image_url, newFolder: 'items' },
+      });
+      if (moveError || !moveResult?.newUrl) throw new Error(t('records.imageSaveFailed'));
+      const finalUrl = moveResult.newUrl;
 
       const newItemData = {
         name: item.label,

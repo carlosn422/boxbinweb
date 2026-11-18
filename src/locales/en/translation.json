@@ -1031,6 +1031,7 @@
     "paymentPending": "Payment is still pending. No balance has been credited.",
     "creditPending": "Payment received. Retry to confirm the balance; you will not be charged again.",
     "paymentIncomplete": "Complete the payment before continuing.",
-    "profileFailed": "Your profile could not be synced. Please sign in again to retry."
+    "profileFailed": "Your profile could not be synced. Please sign in again to retry.",
+    "imageSaveFailed": "The image could not be saved. The item was not created; please try again."
   }
 }

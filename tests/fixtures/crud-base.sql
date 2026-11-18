@@ -74,3 +74,6 @@ create table if not exists public.token_purchases (
   "userEmail" text
 );
 alter table public.token_purchases enable row level security;
+
+create table if not exists public.image_requests("id" text primary key,"userId" text,"imageCount" numeric,"success" boolean,"cost" numeric,"timestamp" jsonb,"firestore_id" text,"processingId" text,"costAnalysis" jsonb,"processingEstimate" jsonb);
+create table if not exists public.video_processing_jobs("id" text primary key,"userId" text,"videoName" text,"createdAt" jsonb,"status_message" text,"error_details" text,"status" text,"finishedAt" jsonb,"firestore_id" text,"result" jsonb,"cost" numeric,"costBreakdown" jsonb);

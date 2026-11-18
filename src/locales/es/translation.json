@@ -1031,6 +1031,7 @@
     "paymentPending": "El pago está pendiente. No se ha acreditado saldo.",
     "creditPending": "Pago recibido. Reintenta confirmar el saldo; no se volverá a cobrar.",
     "paymentIncomplete": "Completa el pago antes de continuar.",
-    "profileFailed": "No se pudo sincronizar tu perfil. Reintenta al volver a iniciar sesión."
+    "profileFailed": "No se pudo sincronizar tu perfil. Reintenta al volver a iniciar sesión.",
+    "imageSaveFailed": "No se pudo guardar la imagen. El artículo no se creó; intenta nuevamente."
   }
 }

@@ -2,3 +2,9 @@
 # Supabase Auth before accepting a connection; this does not disable app auth.
 [functions.boxbin-copilot-voice]
 verify_jwt = false
+
+# The handlers validate the user token with Supabase Auth.
+[functions.move-image-to-final]
+verify_jwt = false
+[functions.move-image-to-final-images]
+verify_jwt = false

@@ -40,3 +40,11 @@ export async function loadQrLabels(owner: string) {
     if (!data || data.length < 1000) return rows;
   }
 }
+
+export async function readTokenBalance() {
+  const { data, error } = await supabase.rpc('app_token_balance');
+  if (error) throw error;
+  const balance = Number(data);
+  if (!Number.isFinite(balance) || balance < 0) throw new Error(String(i18n.t('records.loadFailed')));
+  return balance;
+}

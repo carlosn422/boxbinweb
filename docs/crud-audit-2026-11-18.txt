@@ -39,7 +39,7 @@ Validation
   revocation using mocked HTTP. These browser tests do not prove live storage
   object upload or a real end-user browser session in production.
 
-Pending billing rollout (separate local changes; do not deploy independently)
+Deferred by user: Stripe (local changes only; NOT part of this release)
 - Frontend Stripe secret removal and server-authorized subscription/token flows
   are implemented locally, with 5 billing tests passing.
 - Migration: 202611180005_verified_billing.sql. It restricts direct financial
@@ -59,18 +59,34 @@ Pending billing rollout (separate local changes; do not deploy independently)
   charges, cancellations, token credits or paid subscriptions were created in
   this audit. A checkout older than 23 hours requires server reconciliation;
   it must not blindly reuse an expired Stripe idempotency key.
-- Existing mobile profile synchronization and Trial cancellation write directly
-  to tables. Update and test those callers before applying the financial RLS
-  restrictions; existing installed app versions also need consideration.
+- Mobile profile synchronization now calls app_sync_profile. Trial cancellation
+  remains unchanged. Update and test financial callers before applying billing
+  RLS restrictions; installed app versions also need consideration.
 - The previous web source/workflow used VITE_STRIPE_SECRET_KEY. If populated in
   deployed builds, that key must be rotated after moving callers server-side.
   This audit did not read or rotate the secret.
 
 External and inherited limits
-- Templates, PDF exports, image/video processing and file movement depend on a
-  separate API outside this repository. Its template/export endpoints respond
-  HTTP 401 without authentication; successful authenticated processing remains
-  unverified. The move-processed-* Edge Functions are not deployed.
+- API repository: carlosn422/BinventoryQRAPI, task/supabase (DigitalOcean).
+  Export/template routes now verify ownership or granted read access, paginate
+  inventory and handle imported profile IDs without invalid UUID casts.
+  Service authentication derives ownership from the trusted copilot_owner RPC.
+  Video status is owner-scoped; storage maintenance requires a trusted admin.
+- Processing migrations 202611180006 and 202611180007 were rehearsed against
+  production inside rollback transactions, then applied. Per-owner locking and
+  request receipts make debit and result persistence atomic and idempotent.
+  Existing conflicting token stores produce an error, not silent reconciliation.
+- move-image-to-final and move-image-to-final-images were deployed. They require
+  authentication and an owned Supabase storage path, copy to a unique item path,
+  and retain the source for other extracted items. Web refuses to save an item
+  when its image promotion fails. No external URL is fetched by these handlers.
+- API image/video models are configurable with GEMINI_IMAGE_MODEL and
+  GEMINI_VIDEO_MODEL; credentials come from the API runtime GEMINI_API_KEY.
+  This is separate from Supabase Edge Function secrets used by web/mobile
+  Copilot. Runtime availability must be verified; repository env is not proof
+  of deployed configuration. No paid Gemini generation was exercised.
+- Processing checks: 3 database/storage tests, 9 API unit/HTTP tests; mobile
+  profile regression and TypeScript. Live smoke outcome is reported separately.
 - Legacy owners differ from canonical Auth owners for some migrated accounts.
   No bulk owner remapping or removal of inherited broad policies was performed.
 - Public QR reads/legacy QR update policies remain compatible with existing
