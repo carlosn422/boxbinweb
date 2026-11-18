@@ -108,6 +108,7 @@ export const LocationsManager = () => {
         .from("subscriptions")
         .select("*")
         .eq("userId", effectiveUserId)
+        .in("status", ["active", "trialing"])
         .limit(1);
 
       if (subs && subs.length > 0) {

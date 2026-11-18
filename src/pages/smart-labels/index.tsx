@@ -1,3 +1,4 @@
+import { createQrLabels, loadQrLabels } from '@/services/recordService';
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -6,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabase";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import DatePicker from "react-datepicker";
@@ -40,15 +40,6 @@ type LabelType = {
   userId: string;
 };
 
-const generateQrCodeId = () => {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let result = "";
-  for (let i = 0; i < 3; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return result;
-};
-
 export const SmartLabelsPage = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -79,18 +70,12 @@ export const SmartLabelsPage = () => {
     }
   }, [currentUser]);
 
-  const fetchLabels = async (): Promise<void> => {
+  const fetchLabels = async (): Promise<boolean> => {
     try {
-      if (!currentUser) return;
+      if (!currentUser) return false;
       setIsLoading(true);
 
-      const { data, error } = await supabase
-        .from("qrcodes")
-        .select("*")
-        .eq("userId", currentUser.uid)
-        .order("dateCreated", { ascending: false });
-
-      if (error) throw error;
+      const data = await loadQrLabels(currentUser.uid);
 
       const labelsData: LabelType[] = (data || []).map((row: any) => {
         let parsedDate = row.dateCreated;
@@ -110,10 +95,12 @@ export const SmartLabelsPage = () => {
         };
       });
 
-      setAllLabels(labelsData);
+      setAllLabels(labelsData.sort((a, b) => new Date(b.dateCreated).getTime() - new Date(a.dateCreated).getTime()));
+      return true;
     } catch (error: any) {
       console.error("Error fetching labels:", error);
       toast.error(error.message || t("smartLabels.toasts.failedToLoad", { defaultValue: "Failed to load labels" }));
+      return false;
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -122,8 +109,7 @@ export const SmartLabelsPage = () => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchLabels();
-    toast.success(t("smartLabels.toasts.labelsUpdated", { defaultValue: "Labels updated" }));
+    if (await fetchLabels()) toast.success(t("smartLabels.toasts.labelsUpdated", { defaultValue: "Labels updated" }));
   };
 
   // Filtered labels
@@ -212,32 +198,11 @@ export const SmartLabelsPage = () => {
   };
 
   const handleCreateLabels = async () => {
-    if (!currentUser || quantity < 1) return;
+    if (!currentUser || isCreating) return;
     setIsCreating(true);
 
     try {
-      const newLabels = [];
-      const now = new Date().toISOString();
-
-      for (let i = 0; i < quantity; i++) {
-        const guid =
-          self.crypto?.randomUUID() ||
-          Math.random().toString(36).substring(2) + Date.now().toString(36);
-        const qrcodeId = generateQrCodeId();
-
-        newLabels.push({
-          dateCreated: now,
-          field: `Label ${quantity > 1 ? `(${i + 1})` : ""}`.trim(),
-          guid,
-          isUsed: false,
-          order_key: "",
-          qrcodeId,
-          userId: currentUser.uid,
-        });
-      }
-
-      const { error } = await supabase.from("qrcodes").insert(newLabels);
-      if (error) throw error;
+      await createQrLabels(currentUser.uid, quantity);
 
       toast.success(
         quantity === 1
@@ -953,9 +918,9 @@ export const SmartLabelsPage = () => {
               <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-[11px] text-slate-500">
                 <span>{t("smartLabels.preview", { defaultValue: "Preview: " })}</span>
                 <span className="font-mono font-bold text-slate-800">
-                  {generateQrCodeId()}
+                  A1B2C3D4
                 </span>
-                <span> {t("smartLabels.randomCodeNote", { defaultValue: "(random 3-char unique alphanumeric ID)" })}</span>
+                <span> {t("smartLabels.randomCodeNote", { defaultValue: "(random 8-character alphanumeric code)" })}</span>
               </div>
             </div>
 

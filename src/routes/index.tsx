@@ -36,6 +36,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
           .from("subscriptions")
           .select("id")
           .eq("userId", currentUser.uid)
+          .in("status", ["active", "trialing"])
           .limit(1);
         setHasSubscription(Boolean(data && data.length > 0));
       }
@@ -76,6 +77,7 @@ const ProtectedRouteLayout = ({ children }: { children: React.ReactNode }) => {
           .from("subscriptions")
           .select("id")
           .eq("userId", currentUser.uid)
+          .in("status", ["active", "trialing"])
           .limit(1);
         setHasSubscription(Boolean(data && data.length > 0));
       }

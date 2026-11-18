@@ -1,0 +1,82 @@
+BoxBin web CRUD audit — 2026-11-18
+
+Published core scope
+- QR creation in both entry points supplies UUID IDs. Supabase supplies defaults
+  for imported text IDs in qrcodes, shared_access and subscriptions.
+- QR requestId is available for the template flow. Label reads paginate beyond
+  Supabase's 1000-row limit. Write failures retain the form and show an error.
+- Profile synchronization is an authenticated RPC that derives identity from
+  Auth. It is idempotent and retains existing imported profile IDs and usernames.
+- Sharing uses an authenticated, idempotent username lookup and grant RPC.
+  Revocation confirms the deleted row. Canonical recipients can read shared
+  inventory. Existing Firebase-era policies and ownership are preserved.
+- Item image uploads use the canonical owner's folder plus UUID filenames.
+  Storage policies permit upload/deletion within that namespace and deletion of
+  older files owned by the same uploader. Service-owned imported files outside
+  that namespace are not reassigned or deleted by this change.
+- Chat deletion confirms a returned row. Subscription queries only treat active
+  or trialing subscriptions as current.
+- External API fallback points at the same DigitalOcean host used by mobile.
+
+Database rollout
+- Project: xfqmknrtozlxoscotcqa.
+- 202611180001_inventory_integrity was already applied.
+- Applied 202611180002_remaining_crud and 202611180004_inventory_storage.
+- Schema/policy/count snapshot: /tmp/boxbin-crud/preflight.json (local only).
+- Rehearsal and post-apply smoke use synthetic users and ROLLBACK. Assertions
+  exercise real authenticated RLS: profile idempotency; QR create/update/delete;
+  shared read and denied shared write; revoke; own/foreign upload namespaces.
+- These schema changes do not update, delete or reassign existing business rows.
+- Snapshot before this rollout: 77 bins, 210 items, 34 locations, 1000 QR codes,
+  171 profiles, 11 shares, 75 subscriptions, 741 storage objects.
+
+Validation
+- npm run build
+- npm run test:inventory (8 tests)
+- npm run test:copilot (28 tests, including database integration)
+- npm run test:records (database/RLS and QR service regression tests)
+- Playwright inventory + records: forms, denied writes, persisted reloads and
+  revocation using mocked HTTP. These browser tests do not prove live storage
+  object upload or a real end-user browser session in production.
+
+Pending billing rollout (separate local changes; do not deploy independently)
+- Frontend Stripe secret removal and server-authorized subscription/token flows
+  are implemented locally, with 5 billing tests passing.
+- Migration: 202611180005_verified_billing.sql. It restricts direct financial
+  writes, provides atomic token receipts and checkout reservations, and rejects
+  conflicting legacy balances rather than overwriting either balance.
+- Functions: boxbin-billing, boxbin-billing-webhook, cancel-subscription,
+  upgrade-subscription and validate-coupon. The latter three are compatibility
+  wrappers. Deploy these together with the frontend changes and migration.
+- STRIPE_SECRET_KEY is present in Supabase. STRIPE_WEBHOOK_SECRET is absent.
+- Configure a Stripe webhook at:
+  https://xfqmknrtozlxoscotcqa.supabase.co/functions/v1/boxbin-billing-webhook
+  Events: payment_intent.succeeded; customer.subscription.created;
+  customer.subscription.updated; customer.subscription.deleted.
+  Use API version 2023-10-16 for this handler's subscription object shape.
+  Store its signing secret as STRIPE_WEBHOOK_SECRET in Supabase, never VITE_*.
+- Validate this rollout in Stripe test mode before production purchases. No real
+  charges, cancellations, token credits or paid subscriptions were created in
+  this audit. A checkout older than 23 hours requires server reconciliation;
+  it must not blindly reuse an expired Stripe idempotency key.
+- Existing mobile profile synchronization and Trial cancellation write directly
+  to tables. Update and test those callers before applying the financial RLS
+  restrictions; existing installed app versions also need consideration.
+- The previous web source/workflow used VITE_STRIPE_SECRET_KEY. If populated in
+  deployed builds, that key must be rotated after moving callers server-side.
+  This audit did not read or rotate the secret.
+
+External and inherited limits
+- Templates, PDF exports, image/video processing and file movement depend on a
+  separate API outside this repository. Its template/export endpoints respond
+  HTTP 401 without authentication; successful authenticated processing remains
+  unverified. The move-processed-* Edge Functions are not deployed.
+- Legacy owners differ from canonical Auth owners for some migrated accounts.
+  No bulk owner remapping or removal of inherited broad policies was performed.
+- Public QR reads/legacy QR update policies remain compatible with existing
+  scanner clients; this is not a completed database-wide security audit.
+
+Stripe implementation references
+https://docs.stripe.com/api/idempotent_requests
+https://docs.stripe.com/billing/subscriptions/pending-updates
+https://docs.stripe.com/events/manage-webhook-endpoints

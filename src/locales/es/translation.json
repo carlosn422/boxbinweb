@@ -718,7 +718,7 @@
     "createModalSubtitle": "Genera códigos identificadores QR únicos",
     "quantityToGenerate": "Cantidad a Generar",
     "preview": "Vista previa:",
-    "randomCodeNote": "(código alfanumérico único de 3 caracteres)",
+    "randomCodeNote": "(código alfanumérico aleatorio de 8 caracteres)",
     "generating": "Generando...",
     "generateLabelsBtn": "Generar {{count}} Etiquetas",
     "generateLabelBtn": "Generar Etiqueta",
@@ -1023,5 +1023,14 @@
     "binCreated": "¡Contenedor creado correctamente!",
     "bulkPartial": "Se guardaron {{saved}} de {{total}} artículos. Algunas cargas fallaron.",
     "imageCleanupFailed": "Cambios guardados, pero no se pudo eliminar la imagen anterior."
+  },
+  "records": {
+    "invalidQuantity": "Introduce un número entero del 1 al 100.",
+    "loadFailed": "No se pudieron cargar los registros.",
+    "billingFailed": "No se pudo completar la operación. Inténtalo nuevamente.",
+    "paymentPending": "El pago está pendiente. No se ha acreditado saldo.",
+    "creditPending": "Pago recibido. Reintenta confirmar el saldo; no se volverá a cobrar.",
+    "paymentIncomplete": "Completa el pago antes de continuar.",
+    "profileFailed": "No se pudo sincronizar tu perfil. Reintenta al volver a iniciar sesión."
   }
 }

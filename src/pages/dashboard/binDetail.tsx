@@ -1,3 +1,4 @@
+import { uploadInventoryImage } from '@/services/storageService';
 import i18n from 'i18next';
 import { createInventoryRecord, updateInventoryRecord, deleteInventoryRecord, inventoryError } from '@/services/inventoryService';
 import "./bin-detail.css";
@@ -86,19 +87,6 @@ export interface TokenEstimate {
   tokens_remaining_after?: number;
   required_tokens?: number;
 }
-
-export const uploadImage = async (file: File): Promise<string> => {
-  const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-  const filename = `items/${Date.now()}-${cleanName}`;
-  const { error } = await supabase.storage
-    .from("binventory-storage")
-    .upload(filename, file, { upsert: true });
-  if (error) throw error;
-  const { data: { publicUrl } } = supabase.storage
-    .from("binventory-storage")
-    .getPublicUrl(filename);
-  return publicUrl;
-};
 
 const extractStoragePath = (url: string | null): string | null => {
   if (!url) return null;
@@ -263,6 +251,7 @@ const BinDetailsScreen: React.FC = () => {
         .from("subscriptions")
         .select("*")
         .eq("userId", effectiveUserId)
+        .in("status", ["active", "trialing"])
         .limit(1);
 
       if (subs && subs.length > 0) {
@@ -394,18 +383,7 @@ const BinDetailsScreen: React.FC = () => {
     for (let i = 0; i < files.length; i++) {
       try {
         const file = files[i];
-        const cleanName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-        const filename = `bins/${id}/${Date.now()}_${cleanName}`;
-
-        const { error: uploadErr } = await supabase.storage
-          .from("binventory-storage")
-          .upload(filename, file, { upsert: true });
-
-        if (uploadErr) throw uploadErr;
-
-        const { data: { publicUrl } } = supabase.storage
-          .from("binventory-storage")
-          .getPublicUrl(filename);
+        const publicUrl = await uploadInventoryImage(file, effectiveUserId);
 
         const generatedName = `${bin?.name || "Item"} #${String(items.length + i + 1).padStart(2, "0")}`;
         const itemData = {
@@ -514,7 +492,7 @@ const BinDetailsScreen: React.FC = () => {
 
       if (selectedFile) {
         try {
-          imageUrl = await uploadImage(selectedFile);
+          imageUrl = await uploadInventoryImage(selectedFile, effectiveUserId);
         } catch (uploadError) {
           console.error("Error uploading image:", uploadError);
           const proceed = window.confirm(
@@ -577,7 +555,7 @@ const BinDetailsScreen: React.FC = () => {
       };
 
       if (selectedFile && selectedImage !== currentItem.imageUrl) {
-        const newImageUrl = await uploadImage(selectedFile);
+        const newImageUrl = await uploadInventoryImage(selectedFile, effectiveUserId);
         updateData.imageUrl = newImageUrl;
       } else if (!selectedImage && currentItem.imageUrl) {
         updateData.imageUrl = null;

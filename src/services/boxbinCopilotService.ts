@@ -232,7 +232,7 @@ export async function saveSessionMessages(userId: string, sessionId: string, mes
 export async function deleteCopilotSession(userId: string, sessionId: string): Promise<void> {
   const {
     error
-  } = await supabase.from('copilot_chats').delete().eq('id', sessionId).eq('userId', userId);
+  } = await supabase.from('copilot_chats').delete().eq('id', sessionId).eq('userId', userId).select('id').single();
   if (error) throw new Error(ct('deleteChatError'));
   saveLocalSessions(userId, loadLocalSessions(userId).filter(s => s.id !== sessionId));
 }

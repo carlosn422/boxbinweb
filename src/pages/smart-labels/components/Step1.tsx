@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '../../../context/AuthContext';
-import { supabase } from '../../../lib/supabase';
+import { createQrLabels } from '@/services/recordService';
+import { toast } from 'sonner';
 
 interface Step1Props {
   qrCount: number;
@@ -19,44 +20,18 @@ export const Step1 = ({ qrCount, setQrCount, onGenerate }: Step1Props) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleGenerateClick = async () => {
-    console.log('Generate button clicked with qrCount:', qrCount);
+    if (!isValid || !currentUser || isGenerating) return;
     setIsGenerating(true);
-    
-    const requestGuid = uuidv4();
-    
-    // Simulate generation progress
-    const timer = setInterval(() => {
-      /*setProgress(prev => {
-        if (prev >= 100) {
-          clearInterval(timer);
-          return 100;
-        }
-        return prev + 10;
-      });*/
-    }, 300);
-
     try {
-      const labelsToInsert = [];
-      for (let i = 0; i < qrCount; i++) {
-        labelsToInsert.push({
-          dateCreated: new Date().toISOString(),
-          guid: uuidv4(),
-          isUsed: false,
-          userId: currentUser?.uid,
-          requestId: requestGuid
-        });
-      }
-      const { error: insertErr } = await supabase.from("qrcodes").insert(labelsToInsert);
-      if (insertErr) throw insertErr;
+      const requestGuid = uuidv4();
+      await createQrLabels(currentUser.uid, qrCount, requestGuid);
+      setIsModalOpen(false);
+      onGenerate(requestGuid);
     } catch (error) {
-      console.error('Error creating smartlabels:', error);
-      clearInterval(timer);
+      toast.error(error instanceof Error ? error.message : String((error as { message?: string })?.message || 'Could not create labels'));
+    } finally {
       setIsGenerating(false);
-      return;
     }
-
-    clearInterval(timer);
-    onGenerate(requestGuid);
   };
 
   return (

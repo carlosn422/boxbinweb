@@ -718,7 +718,7 @@
     "createModalSubtitle": "Generate unique QR identifier codes",
     "quantityToGenerate": "Quantity to Generate",
     "preview": "Preview:",
-    "randomCodeNote": "(random 3-char unique alphanumeric ID)",
+    "randomCodeNote": "(random 8-character alphanumeric code)",
     "generating": "Generating...",
     "generateLabelsBtn": "Generate {{count}} Labels",
     "generateLabelBtn": "Generate Label",
@@ -1023,5 +1023,14 @@
     "binCreated": "Container created successfully!",
     "bulkPartial": "Saved {{saved}} of {{total}} items. Some uploads failed.",
     "imageCleanupFailed": "Changes saved, but the previous image could not be removed."
+  },
+  "records": {
+    "invalidQuantity": "Enter a whole number from 1 to 100.",
+    "loadFailed": "Could not load records.",
+    "billingFailed": "Could not complete billing. Please retry.",
+    "paymentPending": "Payment is still pending. No balance has been credited.",
+    "creditPending": "Payment received. Retry to confirm the balance; you will not be charged again.",
+    "paymentIncomplete": "Complete the payment before continuing.",
+    "profileFailed": "Your profile could not be synced. Please sign in again to retry."
   }
 }

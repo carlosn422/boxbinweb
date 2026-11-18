@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+import i18n from 'i18next';
 import { createClient, type User as SupabaseUser } from '@supabase/supabase-js';
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://xfqmknrtozlxoscotcqa.supabase.co';
@@ -109,38 +111,10 @@ export const logoutUser = async () => {
 export const syncUserProfile = async (user: AppUser | null) => {
   if (!user) return;
   try {
-    const { data: existing } = await supabase
-      .from('users')
-      .select('id, username')
-      .or(`uid.eq.${user.uid},auth_user_id.eq.${user.id}`)
-      .maybeSingle();
-
-    if (!existing) {
-      const baseName = (user.email || 'user').split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
-      const username = `${baseName}${Math.floor(1000 + Math.random() * 9000)}`;
-
-      await supabase.from('users').insert({
-        id: user.uid,
-        uid: user.uid,
-        auth_user_id: user.id,
-        email: user.email || '',
-        username,
-        displayName: user.displayName || '',
-        photoURL: user.photoURL || '',
-        createdAt: new Date().toISOString(),
-      });
-    } else {
-      await supabase
-        .from('users')
-        .update({
-          email: user.email || '',
-          displayName: user.displayName || '',
-          photoURL: user.photoURL || '',
-          lastLogin: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-    }
+    const { error } = await supabase.rpc('app_sync_profile');
+    if (error) throw error;
   } catch (e) {
     console.warn('Could not sync user profile to supabase:', e);
+    toast.error(String(i18n.t('records.profileFailed')), { id: 'profile-sync-failed' });
   }
 };

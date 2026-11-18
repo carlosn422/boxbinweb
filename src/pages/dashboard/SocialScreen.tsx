@@ -1,3 +1,5 @@
+import { grantAccess, revokeAccess } from '@/services/recordService';
+import { inventoryError } from '@/services/inventoryService';
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
@@ -61,17 +63,19 @@ export default function SocialScreen() {
       setLoading(true);
 
       // Shared with me
-      const { data: sharedWithMe } = await supabase
+      const { data: sharedWithMe, error: sharedWithMeError } = await supabase
         .from("shared_access")
         .select("*")
         .eq("grantedUserId", currentUser.uid);
+        if (sharedWithMeError) throw sharedWithMeError;
 
       if (sharedWithMe && sharedWithMe.length > 0) {
         const ownerIds = sharedWithMe.map((s) => s.ownerUserId).filter(Boolean);
-        const { data: ownerUsers } = await supabase
+        const { data: ownerUsers, error: ownerUsersError } = await supabase
           .from("users")
           .select("uid, username, displayName")
           .in("uid", ownerIds);
+        if (ownerUsersError) throw ownerUsersError;
 
         const ownerMap = new Map((ownerUsers || []).map((u) => [u.uid, u]));
 
@@ -90,17 +94,19 @@ export default function SocialScreen() {
       }
 
       // Shared by me
-      const { data: sharedByMe } = await supabase
+      const { data: sharedByMe, error: sharedByMeError } = await supabase
         .from("shared_access")
         .select("*")
         .eq("ownerUserId", currentUser.uid);
+        if (sharedByMeError) throw sharedByMeError;
 
       if (sharedByMe && sharedByMe.length > 0) {
         const grantedIds = sharedByMe.map((s) => s.grantedUserId).filter(Boolean);
-        const { data: grantedUsers } = await supabase
+        const { data: grantedUsers, error: grantedUsersError } = await supabase
           .from("users")
           .select("uid, username, displayName")
           .in("uid", grantedIds);
+        if (grantedUsersError) throw grantedUsersError;
 
         const grantedMap = new Map((grantedUsers || []).map((u) => [u.uid, u]));
 
@@ -119,6 +125,7 @@ export default function SocialScreen() {
       }
     } catch (err) {
       console.error("Error fetching shared access:", err);
+      setModalState({ isOpen: true, type: "error", message: inventoryError(err, t("records.loadFailed")) });
     } finally {
       setLoading(false);
     }
@@ -144,50 +151,7 @@ export default function SocialScreen() {
     try {
       if (!currentUser) return;
 
-      const { data: targetUser, error: userErr } = await supabase
-        .from("users")
-        .select("*")
-        .eq("username", username.trim())
-        .maybeSingle();
-
-      if (userErr || !targetUser) {
-        setModalState({
-          isOpen: true,
-          type: "error",
-          message: t("shareAccess.errors.userNotFound", {
-            defaultValue: "User not found",
-          }),
-        });
-        setIsProcessing(false);
-        setUsername("");
-        setIsModalVisible(false);
-        return;
-      }
-
-      const { data: existingAccess } = await supabase
-        .from("shared_access")
-        .select("id")
-        .eq("ownerUserId", currentUser.uid)
-        .eq("grantedUserId", targetUser.uid)
-        .maybeSingle();
-
-      if (existingAccess) {
-        setModalState({
-          isOpen: true,
-          type: "error",
-          message: t("shareAccess.errors.alreadyShared", {
-            defaultValue: "Access is already shared with this user",
-          }),
-        });
-        setIsProcessing(false);
-        return;
-      }
-
-      await supabase.from("shared_access").insert({
-        ownerUserId: currentUser.uid,
-        grantedUserId: targetUser.uid,
-        createdAt: new Date().toISOString(),
-      });
+      await grantAccess(username);
 
       setUsername("");
       setIsModalVisible(false);
@@ -204,9 +168,9 @@ export default function SocialScreen() {
       setModalState({
         isOpen: true,
         type: "error",
-        message: t("shareAccess.errors.grantFailed", {
+        message: inventoryError(error, t("shareAccess.errors.grantFailed", {
           defaultValue: "Failed to grant access",
-        }),
+        })),
       });
     } finally {
       setIsProcessing(false);
@@ -228,7 +192,7 @@ export default function SocialScreen() {
 
     if (confirmRevoke) {
       try {
-        await supabase.from("shared_access").delete().eq("id", accountId);
+        await revokeAccess(currentUser?.uid, accountId);
         await fetchSharedData();
         setModalState({
           isOpen: true,
@@ -242,9 +206,9 @@ export default function SocialScreen() {
         setModalState({
           isOpen: true,
           type: "error",
-          message: t("shareAccess.errors.revokeFailed", {
+          message: inventoryError(error, t("shareAccess.errors.revokeFailed", {
             defaultValue: "Failed to revoke access",
-          }),
+          })),
         });
       }
     }
