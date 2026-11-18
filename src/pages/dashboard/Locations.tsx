@@ -1,3 +1,4 @@
+import { createInventoryRecord, updateInventoryRecord, deleteInventoryRecord, inventoryError } from '@/services/inventoryService';
 import { useState, useEffect, useMemo } from "react";
 import {
   Search,
@@ -227,15 +228,11 @@ export const LocationsManager = () => {
 
     setOperationLoading(true);
     try {
-      const { error: insErr } = await supabase.from("locations").insert({
+      await createInventoryRecord('locations', effectiveUserId, {
         name: itemName.trim(),
         address: itemAddress.trim(),
         description: itemDescription.trim(),
-        createdAt: new Date().toISOString(),
-        userId: effectiveUserId,
       });
-
-      if (insErr) throw insErr;
 
       resetForm();
       setIsModalVisible(false);
@@ -247,6 +244,7 @@ export const LocationsManager = () => {
         }),
       });
 
+      setCurrentPage(1);
       await loadLocations(1);
       await getTotalLocations();
     } catch (error) {
@@ -254,9 +252,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: t("locations.createFailed", {
+        message: inventoryError(error, t("locations.createFailed", {
           defaultValue: "Failed to create location",
-        }),
+        })),
       });
     } finally {
       setOperationLoading(false);
@@ -268,17 +266,12 @@ export const LocationsManager = () => {
 
     setOperationLoading(true);
     try {
-      const { error: updErr } = await supabase
-        .from("locations")
-        .update({
-          name: itemName.trim(),
-          address: itemAddress.trim(),
-          description: itemDescription.trim(),
-          updatedAt: new Date().toISOString(),
-        })
-        .eq("id", editingId);
-
-      if (updErr) throw updErr;
+      await updateInventoryRecord('locations', effectiveUserId, editingId, {
+        name: itemName.trim(),
+        address: itemAddress.trim(),
+        description: itemDescription.trim(),
+        updatedAt: new Date().toISOString(),
+      });
 
       resetForm();
       setIsEditModalVisible(false);
@@ -299,9 +292,9 @@ export const LocationsManager = () => {
       setModalState({
         isOpen: true,
         type: "error",
-        message: t("locations.updateFailed", {
+        message: inventoryError(error, t("locations.updateFailed", {
           defaultValue: "Failed to update location",
-        }),
+        })),
       });
     } finally {
       setOperationLoading(false);
@@ -321,12 +314,7 @@ export const LocationsManager = () => {
 
     setOperationLoading(true);
     try {
-      const { error: delErr } = await supabase
-        .from("locations")
-        .delete()
-        .eq("id", locationId);
-
-      if (delErr) throw delErr;
+      await deleteInventoryRecord('locations', effectiveUserId, locationId);
 
       setSelectedLocation(null);
       setModalState({
@@ -337,16 +325,18 @@ export const LocationsManager = () => {
         }),
       });
 
-      await loadLocations(currentPage);
+      const nextPage = Math.max(1, Math.min(currentPage, Math.ceil((totalLocations - 1) / itemsPerPage)));
+      setCurrentPage(nextPage);
+      await loadLocations(nextPage);
       await getTotalLocations();
     } catch (error) {
       console.error("Error deleting location:", error);
       setModalState({
         isOpen: true,
         type: "error",
-        message: t("locations.deleteFailed", {
+        message: inventoryError(error, t("locations.deleteFailed", {
           defaultValue: "Failed to delete location",
-        }),
+        })),
       });
     } finally {
       setOperationLoading(false);

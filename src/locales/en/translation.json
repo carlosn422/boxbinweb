@@ -1016,5 +1016,12 @@
     "aspectSquare": "Square",
     "aspectWidescreen": "Widescreen",
     "noLocation": "No location"
+  },
+  "inventory": {
+    "sessionRequired": "Sign in before changing inventory.",
+    "recordUnavailable": "The record was not saved or is no longer accessible.",
+    "binCreated": "Container created successfully!",
+    "bulkPartial": "Saved {{saved}} of {{total}} items. Some uploads failed.",
+    "imageCleanupFailed": "Changes saved, but the previous image could not be removed."
   }
 }

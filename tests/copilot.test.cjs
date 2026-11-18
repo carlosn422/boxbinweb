@@ -422,7 +422,11 @@ test('PostgreSQL edits: ownership, stale snapshots, exact patches, quantity sync
     await assert.rejects(()=>execute('edit-bad-tags','update_item',{itemId:'item-1',tags:[{}],expectedVersion:before.version}),/COPILOT_INVALID/);
     const binSnapshot=await prepare('update_bin','a-box');await execute('edit-bin-name','update_bin',{binId:'a-box',name:'New bin name',expectedVersion:binSnapshot.version});
     assert.equal((await db.query("select name from bins where id='a-box'")).rows[0].name,'New bin name');
-    await db.exec(`update bins set location='{"id":"a-loc","name":"Bodega","address":"Old"}' where id in ('a-box','b-box')`);
+    // Simulate legacy imported references that predate parent validation. New
+    // cross-owner assignments are rejected by the inventory migration.
+    await db.exec(`alter table bins disable trigger inventory_bin_parent;
+      update bins set location='{"id":"a-loc","name":"Bodega","address":"Old"}' where id in ('a-box','b-box');
+      alter table bins enable trigger inventory_bin_parent;`);
     const locSnapshot=await prepare('update_location','a-loc');await execute('edit-location','update_location',{locationId:'a-loc',name:'Warehouse',address:'New address',expectedVersion:locSnapshot.version});
     const bins=(await db.query('select id,location from bins order by id')).rows;
     assert.equal(bins.find(b=>b.id==='a-box').location.name,'Warehouse');assert.equal(bins.find(b=>b.id==='b-box').location.name,'Bodega','foreign owner labels are untouched');

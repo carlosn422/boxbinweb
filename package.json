@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test:copilot": "tsc -p tsconfig.copilot.json && node --test tests/copilot.test.cjs",
-    "test:copilot:browser": "playwright test --config=playwright.copilot.config.ts"
+    "test:copilot:browser": "playwright test --config=playwright.copilot.config.ts",
+    "test:inventory": "node --test tests/inventory.test.cjs",
+    "test:inventory:browser": "playwright test --config=playwright.copilot.config.ts tests/browser/inventory.spec.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.14",

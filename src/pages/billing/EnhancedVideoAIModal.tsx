@@ -1,3 +1,4 @@
+import { createInventoryRecord } from '@/services/inventoryService';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dialog,
@@ -312,6 +313,7 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
         name: item.label,
         description: item.description || "",
         quantity: 1,
+        cuantity: "1",
         value: item.estimated_value_usd ? Number(item.estimated_value_usd) : 0,
         tags: item.tags || [],
         confidence: item.confidence,
@@ -322,21 +324,17 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
         imageUrl: finalUrl,
       };
 
-      const { data: inserted, error: insertError } = await supabase
-        .from("items")
-        .insert(newItemData)
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
+      const inserted = await createInventoryRecord('items', effectiveUserId, newItemData);
 
       setItems((prev: any) => [...prev, inserted || { id: item.id, ...newItemData }]);
       setDetectedItems((prev: any[]) => prev.filter((d) => d.id !== item.id));
 
       toast.success(t("aiModals.addedToContainerSuccess", { name: item.label, defaultValue: `Added "${item.label}" to container` }));
+      return true;
     } catch (error) {
       console.error("Error adding detected item:", error);
       toast.error(t("aiModals.failedToAddItem", { defaultValue: "Failed to add item to container" }));
+      return false;
     } finally {
       setAddingItemId(null);
     }
@@ -345,9 +343,11 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
   const handleAddAllItems = async () => {
     try {
       setIsAddingAll(true);
+      let failed = false;
       for (const item of detectedItems) {
-        await handleAddDetectedItem(item);
+        if (!await handleAddDetectedItem(item)) failed = true;
       }
+      if (failed) return; // Retain failed detections so the user can retry.
       setIsVideoUploadOpen(false);
       resetVideoForm();
     } catch (error) {

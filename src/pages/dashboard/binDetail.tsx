@@ -1,3 +1,5 @@
+import i18n from 'i18next';
+import { createInventoryRecord, updateInventoryRecord, deleteInventoryRecord, inventoryError } from '@/services/inventoryService';
 import "./bin-detail.css";
 import { ResponsiveDisclosure } from "@/components/layout/ResponsiveDisclosure";
 import React, { useState, useEffect, useMemo } from "react";
@@ -113,6 +115,18 @@ const extractStoragePath = (url: string | null): string | null => {
   return null;
 };
 
+async function removeStoredImage(url: string) {
+  const path = extractStoragePath(url);
+  if (!path) return;
+  try {
+    const { error } = await supabase.storage.from('binventory-storage').remove([path]);
+    if (error) throw error;
+  } catch (error) {
+    console.warn('Inventory saved, but image cleanup failed:', error);
+    toast.warning(String(i18n.t('inventory.imageCleanupFailed')));
+  }
+}
+
 // types
 export interface BinDetails {
   id: string;
@@ -138,7 +152,7 @@ export interface Item {
   createdAt: string;
   binId: string;
   userId?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   cuantity: string;
   value: string;
   quantity?: string | number;
@@ -235,6 +249,7 @@ const BinDetailsScreen: React.FC = () => {
   const [selectedLocation, setSelectedLocation] = useState<any | null>(null);
   const [isUpdatingBin, setIsUpdatingBin] = useState(false);
   const [isDeletingBin, setIsDeletingBin] = useState(false);
+  const [isDeleteBinOpen, setIsDeleteBinOpen] = useState(false);
 
   // Stepper handlers
   const incrementQuantity = () => setItemCuantity((prev) => prev + 1);
@@ -397,6 +412,7 @@ const BinDetailsScreen: React.FC = () => {
           name: generatedName,
           description: "",
           cuantity: "1",
+          quantity: 1,
           value: "0",
           tags: [],
           createdAt: new Date().toISOString(),
@@ -405,13 +421,7 @@ const BinDetailsScreen: React.FC = () => {
           imageUrl: publicUrl,
         };
 
-        const { data: inserted, error: insertErr } = await supabase
-          .from("items")
-          .insert(itemData)
-          .select()
-          .single();
-
-        if (insertErr) throw insertErr;
+        const inserted = await createInventoryRecord('items', effectiveUserId, itemData);
         newItems.push(inserted as Item);
       } catch (err) {
         console.error("Error uploading file index", i, err);
@@ -423,7 +433,11 @@ const BinDetailsScreen: React.FC = () => {
     setItems((prev) => [...prev, ...newItems]);
     setIsBulkUploading(false);
     setIsBulkUploadOpen(false);
-    toast.success(t("containers.bulkSuccessToast", { count: newItems.length, defaultValue: `Successfully uploaded ${newItems.length} items` }));
+    if (newItems.length < files.length) {
+      toast.error(t("inventory.bulkPartial", { saved: newItems.length, total: files.length }));
+    } else {
+      toast.success(t("containers.bulkSuccessToast", { count: newItems.length, defaultValue: `Successfully uploaded ${newItems.length} items` }));
+    }
   };
 
   // Tags management
@@ -526,13 +540,7 @@ const BinDetailsScreen: React.FC = () => {
         ...(imageUrl && { imageUrl }),
       };
 
-      const { data: inserted, error: insertErr } = await supabase
-        .from("items")
-        .insert(itemData)
-        .select()
-        .single();
-
-      if (insertErr) throw insertErr;
+      const inserted = await createInventoryRecord('items', effectiveUserId, itemData);
       const newItem = inserted as Item;
 
       setItems((prev) => [newItem, ...prev]);
@@ -541,7 +549,7 @@ const BinDetailsScreen: React.FC = () => {
       toast.success(t("containers.itemAddedToast", { defaultValue: "Item added successfully" }));
     } catch (error) {
       console.error("Error adding item:", error);
-      toast.error(t("containers.itemAddErrorToast", { defaultValue: "Failed to add item" }));
+      toast.error(inventoryError(error, t("containers.itemAddErrorToast", { defaultValue: "Failed to add item" })));
     } finally {
       setIsSavingItem(false);
     }
@@ -569,79 +577,41 @@ const BinDetailsScreen: React.FC = () => {
       };
 
       if (selectedFile && selectedImage !== currentItem.imageUrl) {
-        if (currentItem.imageUrl) {
-          try {
-            const oldImagePath = extractStoragePath(currentItem.imageUrl);
-            if (oldImagePath) {
-              await supabase.storage.from("binventory-storage").remove([oldImagePath]);
-            }
-          } catch (e) {
-            console.warn("Could not delete old image:", e);
-          }
-        }
-
         const newImageUrl = await uploadImage(selectedFile);
         updateData.imageUrl = newImageUrl;
+      } else if (!selectedImage && currentItem.imageUrl) {
+        updateData.imageUrl = null;
       }
 
-      const { error: updateErr } = await supabase
-        .from("items")
-        .update(updateData)
-        .eq("id", currentItem.id)
-        .eq("userId", effectiveUserId);
-
-      if (updateErr) throw updateErr;
-
-      setItems((prev) =>
-        prev.map((item) =>
-          item.id === currentItem.id
-            ? {
-              ...item,
-              ...updateData,
-              cuantity: itemCuantity.toString(),
-              quantity: itemCuantity.toString(),
-            }
-            : item
-        )
-      );
+      const saved = await updateInventoryRecord('items', effectiveUserId, currentItem.id, updateData);
+      setItems((prev) => prev.map((item) => item.id === saved.id ? saved as Item : item));
+      // Only remove the previous image once the new record has been persisted.
+      if ('imageUrl' in updateData && currentItem.imageUrl && updateData.imageUrl !== currentItem.imageUrl) {
+        await removeStoredImage(currentItem.imageUrl);
+      }
 
       resetItemForm();
       setIsEditItemOpen(false);
       toast.success(t("containers.itemUpdatedToast", { defaultValue: "Item updated successfully" }));
     } catch (error) {
       console.error("Error updating item:", error);
-      toast.error(t("containers.itemUpdateErrorToast", { defaultValue: "Failed to update item" }));
+      toast.error(inventoryError(error, t("containers.itemUpdateErrorToast", { defaultValue: "Failed to update item" })));
     } finally {
       setIsSavingItem(false);
     }
   };
 
   // Delete item
-  const deleteItem = async (itemId: string, imageUrl: string | undefined) => {
+  const deleteItem = async (itemId: string, imageUrl: string | null | undefined) => {
     try {
-      const { error: delErr } = await supabase
-        .from("items")
-        .delete()
-        .eq("id", itemId)
-        .eq("userId", effectiveUserId);
-      if (delErr) throw delErr;
-
-      if (imageUrl) {
-        try {
-          const path = extractStoragePath(imageUrl);
-          if (path) {
-            await supabase.storage.from("binventory-storage").remove([path]);
-          }
-        } catch (e) {
-          console.warn("Could not delete item image:", e);
-        }
-      }
+      await deleteInventoryRecord('items', effectiveUserId, itemId);
+      if (imageUrl) await removeStoredImage(imageUrl);
 
       setItems((prev) => prev.filter((item) => item.id !== itemId));
       toast.success(t("containers.itemDeletedToast", { defaultValue: "Item deleted" }));
     } catch (error) {
       console.error("Error deleting item:", error);
-      toast.error(t("containers.itemDeleteErrorToast", { defaultValue: "Failed to delete item" }));
+      toast.error(inventoryError(error, t("containers.itemDeleteErrorToast", { defaultValue: "Failed to delete item" })));
     }
   };
 
@@ -670,29 +640,12 @@ const BinDetailsScreen: React.FC = () => {
         address: binAddress.trim(),
         description: binDescription.trim(),
         updatedAt: new Date().toISOString(),
-        location: selectedLocation ?? bin?.location,
+        location: selectedLocation ?? null,
       };
 
       if (!id || !effectiveUserId) return;
-      const { error: binUpdateErr } = await supabase
-        .from("bins")
-        .update(updatePayload)
-        .eq("id", id)
-        .eq("userId", effectiveUserId);
-
-      if (binUpdateErr) throw binUpdateErr;
-
-      setBin((prev) =>
-        prev
-          ? {
-            ...prev,
-            name: updatePayload.name,
-            address: updatePayload.address,
-            description: updatePayload.description,
-            location: updatePayload.location,
-          }
-          : null
-      );
+      const saved = await updateInventoryRecord('bins', effectiveUserId, id, updatePayload);
+      setBin(saved as BinDetails);
 
       setIsEditBinOpen(false);
       toast.success(t("containers.binUpdatedToast", { defaultValue: "Container updated successfully" }));
@@ -712,27 +665,16 @@ const BinDetailsScreen: React.FC = () => {
     try {
       setIsDeletingBin(true);
 
+      await deleteInventoryRecord('bins', effectiveUserId, id);
       for (const item of items) {
-        if (item.imageUrl) {
-          const path = extractStoragePath(item.imageUrl);
-          if (path) {
-            try {
-              await supabase.storage.from("binventory-storage").remove([path]);
-            } catch (e) {
-              console.warn("Storage deletion ignored:", e);
-            }
-          }
-        }
+        if (item.imageUrl) await removeStoredImage(item.imageUrl);
       }
-
-      await supabase.from("items").delete().eq("binId", id).eq("userId", effectiveUserId);
-      await supabase.from("bins").delete().eq("id", id).eq("userId", effectiveUserId);
 
       toast.success(t("containers.binDeletedToast", { defaultValue: "Container deleted successfully" }));
       navigate("/home");
     } catch (err) {
       console.error("Error deleting bin:", err);
-      toast.error(t("containers.binDeleteErrorToast", { defaultValue: "Failed to delete container" }));
+      toast.error(inventoryError(err, t("containers.binDeleteErrorToast", { defaultValue: "Failed to delete container" })));
     } finally {
       setIsDeletingBin(false);
     }
@@ -1260,13 +1202,14 @@ const BinDetailsScreen: React.FC = () => {
 
                 <DropdownMenuSeparator className="my-1 bg-slate-100" />
 
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <div className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2 text-red-600 hover:bg-red-50 font-semibold text-xs transition-colors">
-                      <Trash2 className="w-3.5 h-3.5" />
-                      <span>{t("actions.delete", { defaultValue: "Delete" })}</span>
-                    </div>
-                  </AlertDialogTrigger>
+                <DropdownMenuItem onSelect={() => setIsDeleteBinOpen(true)} className="text-red-600 focus:text-red-600">
+                  <Trash2 className="w-3.5 h-3.5 mr-2" />
+                  {t("actions.delete", { defaultValue: "Delete" })}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <AlertDialog open={isDeleteBinOpen} onOpenChange={setIsDeleteBinOpen}>
                   <AlertDialogContent className="workspace-safe-dialog rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-md p-6">
                     <AlertDialogHeader>
                       <AlertDialogTitle className="text-base font-black text-slate-900">
@@ -1292,9 +1235,7 @@ const BinDetailsScreen: React.FC = () => {
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
-                </AlertDialog>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            </AlertDialog>
 
             </ResponsiveDisclosure>
 

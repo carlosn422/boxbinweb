@@ -1016,5 +1016,12 @@
     "aspectSquare": "Cuadrado",
     "aspectWidescreen": "Panorámico",
     "noLocation": "Sin ubicación"
+  },
+  "inventory": {
+    "sessionRequired": "Inicia sesión antes de modificar el inventario.",
+    "recordUnavailable": "El registro no se guardó o ya no está disponible.",
+    "binCreated": "¡Contenedor creado correctamente!",
+    "bulkPartial": "Se guardaron {{saved}} de {{total}} artículos. Algunas cargas fallaron.",
+    "imageCleanupFailed": "Cambios guardados, pero no se pudo eliminar la imagen anterior."
   }
 }

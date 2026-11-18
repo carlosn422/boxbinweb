@@ -1,3 +1,4 @@
+import { createInventoryRecord } from '@/services/inventoryService';
 import { copilotText as ct } from '@/lib/copilotI18n';
 import { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
@@ -412,29 +413,19 @@ export default function HomeScreen() {
         throw new Error("Name is required");
       }
 
-      const newBin = {
+      await createInventoryRecord('bins', effectiveUserId, {
         ...binData,
-        createdAt: new Date().toISOString(),
-        userId: effectiveUserId,
-        location: binData?.location ?? null,
-      };
+        location: binData.location ?? null,
+      });
 
-      const { data: inserted, error: insErr } = await supabase
-        .from("bins")
-        .insert(newBin)
-        .select()
-        .single();
-
-      if (insErr) throw insErr;
-      console.log("Bin created with ID:", inserted?.id);
-
-      openModal("success", "Container created successfully!", "");
+      openModal("success", t("inventory.binCreated"), "");
 
       await fetchBins();
       fetchStats();
     } catch (error: any) {
       console.error("Error creating bin:", error);
-      toast.error(error.message || "Error creating bin");
+      toast.error(error.message || t("containers.binUpdateErrorToast"));
+      throw error; // Keep AddBin open with the entered values on failure.
     }
   };
 
