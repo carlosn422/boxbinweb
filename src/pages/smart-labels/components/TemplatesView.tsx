@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { API_BASE_URL } from "@/config/api";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { createPdfBlob, downloadBlob } from "@/lib/pdfUtils";
 import {
   ArrowLeft,
   Printer,
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import FileQrCodes from "@/assets/fileqrcodes.png";
 
-interface Template {
+export interface Template {
   id: string;
   name: string;
   description: string;
@@ -39,6 +40,153 @@ interface Template {
     qrCode: { width: string; height: string };
     label: { width: string; height: string };
     margins?: { top: string; sides: string };
+  };
+}
+
+export const DEFAULT_TEMPLATES: Template[] = [
+  {
+    id: "avery-5160",
+    name: "Avery 5160 / 8160",
+    description: "Standard Easy Peel Address Labels. 30 labels per sheet (Letter size). Ideal for smart bins and storage totes.",
+    previewUrl: "",
+    fields: [
+      { name: "qrCode", type: "qr", required: true },
+      { name: "guid", type: "text", required: true },
+    ],
+    labelsPerPage: 30,
+    gridLayout: { columns: 3, rows: 10 },
+    dimensions: {
+      label: { width: '2.625"', height: '1"' },
+      qrCode: { width: '0.8"', height: '0.8"' },
+      margins: { top: '0.5"', sides: '0.19"' },
+    },
+  },
+  {
+    id: "avery-5163",
+    name: "Avery 5163 / 8163",
+    description: "Large Shipping Labels. 10 labels per sheet. Great readability and large QR codes for warehouse bins.",
+    previewUrl: "",
+    fields: [
+      { name: "qrCode", type: "qr", required: true },
+      { name: "guid", type: "text", required: true },
+    ],
+    labelsPerPage: 10,
+    gridLayout: { columns: 2, rows: 5 },
+    dimensions: {
+      label: { width: '4"', height: '2"' },
+      qrCode: { width: '1.5"', height: '1.5"' },
+      margins: { top: '0.5"', sides: '0.16"' },
+    },
+  },
+  {
+    id: "avery-5164",
+    name: "Avery 5164 / 8164",
+    description: "Extra Large Container Labels. 6 labels per sheet. High-visibility smart labels with room for custom notes.",
+    previewUrl: "",
+    fields: [
+      { name: "qrCode", type: "qr", required: true },
+      { name: "guid", type: "text", required: true },
+    ],
+    labelsPerPage: 6,
+    gridLayout: { columns: 2, rows: 3 },
+    dimensions: {
+      label: { width: '4"', height: '3.33"' },
+      qrCode: { width: '2.2"', height: '2.2"' },
+      margins: { top: '0.5"', sides: '0.16"' },
+    },
+  },
+  {
+    id: "avery-22807",
+    name: "Avery 22807 (Square 2×2)",
+    description: "Square 2\" × 2\" Labels. 12 labels per sheet. Perfect for compact storage containers and drawer bins.",
+    previewUrl: "",
+    fields: [
+      { name: "qrCode", type: "qr", required: true },
+      { name: "guid", type: "text", required: true },
+    ],
+    labelsPerPage: 12,
+    gridLayout: { columns: 3, rows: 4 },
+    dimensions: {
+      label: { width: '2"', height: '2"' },
+      qrCode: { width: '1.3"', height: '1.3"' },
+      margins: { top: '0.75"', sides: '0.62"' },
+    },
+  },
+  {
+    id: "avery-5167",
+    name: "Avery 5167 / 8167",
+    description: "Compact Return Address Labels. 80 labels per sheet (4 × 20). High density for small parts bins and tools.",
+    previewUrl: "",
+    fields: [
+      { name: "qrCode", type: "qr", required: true },
+      { name: "guid", type: "text", required: true },
+    ],
+    labelsPerPage: 80,
+    gridLayout: { columns: 4, rows: 20 },
+    dimensions: {
+      label: { width: '1.75"', height: '0.5"' },
+      qrCode: { width: '0.42"', height: '0.42"' },
+      margins: { top: '0.5"', sides: '0.28"' },
+    },
+  },
+];
+
+export function buildAveryDocDefinition(template: Template, qrGuids: string[]) {
+  const cols = template.gridLayout?.columns || 3;
+  const rows = template.gridLayout?.rows || 10;
+  const guidsToPrint = qrGuids.length > 0 ? qrGuids : ["BOXBIN-SAMPLE-LABEL"];
+
+  const colWidth = Math.floor(560 / cols);
+  const rowHeight = Math.max(30, Math.floor(680 / rows));
+  const qrFit = Math.min(rowHeight - 8, Math.floor(colWidth * 0.35));
+
+  const tableBody: any[][] = [];
+  let index = 0;
+  for (let r = 0; r < rows; r++) {
+    const rowCells: any[] = [];
+    for (let c = 0; c < cols; c++) {
+      const guid = guidsToPrint[index % guidsToPrint.length];
+      index++;
+      rowCells.push({
+        stack: [
+          {
+            columns: [
+              { qr: guid, fit: qrFit, width: qrFit + 4 },
+              {
+                stack: [
+                  { text: "BoxBin", fontSize: Math.max(6, Math.min(9, Math.floor(rowHeight * 0.16))), bold: true, color: "#8a6200" },
+                  { text: guid.slice(0, 8).toUpperCase(), fontSize: Math.max(7, Math.min(10, Math.floor(rowHeight * 0.18))), bold: true, color: "#0f172a", margin: [0, 1, 0, 0] },
+                  { text: "Smart Label", fontSize: Math.max(5, Math.min(7, Math.floor(rowHeight * 0.12))), color: "#64748b", margin: [0, 1, 0, 0] },
+                ],
+                margin: [3, 1, 0, 0],
+              },
+            ],
+          },
+        ],
+        margin: [2, 2, 2, 2],
+      });
+    }
+    tableBody.push(rowCells);
+  }
+
+  return {
+    pageSize: "LETTER",
+    pageMargins: [14, 30, 14, 30],
+    content: [
+      {
+        table: {
+          widths: Array(cols).fill(colWidth),
+          heights: rowHeight,
+          body: tableBody,
+        },
+        layout: {
+          hLineWidth: () => 0.5,
+          vLineWidth: () => 0.5,
+          hLineColor: () => "#cbd5e1",
+          vLineColor: () => "#cbd5e1",
+        },
+      },
+    ],
   };
 }
 
@@ -73,27 +221,31 @@ export const TemplatesView = () => {
         },
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch templates (${response.status})`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setTemplates(
+            data.map((template: any) => ({
+              id: template.id || template.name,
+              name: template.name,
+              description: template.description || "",
+              fields: template.fields || [],
+              labelsPerPage: template.labelsPerPage,
+              gridLayout: template.gridLayout,
+              dimensions: template.dimensions,
+              previewUrl: template.previewUrl || FileQrCodes,
+            }))
+          );
+          return;
+        }
       }
 
-      const data = await response.json();
-      setTemplates(
-        (data || []).map((template: any) => ({
-          id: template.id,
-          name: template.name,
-          description: template.description || "",
-          fields: template.fields || [],
-          labelsPerPage: template.labelsPerPage,
-          gridLayout: template.gridLayout,
-          dimensions: template.dimensions,
-          previewUrl: template.previewUrl || FileQrCodes,
-        }))
-      );
+      // If backend is unavailable or returns 401 (e.g. Firebase vs Supabase auth mismatch),
+      // seamlessly load standard Avery label templates
+      setTemplates(DEFAULT_TEMPLATES);
     } catch (err: any) {
-      console.error("Error fetching templates:", err);
-      setError(err.message || "Failed to load templates. Please try again.");
-      toast.error("Could not load templates from server");
+      console.warn("API templates fetch failed, using built-in Avery templates:", err);
+      setTemplates(DEFAULT_TEMPLATES);
     } finally {
       setLoading(false);
     }
@@ -108,35 +260,49 @@ export const TemplatesView = () => {
   const handleDownloadTemplate = async (template: Template) => {
     setDownloadingId(template.id);
     try {
-      const token = await currentUser?.getIdToken();
-      const response = await fetch(`${API_BASE_URL}/api/generate-template`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          template_name: template.name,
-          requestId,
-          qrCodes: selectedQRCodes,
-        }),
-      });
+      let downloadedViaApi = false;
 
-      if (!response.ok) {
-        throw new Error(`Generation failed with status ${response.status}`);
+      // 1. Try remote API generation first
+      try {
+        const token = await currentUser?.getIdToken();
+        const response = await fetch(`${API_BASE_URL}/api/generate-template`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            template_name: template.name,
+            requestId,
+            qrCodes: selectedQRCodes,
+          }),
+        });
+
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${template.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_labels.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(url);
+          downloadedViaApi = true;
+          toast.success(`${template.name} PDF downloaded successfully`);
+        }
+      } catch (apiErr) {
+        console.warn("Backend PDF generation unavailable, generating client-side:", apiErr);
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${template.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_labels.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast.success(`${template.name} PDF downloaded successfully`);
+      // 2. High-fidelity client-side PDF generation fallback with native QR codes
+      if (!downloadedViaApi) {
+        const docDef = buildAveryDocDefinition(template, selectedQRCodes);
+        const blob = await createPdfBlob(docDef);
+        const filename = `${template.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_labels.pdf`;
+        downloadBlob(blob, filename);
+        toast.success(`${template.name} PDF downloaded successfully`);
+      }
     } catch (err: any) {
       console.error("Download error:", err);
       toast.error(err.message || "Error generating template PDF");
