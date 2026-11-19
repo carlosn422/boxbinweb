@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
-import { API_BASE_URL } from "@/config/api";
+import { supabase } from "@/lib/supabase";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 import { createPdfBlob, downloadBlob } from "@/lib/pdfUtils";
@@ -48,7 +48,7 @@ export const DEFAULT_TEMPLATES: Template[] = [
     id: "avery-5160",
     name: "Avery 5160 / 8160",
     description: "Standard Easy Peel Address Labels. 30 labels per sheet (Letter size). Ideal for smart bins and storage totes.",
-    previewUrl: "",
+    previewUrl: FileQrCodes,
     fields: [
       { name: "qrCode", type: "qr", required: true },
       { name: "guid", type: "text", required: true },
@@ -65,7 +65,7 @@ export const DEFAULT_TEMPLATES: Template[] = [
     id: "avery-5163",
     name: "Avery 5163 / 8163",
     description: "Large Shipping Labels. 10 labels per sheet. Great readability and large QR codes for warehouse bins.",
-    previewUrl: "",
+    previewUrl: FileQrCodes,
     fields: [
       { name: "qrCode", type: "qr", required: true },
       { name: "guid", type: "text", required: true },
@@ -82,7 +82,7 @@ export const DEFAULT_TEMPLATES: Template[] = [
     id: "avery-5164",
     name: "Avery 5164 / 8164",
     description: "Extra Large Container Labels. 6 labels per sheet. High-visibility smart labels with room for custom notes.",
-    previewUrl: "",
+    previewUrl: FileQrCodes,
     fields: [
       { name: "qrCode", type: "qr", required: true },
       { name: "guid", type: "text", required: true },
@@ -99,7 +99,7 @@ export const DEFAULT_TEMPLATES: Template[] = [
     id: "avery-22807",
     name: "Avery 22807 (Square 2×2)",
     description: "Square 2\" × 2\" Labels. 12 labels per sheet. Perfect for compact storage containers and drawer bins.",
-    previewUrl: "",
+    previewUrl: FileQrCodes,
     fields: [
       { name: "qrCode", type: "qr", required: true },
       { name: "guid", type: "text", required: true },
@@ -116,7 +116,7 @@ export const DEFAULT_TEMPLATES: Template[] = [
     id: "avery-5167",
     name: "Avery 5167 / 8167",
     description: "Compact Return Address Labels. 80 labels per sheet (4 × 20). High density for small parts bins and tools.",
-    previewUrl: "",
+    previewUrl: FileQrCodes,
     fields: [
       { name: "qrCode", type: "qr", required: true },
       { name: "guid", type: "text", required: true },
@@ -214,37 +214,10 @@ export const TemplatesView = () => {
     setLoading(true);
     setError(null);
     try {
-      const token = await currentUser?.getIdToken();
-      const response = await fetch(`${API_BASE_URL}/api/export-templates`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setTemplates(
-            data.map((template: any) => ({
-              id: template.id || template.name,
-              name: template.name,
-              description: template.description || "",
-              fields: template.fields || [],
-              labelsPerPage: template.labelsPerPage,
-              gridLayout: template.gridLayout,
-              dimensions: template.dimensions,
-              previewUrl: template.previewUrl || FileQrCodes,
-            }))
-          );
-          return;
-        }
-      }
-
-      // If backend is unavailable or returns 401 (e.g. Firebase vs Supabase auth mismatch),
-      // seamlessly load standard Avery label templates
+      // Avery templates are natively available in the Supabase ecosystem
       setTemplates(DEFAULT_TEMPLATES);
     } catch (err: any) {
-      console.warn("API templates fetch failed, using built-in Avery templates:", err);
+      console.warn("Error initializing templates:", err);
       setTemplates(DEFAULT_TEMPLATES);
     } finally {
       setLoading(false);
@@ -260,49 +233,24 @@ export const TemplatesView = () => {
   const handleDownloadTemplate = async (template: Template) => {
     setDownloadingId(template.id);
     try {
-      let downloadedViaApi = false;
-
-      // 1. Try remote API generation first
-      try {
-        const token = await currentUser?.getIdToken();
-        const response = await fetch(`${API_BASE_URL}/api/generate-template`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            template_name: template.name,
-            requestId,
-            qrCodes: selectedQRCodes,
-          }),
-        });
-
-        if (response.ok) {
-          const blob = await response.blob();
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${template.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_labels.pdf`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          window.URL.revokeObjectURL(url);
-          downloadedViaApi = true;
-          toast.success(`${template.name} PDF downloaded successfully`);
+      let guidsToPrint = selectedQRCodes;
+      if (guidsToPrint.length === 0 && requestId) {
+        const { data } = await supabase
+          .from("qrcodes")
+          .select("guid")
+          .eq("requestId", requestId)
+          .limit(1000);
+        if (data && data.length > 0) {
+          guidsToPrint = data.map((r: any) => r.guid);
         }
-      } catch (apiErr) {
-        console.warn("Backend PDF generation unavailable, generating client-side:", apiErr);
       }
 
-      // 2. High-fidelity client-side PDF generation fallback with native QR codes
-      if (!downloadedViaApi) {
-        const docDef = buildAveryDocDefinition(template, selectedQRCodes);
-        const blob = await createPdfBlob(docDef);
-        const filename = `${template.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_labels.pdf`;
-        downloadBlob(blob, filename);
-        toast.success(`${template.name} PDF downloaded successfully`);
-      }
+      // High-fidelity client-side PDF generation with native QR codes
+      const docDef = buildAveryDocDefinition(template, guidsToPrint);
+      const blob = await createPdfBlob(docDef);
+      const filename = `${template.name.replace(/[^a-zA-Z0-9_-]/g, "_")}_labels.pdf`;
+      downloadBlob(blob, filename);
+      toast.success(`${template.name} PDF downloaded successfully`);
     } catch (err: any) {
       console.error("Download error:", err);
       toast.error(err.message || "Error generating template PDF");
