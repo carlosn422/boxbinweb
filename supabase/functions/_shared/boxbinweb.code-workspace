@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "../../../../Binventory"
+		},
+		{
+			"path": "../../../../BinventoryQRAPI"
 		}
 	],
 	"settings": {}
