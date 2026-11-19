@@ -185,7 +185,7 @@ export default function ActiveSubscriptionPage() {
           .from("subscriptions")
           .select("*")
           .eq("userId", currentUser.uid)
-          .in("status", ["active", "trialing"])
+          .in("status", ["active", "trialing", "past_due"])
           .maybeSingle();
 
         if (sub) {
@@ -275,11 +275,15 @@ export default function ActiveSubscriptionPage() {
                 variant="outline"
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isActive
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-amber-50 text-amber-700 border-amber-200"
+                  : subscription?.status === "past_due"
+                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                  : "bg-slate-100 text-slate-700 border-slate-200"
                   }`}
               >
                 {isActive
                   ? t("subscription.statusActive") || "Active"
+                  : subscription?.status === "past_due"
+                  ? "Past Due"
                   : t("subscription.statusInactive") || "Inactive"}
               </Badge>
             </div>
@@ -310,6 +314,26 @@ export default function ActiveSubscriptionPage() {
             </Button>
           </div>
         </div>
+
+        {subscription?.status === "past_due" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-amber-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                {t("subscription.pastDueNotice", {
+                  defaultValue: "Your subscription payment is past due. Please update your payment method or upgrade to maintain full account access.",
+                })}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              onClick={handleUpgradeClick}
+              className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0 self-start sm:self-auto"
+            >
+              {t("subscription.updatePayment", { defaultValue: "Update Payment" })}
+            </Button>
+          </div>
+        )}
 
         {/* Compact KPI Stats Ribbon */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
