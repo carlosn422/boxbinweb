@@ -175,7 +175,7 @@ export default function TokensPurchasePage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate("/billing/active-subscription")}
+              onClick={() => navigate("/subscription")}
               className="h-8 text-xs font-medium border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
             >
               {t("tokens.subscriptionAndPlan", { defaultValue: "Subscription & Plan" })}

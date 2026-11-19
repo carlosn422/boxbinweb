@@ -239,6 +239,38 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: "/billing/active-subscription",
+    element: (
+      <ProtectedRoute>
+        <ActiveSubscriptionPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/billing/subscription",
+    element: (
+      <ProtectedRoute>
+        <ActiveSubscriptionPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/billing/tokens",
+    element: (
+      <ProtectedRoute>
+        <TokensPurchasePage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/profile",
+    element: <Navigate to="/subscription" replace />,
+  },
+  {
+    path: "/settings",
+    element: <Navigate to="/subscription" replace />,
+  },
+  {
     path: "/tokensai",
     element: (
       <ProtectedRoute>

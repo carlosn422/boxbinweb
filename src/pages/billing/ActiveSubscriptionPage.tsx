@@ -293,7 +293,7 @@ export default function ActiveSubscriptionPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate("/billing/tokens")}
+              onClick={() => navigate("/tokensai")}
               className="h-8 text-xs font-medium border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
             >
               <Coins className="w-3.5 h-3.5 mr-1.5 text-amber-600" />
@@ -510,7 +510,7 @@ export default function ActiveSubscriptionPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => navigate("/billing/tokens")}
+                onClick={() => navigate("/tokensai")}
                 className="w-full h-8 text-xs font-medium border-slate-200 hover:bg-slate-50 text-slate-700 flex items-center justify-center gap-1.5"
               >
                 <span>Purchase AI Tokens</span>
