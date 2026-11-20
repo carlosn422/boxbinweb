@@ -1,3 +1,5 @@
+import { MarketReferences } from '@/components/ai/MarketReferences';
+import { readMarketResearch } from '@/lib/marketResearch';
 import { readTokenBalance } from '@/services/recordService';
 import { createInventoryRecord } from '@/services/inventoryService';
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -24,7 +26,6 @@ import {
   Zap,
   Star,
   Image as ImageIcon,
-  ExternalLink,
   ShieldCheck,
   AlertTriangle,
   Plus,
@@ -36,12 +37,11 @@ import { getStripePlans } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 import { Elements } from "@stripe/react-stripe-js";
 import TokenCheckoutForm from "./TokenCheckoutForm";
-import { loadStripe } from "@stripe/stripe-js";
-import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
+import { stripePromise } from "@/lib/stripe";
 import { API_BASE_URL } from "@/config/api";
 import { useTranslation } from "react-i18next";
 
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
 const planIcons = [Coins, Zap, Star, Crown];
 
 interface EnhancedImagesAIModalProps {
@@ -190,6 +190,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
     setIsUploading(true);
     try {
       const formData = new FormData();
+      formData.append("marketResearch", "true");
       selectedImages.forEach((file) => {
         formData.append("files", file);
       });
@@ -225,6 +226,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
     if (!estimateData?.success) return;
 
     const formData = new FormData();
+    formData.append("marketResearch", "true");
     selectedImages.forEach((file) => {
       formData.append("files", file);
     });
@@ -277,7 +279,8 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
         description: item.description || "",
         quantity: 1,
         cuantity: "1",
-        value: item.estimated_value_usd ? Number(item.estimated_value_usd) : 1,
+        value: readMarketResearch(item.market_research)?.offers[item.selectedOffer]?.price?.toString() ?? "",
+        market_research: readMarketResearch(item.market_research),
         tags: item.tags || [],
         confidence: item.confidence,
         createdAt: new Date().toISOString(),
@@ -677,11 +680,11 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                     {t("aiModals.imageNotAvailable", { defaultValue: "Image not available" })}
                   </div>
 
-                  <div className="absolute top-2 right-2">
+                  {Number.isFinite(item.confidence) && <div className="absolute top-2 right-2">
                     <span className="px-2 py-0.5 bg-emerald-600/90 backdrop-blur-xs text-white text-[10px] font-bold rounded-full font-mono shadow-2xs">
-                      {Math.round(item.confidence * 100)}%
+                      {Math.round(Math.max(0, Math.min(1, item.confidence)) * 100)}%
                     </span>
-                  </div>
+                  </div>}
                   {item.timestamp_seconds !== undefined && (
                     <div className="absolute top-2 left-2">
                       <span className="px-2 py-0.5 bg-slate-900/80 backdrop-blur-xs text-white text-[10px] font-semibold rounded-full flex items-center gap-1">
@@ -701,12 +704,18 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                       {item.description || item.label}
                     </p>
 
-                    {item.estimated_value_usd && (
-                      <div className="flex items-center justify-between p-2 mt-2 bg-slate-50 rounded-xl text-xs">
-                        <span className="text-slate-500">{t("aiModals.estimatedValue", { defaultValue: "Estimated Value:" })}</span>
-                        <span className="font-bold font-mono text-emerald-600">${item.estimated_value_usd}</span>
-                      </div>
-                    )}
+                    <MarketReferences research={item.market_research} expanded />
+                    {!!readMarketResearch(item.market_research)?.offers.length && <label className="mt-2 block text-xs text-slate-600">
+                      {t('market.inventoryValue')}
+                      <select className="mt-1 w-full min-w-0 rounded border border-slate-200 bg-white p-1.5" value={item.selectedOffer ?? ''}
+                        onChange={event => setDetectedItems(previous => previous.map(detected => detected.id === item.id
+                          ? { ...detected, selectedOffer: event.target.value === '' ? undefined : Number(event.target.value) } : detected))}>
+                        <option value="">{t('market.unassigned')}</option>
+                        {readMarketResearch(item.market_research)?.offers.map((offer, index) => <option key={offer.url} value={index}>
+                          {offer.marketplace === 'amazon' ? 'Amazon' : 'eBay'} · ${offer.price.toFixed(2)} USD · {t(`market.condition.${offer.condition}`)}
+                        </option>)}
+                      </select>
+                    </label>}
 
                     {item.tags && item.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">
@@ -742,17 +751,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                       )}
                     </Button>
 
-                    {item.reference_url && (
-                      <Button
-                        onClick={() => window.open(item.reference_url, "_blank")}
-                        variant="outline"
-                        size="sm"
-                        className="w-full h-7 text-[11px] rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 flex items-center justify-center gap-1"
-                      >
-                        <ExternalLink className="w-3 h-3 text-slate-400" />
-                        <span>{t("aiModals.viewSimilarEbay", { defaultValue: "View Similar on eBay" })}</span>
-                      </Button>
-                    )}
+
                   </div>
                 </div>
               </div>
@@ -974,6 +973,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                   ? t("aiModals.tokenVerificationSubtitle", { defaultValue: "Verify your token balance before AI analysis" })
                   : t("aiModals.imagesModalSubtitle", { defaultValue: "Upload photos to automatically detect and catalog items" })}
               </p>
+              {!showTokenPurchase && !showResults && <p className="mt-2 text-xs text-slate-500">{t('market.searchNotice')}</p>}
             </div>
           </div>
         </DialogHeader>

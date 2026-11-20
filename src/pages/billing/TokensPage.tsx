@@ -3,12 +3,11 @@ import { claimFreeTokens } from '@/lib/stripe';
 import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Elements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getStripePlans } from "../../lib/stripe";
-import { STRIPE_PUBLISHABLE_KEY } from "../../config/stripe";
+import { stripePromise } from "@/lib/stripe";
 import {
   Check,
   Sparkles,
@@ -27,7 +26,7 @@ import { useTranslation } from "react-i18next";
 import TokenCheckoutForm from "./TokenCheckoutForm.tsx";
 import { useNavigate } from "react-router-dom";
 
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
 
 export default function TokensPurchasePage() {
   const { t } = useTranslation();

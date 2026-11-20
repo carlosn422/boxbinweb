@@ -24,6 +24,8 @@ import {
   getStripePlanById,
   getStripePlans,
   upgradeSubscription,
+  syncStripeSubscription,
+  billingErrorMessage,
 } from "@/lib/stripe";
 import {
   AlertDialog,
@@ -46,12 +48,12 @@ import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { Elements } from "@stripe/react-stripe-js";
 import CheckoutForm from "./CheckoutForm";
-import { loadStripe } from "@stripe/stripe-js";
-import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
+import PaymentMethodForm from "./PaymentMethodForm";
+import { stripePromise } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import { useTranslation } from "react-i18next";
 
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
 
 export default function ActiveSubscriptionPage() {
   const { t } = useTranslation();
@@ -60,6 +62,10 @@ export default function ActiveSubscriptionPage() {
   const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [loadWarning, setLoadWarning] = useState<string | null>(null);
+  const requiresPayment = ['past_due', 'unpaid', 'incomplete'].includes(subscription?.status);
+  const ended = ['canceled', 'incomplete_expired'].includes(subscription?.status);
 
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
@@ -141,6 +147,8 @@ export default function ActiveSubscriptionPage() {
   }, [subscription?.price]);
 
   const handleUpgradeClick = () => {
+    if (!subscription || ended) { navigate('/billing'); return; }
+    if (requiresPayment) { setShowPaymentForm(true); return; }
     setShowUpgradeModal(true);
     fetchPlans();
   };
@@ -170,52 +178,43 @@ export default function ActiveSubscriptionPage() {
       window.location.reload();
     } catch (error: any) {
       console.error("Error updating plan:", error);
-      toast.error("Hubo un problema al actualizar tu suscripción.");
+      toast.error(billingErrorMessage(error));
     } finally {
       setUpgradingToPlan(null);
     }
   };
 
-  useEffect(() => {
-    const fetchSubscription = async () => {
-      if (!currentUser?.uid) return;
-
-      try {
-        const { data: sub } = await supabase
-          .from("subscriptions")
-          .select("*")
-          .eq("userId", currentUser.uid)
-          .in("status", ["active", "trialing", "past_due"])
-          .maybeSingle();
-
-        if (sub) {
-          if (sub.planId) {
-            const stripePlan = await getStripePlanById(sub.planId);
-            if (stripePlan) {
-              const fullSubscription = {
-                ...sub,
-                plan: stripePlan?.product?.name ?? "Custom Plan",
-                price: (stripePlan?.unit_amount ?? 0) / 100,
-                interval: stripePlan?.recurring?.interval ?? "month",
-                metadata: stripePlan?.metadata ?? {},
-              };
-              setSubscription(fullSubscription);
-            } else {
-              setSubscription(sub);
-            }
-          } else {
-            setSubscription(sub);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching subscription:", error);
-      } finally {
-        setLoading(false);
+  const fetchSubscription = useCallback(async () => {
+    if (!currentUser?.uid) { setLoading(false); return; }
+    setLoadWarning(null);
+    try {
+      const { data: sub, error } = await supabase.from('subscriptions').select('*').eq('userId', currentUser.uid).maybeSingle();
+      if (error) throw error;
+      setSubscription(sub);
+      if (sub?.planId) {
+        try {
+          const stripePlan = await getStripePlanById(sub.planId);
+          setSubscription({
+            ...sub, plan: stripePlan.product?.name, price: stripePlan.unit_amount / 100,
+            currency: stripePlan.currency, interval: stripePlan.recurring?.interval,
+            metadata: stripePlan.metadata ?? {},
+          });
+        } catch { setLoadWarning(t('billingRecovery.planDetailsUnavailable')); }
       }
-    };
+    } catch { setLoadWarning(t('billingRecovery.loadFailed')); }
+    finally { setLoading(false); }
+  }, [currentUser?.uid, t]);
 
-    fetchSubscription();
-  }, [currentUser]);
+  useEffect(() => { void fetchSubscription(); }, [fetchSubscription]);
+
+  const refreshSubscription = async () => {
+    setRedirecting(true);
+    try {
+      if (subscription?.stripeSubscriptionId) await syncStripeSubscription(subscription.stripeSubscriptionId);
+      await fetchSubscription();
+    } catch (error) { setLoadWarning(billingErrorMessage(error)); }
+    finally { setRedirecting(false); }
+  };
 
   if (loading) {
     return (
@@ -231,9 +230,9 @@ export default function ActiveSubscriptionPage() {
   }
 
   const isReactNative = (window as any).ReactNativeWebView;
-  const isActive = subscription?.status === "active";
+  const isActive = ["active", "trialing"].includes(subscription?.status);
   const planName = subscription?.plan || t("subscription.planUnknown") || "Basic / Trial";
-  const planPrice = subscription?.price ? `$${subscription.price.toFixed(2)}` : "$0.00";
+  const planPrice = subscription?.price != null ? new Intl.NumberFormat(undefined, { style: "currency", currency: subscription.currency || "usd" }).format(subscription.price) : "—";
   const interval = subscription?.interval || "month";
   const binsLimit = subscription?.metadata?.bins || "—";
   const itemsLimit = subscription?.metadata?.items || "—";
@@ -275,16 +274,12 @@ export default function ActiveSubscriptionPage() {
                 variant="outline"
                 className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isActive
                   ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : subscription?.status === "past_due"
+                  : requiresPayment
                   ? "bg-amber-50 text-amber-700 border-amber-200"
                   : "bg-slate-100 text-slate-700 border-slate-200"
                   }`}
               >
-                {isActive
-                  ? t("subscription.statusActive") || "Active"
-                  : subscription?.status === "past_due"
-                  ? "Past Due"
-                  : t("subscription.statusInactive") || "Inactive"}
+                {subscription?.status ? t(`billingRecovery.status.${subscription.status}`, { defaultValue: subscription.status }) : t('subscription.statusInactive')}
               </Badge>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -310,27 +305,33 @@ export default function ActiveSubscriptionPage() {
               className="h-8 px-3.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs flex items-center gap-1.5 transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5 text-brand-400" />
-              <span>{t("subscription.upgrade") || "Upgrade Plan"}</span>
+              <span>{t(requiresPayment ? "billingRecovery.updateCard" : "subscription.upgrade")}</span>
             </Button>
           </div>
         </div>
 
-        {subscription?.status === "past_due" && (
+        {loadWarning && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p>{loadWarning}</p>
+          <Button variant="outline" onClick={refreshSubscription} disabled={redirecting}>{t('subscription.tryAgain')}</Button>
+        </div>}
+        {ended && <div className="rounded-xl border p-3 text-sm">
+          <p>{t('billingRecovery.subscriptionEnded')}</p>
+          <Button onClick={() => navigate('/billing')}>{t('billingRecovery.choosePlan')}</Button>
+        </div>}
+        {requiresPayment && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-amber-800 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
             <div className="flex items-center gap-2.5">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
               <span>
-                {t("subscription.pastDueNotice", {
-                  defaultValue: "Your subscription payment is past due. Please update your payment method or upgrade to maintain full account access.",
-                })}
+                {t('billingRecovery.paymentRequired')}
               </span>
             </div>
             <Button
               size="sm"
-              onClick={handleUpgradeClick}
+              onClick={() => setShowPaymentForm(true)}
               className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white shrink-0 self-start sm:self-auto"
             >
-              {t("subscription.updatePayment", { defaultValue: "Update Payment" })}
+              {t('billingRecovery.updateCard')}
             </Button>
           </div>
         )}
@@ -498,13 +499,16 @@ export default function ActiveSubscriptionPage() {
                     className="w-full sm:w-auto h-9 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg shadow-2xs flex items-center justify-center gap-2"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-brand-400" />
-                    <span>{t("subscription.upgrade") || "Change / Upgrade Tier"}</span>
+                    <span>{t(requiresPayment ? "billingRecovery.updateCard" : "subscription.upgrade")}</span>
                   </Button>
 
+                  {subscription?.stripeSubscriptionId && !ended && <Button variant="outline" onClick={() => setShowPaymentForm(true)} className="h-auto min-h-9 whitespace-normal text-xs">
+                    <CreditCard className="w-4 h-4 mr-2" />{t('billingRecovery.updateCard')}
+                  </Button>}
                   <Button
                     variant="ghost"
                     size="sm"
-                    disabled={redirecting}
+                    disabled={redirecting || !subscription || ended}
                     onClick={() => setShowCancelDialog(true)}
                     className="text-xs text-red-600 hover:text-red-700 hover:bg-red-50 h-8 px-3"
                   >
@@ -784,6 +788,19 @@ export default function ActiveSubscriptionPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showPaymentForm} onOpenChange={setShowPaymentForm}>
+        <DialogContent className="workspace-safe-dialog max-w-md overflow-y-auto" aria-describedby="payment-card-help">
+          <DialogHeader><DialogTitle>{t('billingRecovery.updateCard')}</DialogTitle></DialogHeader>
+          <Elements stripe={stripePromise}>
+            <PaymentMethodForm onSuccess={() => {
+              setShowPaymentForm(false);
+              toast.success(t('billingRecovery.cardUpdated'));
+              void fetchSubscription();
+            }} />
+          </Elements>
         </DialogContent>
       </Dialog>
 

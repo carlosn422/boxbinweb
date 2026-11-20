@@ -1,5 +1,5 @@
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,7 @@ import { v4 as uuid } from "uuid";
 import { useAuth } from "@/context/AuthContext";
 import { createStripePaymentIntent, creditPurchasedTokens } from "@/lib/stripe";
 import { useTranslation } from "react-i18next";
+import { usePaymentAvailability } from './usePaymentAvailability';
 import { Loader2 } from "lucide-react";
 
 type TokenCheckoutFormProps = {
@@ -29,6 +30,8 @@ export default function TokenCheckoutForm({
   const elements = useElements();
   const { currentUser } = useAuth();
 
+  const unavailable = usePaymentAvailability();
+  const busy = useRef(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nameOnCard, setNameOnCard] = useState("");
@@ -38,7 +41,8 @@ export default function TokenCheckoutForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
+    if (!stripe || !elements || unavailable || busy.current) return;
+    busy.current = true;
 
     setLoading(true);
     setError(null);
@@ -57,6 +61,7 @@ export default function TokenCheckoutForm({
       }
       const previous = await stripe.retrievePaymentIntent(pending.clientSecret!);
       if (previous.error) throw previous.error;
+      if (previous.paymentIntent?.status === 'processing') throw new Error(t('records.paymentPending'));
       if (previous.paymentIntent?.status !== 'succeeded') {
         if (previous.paymentIntent?.status === 'canceled') {
           localStorage.removeItem(storageKey);
@@ -75,9 +80,9 @@ export default function TokenCheckoutForm({
         (window as any).ReactNativeWebView.postMessage(JSON.stringify({ type: 'TOKENS_PURCHASE_SUCCESS', tokens }));
       } else { window.location.href = '/home'; }
     } catch (err: any) {
-      console.error(err);
-      setError(err?.message || "Unexpected error");
+      setError(err?.message || t('records.billingFailed'));
     } finally {
+      busy.current = false;
       setLoading(false);
     }
   };
@@ -132,12 +137,13 @@ export default function TokenCheckoutForm({
         </div>
       </div>
 
-      {error && <p className="text-red-500 text-xs">{error}</p>}
+      {unavailable && <p role="alert" className="text-red-500 text-xs">{t("billingRecovery.unavailable")}</p>}
+      {error && <p role="alert" className="text-red-500 text-xs">{error}</p>}
 
       <Button
         type="submit"
         className="w-full h-9 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-xs"
-        disabled={!stripe || loading}
+        disabled={!stripe || loading || unavailable}
       >
         {loading ? (
           <span className="flex items-center gap-1.5">

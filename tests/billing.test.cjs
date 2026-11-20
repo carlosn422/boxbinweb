@@ -39,10 +39,10 @@ test('PostgreSQL: checkout reservation retries and subscription updates preserve
  try {
   const id=(await reserve('price_paid')).rows[0].r.id;
   assert.equal((await reserve('price_paid')).rows[0].r.id,id);
-  await assert.rejects(()=>reserve('price_other'),/BILLING_CHECKOUT_PENDING/);
+  assert.equal((await reserve('price_other')).rows[0].r.id,id, 'retain original request until Stripe is reconciled');
   const saved=(await save({planId:'price_paid',status:'incomplete',stripeSubscriptionId:'sub_one',billingDetails:{name:'Example'}})).rows[0].r.id;
   assert.equal((await save({planId:'price_paid',status:'active',stripeSubscriptionId:'sub_one'})).rows[0].r.id,saved);
-  assert.equal((await db.query('select count(*) n from billing_subscription_checkouts')).rows[0].n,0);
+  assert.equal((await db.query('select count(*) n from billing_subscription_checkouts')).rows[0].n,1);
   assert.equal((await db.query('select "billingDetails" from subscriptions')).rows[0].billingDetails.name,'Example');
   await assert.rejects(()=>save({planId:'price_other',status:'active',stripeSubscriptionId:'sub_two'}),/BILLING_SUBSCRIPTION_CONFLICT/);
   await save({planId:'price_paid',status:'canceled',stripeSubscriptionId:'sub_one'});

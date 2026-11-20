@@ -1,0 +1,61 @@
+Billing recovery changes
+
+Scope
+- A verified SetupIntent updates the subscription's default card and attempts its
+  outstanding invoice. Required card authentication is completed in the browser.
+- Checkout retries reconcile the original Stripe request before replacing it.
+  An owner-scoped lease prevents two server requests from rotating it concurrently.
+- After 23 hours, recovery lists Stripe subscriptions instead of replaying a key
+  that Stripe may have discarded. Recovery fails closed if the bounded scan cannot
+  finish or multiple live subscriptions exist; it does not create another charge.
+- An unpaid initial invoice is voided before changing its plan/coupon. A paid or
+  processing payment cannot be replaced through this path.
+- Webhooks compare the current Stripe subscriptions before replacing local IDs.
+  Reservations survive subscription saves so interrupted replacements can recover.
+- Failed plan-detail requests preserve subscription state and payment actions.
+  Expired/incomplete/unpaid subscriptions remain visible.
+- Missing Stripe browser configuration shows an unavailable message in development
+  and fails production builds. Browser and server keys must belong to the same
+  Stripe account and mode.
+
+Rollout procedure (migration and functions applied on 2026-11-19;
+see billing-deployment-2026-11-19.txt for verification; web remains pending)
+1. Back up billing_subscription_checkouts, subscriptions, and the definitions of
+   billing_reserve_checkout and billing_save_subscription in the target project.
+2. Apply supabase/migrations/202611190001_billing_recovery.sql after the existing
+   202611180005_verified_billing.sql migration. It retains existing records.
+3. Deploy boxbin-billing and boxbin-billing-webhook. Both use verify_jwt=false in
+   supabase/config.toml; handlers enforce user authentication / Stripe signatures.
+   The legacy upgrade-subscription and cancel-subscription wrappers import the
+   same shared code and should be redeployed with the same revision if still used.
+4. Configure STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET in the target project.
+   Configure VITE_STRIPE_PUBLISHABLE_KEY in the web build (the existing GitHub
+   workflow maps its STRIPE_PUBLISHABLE_KEY secret to this variable).
+5. Preserve the existing Stripe endpoint subscriptions and enable these events:
+   payment_intent.succeeded
+   customer.subscription.created
+   customer.subscription.updated
+   customer.subscription.deleted
+   invoice.paid
+   invoice.payment_failed
+   invoice.payment_action_required
+6. Build and deploy the web with the actual publishable key. A dummy key used for
+   build verification is not a deployable payment configuration.
+
+Verification
+  npm run test:billing
+  npm run test:billing:browser
+  npm run build  (requires the matching publishable key)
+
+Unit/integration tests use local PostgreSQL (PGlite) and a simulated Stripe API.
+Browser tests use a simulated Stripe SDK and Supabase responses, not a live card.
+Before declaring production verified, exercise Stripe test mode for first payment,
+decline followed by another card, 3DS, full-discount setup, renewal failure/recovery,
+expired checkout, lost response, webhook replay, and token credit reconciliation.
+Read back subscription/balance state and Stripe delivery results after each case.
+
+Stripe references
+https://docs.stripe.com/api/idempotent_requests
+https://docs.stripe.com/api/invoices/object?api-version=2024-10-28.acacia
+https://docs.stripe.com/billing/subscriptions/deferred-payment
+https://docs.stripe.com/billing/subscriptions/webhooks

@@ -1033,5 +1033,71 @@
     "paymentIncomplete": "Completa el pago antes de continuar.",
     "profileFailed": "No se pudo sincronizar tu perfil. Reintenta al volver a iniciar sesión.",
     "imageSaveFailed": "No se pudo guardar la imagen. El artículo no se creó; intenta nuevamente."
+  },
+  "billingRecovery": {
+    "busy": "Hay otra solicitud de pago en curso. Espera un momento y vuelve a intentarlo.",
+    "recoveryPending": "Estamos comprobando tu pago anterior. Vuelve a intentarlo en unos momentos; no inicies otra compra.",
+    "subscriptionExists": "Ya tienes una suscripción. Abre Suscripción y planes para administrarla.",
+    "subscriptionEnded": "Esta suscripción terminó. Elige un plan para suscribirte de nuevo.",
+    "cardDeclined": "Tu tarjeta fue rechazada. Prueba con otra tarjeta o consulta a tu banco.",
+    "unavailable": "Los pagos con tarjeta no están disponibles temporalmente. Inténtalo más tarde.",
+    "syncPending": "Recibimos tu pago, pero todavía estamos confirmando la activación. Vuelve a intentarlo para consultar su estado sin pagar de nuevo.",
+    "cardHelp": "Guarda una tarjeta para las próximas renovaciones. Si hay una factura pendiente, también intentaremos pagarla con esta tarjeta.",
+    "saveCard": "Guardar tarjeta y resolver pago pendiente",
+    "resume": "Consultar estado del pago",
+    "country": "País de facturación",
+    "countries": {
+      "US": "Estados Unidos",
+      "MX": "México",
+      "CA": "Canadá",
+      "ES": "España",
+      "AR": "Argentina",
+      "CO": "Colombia",
+      "CL": "Chile",
+      "PE": "Perú",
+      "BR": "Brasil",
+      "GB": "Reino Unido",
+      "FR": "Francia",
+      "DE": "Alemania",
+      "IT": "Italia",
+      "AU": "Australia",
+      "NZ": "Nueva Zelanda"
+    },
+    "planDetailsUnavailable": "Cargamos tu suscripción, pero los detalles del plan no están disponibles temporalmente. Puedes administrar tu tarjeta.",
+    "loadFailed": "No pudimos cargar tu suscripción. Vuelve a intentarlo.",
+    "paymentRequired": "Tu suscripción tiene un pago pendiente. Actualiza tu tarjeta para completarlo.",
+    "updateCard": "Actualizar tarjeta de pago",
+    "choosePlan": "Elegir un plan",
+    "cardUpdated": "Tu tarjeta de pago y tu suscripción están actualizadas.",
+    "status": {
+      "active": "Activa",
+      "trialing": "Periodo de prueba",
+      "past_due": "Pago vencido",
+      "unpaid": "Sin pagar",
+      "incomplete": "Pago pendiente",
+      "incomplete_expired": "Intento vencido",
+      "canceled": "Cancelada",
+      "paused": "Pausada"
+    }
+  },
+  "market": {
+    "resultsSource": "Fuente: página de resultados de la tienda; confirma la publicación y su precio.",
+    "searchNotice": "Incluye búsqueda de precios en USD en Amazon y eBay para hasta 8 productos diferentes por lote, según los resultados disponibles. La estimación de tokens incluye la búsqueda.",
+    "references": "Referencias de mercado",
+    "not_found": "Sin precio respaldado por una fuente",
+    "unavailable": "Búsqueda de precios no disponible",
+    "not_checked": "Búsqueda de precios no completada",
+    "disclaimer": "Precios de publicaciones de EE. UU. consultados en la web, sin envío ni impuestos. Los artículos similares pueden variar en modelo y estado. El precio puede cambiar; confírmalo en la tienda.",
+    "checkedAt": "Consulta: {{date}}",
+    "similar": "Artículo similar",
+    "search": "Buscar en {{store}}",
+    "inventoryValue": "Usar una referencia como valor de inventario (opcional)",
+    "unassigned": "Dejar valor sin asignar",
+    "condition": {
+      "new": "Nuevo",
+      "used": "Usado",
+      "refurbished": "Reacondicionado",
+      "unknown": "Estado sin especificar"
+    }
   }
 }

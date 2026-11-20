@@ -1,0 +1,49 @@
+BoxBin billing deployment — 2026-11-19
+
+Target: Boxbin production, xfqmknrtozlxoscotcqa.
+User authorized applying the prepared migration and deploying changed functions.
+
+Database
+- Applied only 202611190001_billing_recovery.sql and registered version
+  202611190001 / billing_recovery in supabase_migrations.schema_migrations.
+- Transaction included function-definition drift checks and table locks, and
+  compared all subscription/checkout data before committing.
+- A separate read after commit confirmed all 75 subscription rows and zero
+  checkout rows match the backup exactly.
+- billing_checkout_locks has RLS enabled and zero rows. All four affected RPCs
+  are security-definer, executable by service_role, not anon or authenticated.
+
+Deployed functions
+- boxbin-billing: version 4, ACTIVE.
+- boxbin-billing-webhook: version 3, ACTIVE.
+- cancel-subscription: version 1, ACTIVE.
+- upgrade-subscription: version 1, ACTIVE.
+- validate-coupon: version 1, ACTIVE.
+
+Verification
+- Downloaded each deployed function and compared SHA-256 with the local
+  entrypoints and shared dependencies: all 21 file comparisons match.
+- Billing, cancel, upgrade and coupon endpoints rejected both missing and
+  invalid Bearer tokens with HTTP 401 BILLING_UNAUTHORIZED (8 checks).
+- Webhook rejected a missing signature with HTTP 400 INVALID_SIGNATURE.
+- User endpoints validate tokens through Supabase Auth getUser. The webhook
+  validates Stripe's HMAC signature. verify_jwt=false does not bypass those
+  handler checks. The two existing functions retained their prior setting.
+
+Private backup and evidence (ignored by git; directory mode 0700)
+.billing-deploy-20261119.local/
+- database-before.json, database-after.json
+- before/: downloaded prior billing and webhook sources
+- after/: downloaded deployed sources
+- manifest.json, functions-after.json, source-verification.json, smoke-tests.json
+
+Backup SHA-256:
+741878e1159c440e78f887dc34c1947d9f1eb3145093a3bbb08236ccdf54c28c
+Migration source SHA-256:
+2e17a1fc4c7fe3c7e0b21e022b292718e73dc653b12e724e652f7194e3184470
+
+Scope remaining
+- Web frontend was not deployed in this operation.
+- Stripe Dashboard event subscriptions/secrets were not modified.
+- No charge, authenticated payment, renewal or card-change transaction was
+  performed. These deployment/auth checks do not establish an end-to-end payment.

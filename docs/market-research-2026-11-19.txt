@@ -1,0 +1,60 @@
+Photo marketplace references — US / USD
+
+Implementation
+- Web requests marketResearch=true for both image token estimation and processing.
+- BinventoryQRAPI/src/services/market-research.js runs Google Search grounding after
+  visual identification. No Amazon/eBay credentials or browser scraping are used.
+- At most 8 distinct product lookups, 2 concurrent requests, 30 seconds per lookup,
+  60 seconds overall. Duplicate products share research. Unsearched items are
+  explicitly marked not_checked. Failed searches never discard image detections.
+- Only positive USD prices with a grounding support covering the numeric price
+  and pointing to a US Amazon/eBay source are accepted. Direct listings and
+  store results pages are distinguished explicitly; result-page references use
+  the actual citation URL, never a fabricated model-generated item link. UTF-8 byte
+  offsets follow https://aistudio.google.com/api-reference/generate-content .
+- Citation redirects are followed only on Google's known grounding endpoint.
+  Arbitrary model URLs and merchant sites are never fetched by the API.
+- These are search-backed asking prices for comparable listings, not verified
+  sold prices, exact visual matches, appraisals, inventory values or checkout quotes.
+  Availability, shipping and tax are not validated. Store prices may change.
+- Research (including date, condition, URLs and Google search suggestions) is saved
+  in image_requests.result and then items.market_research when the user adds it.
+- The user may select a reference as inventory value. Otherwise value stays empty;
+  the old invented $1 fallback and unsupported visual-model estimates are removed.
+- Search token usage joins the existing atomic processing completion/debit. The
+  preflight estimate includes a search allowance, but is still approximate. Provider
+  Google Search fees are separate from token usage and excluded from the existing
+  illustrative image-cost dollar estimate.
+
+Deployment
+- Apply supabase/migrations/202611190002_item_market_research.sql before web release.
+  It adds one nullable JSONB column without changing existing item values or RLS.
+- Deploy the BinventoryQRAPI repository to its DigitalOcean runtime, then the web.
+  No Supabase Edge Function changes are required for this feature.
+- The API runtime needs Node.js 18+ and its own GEMINI_API_KEY with Google Search
+  grounding available. Optional GEMINI_MARKET_MODEL selects the search model
+  (default: gemini-3.5-flash, minimal thinking for supported 3.5/3.6 models). No provider key belongs in the browser.
+- Verify one authenticated image upload against the deployed API: a recognizable
+  product, a priced citation from Amazon/eBay, add item, reload, reopen its source.
+  Also confirm a no-result item can be saved with an empty value.
+- Existing inventory is not automatically repriced or researched.
+
+Verification
+- API: npm run test:market (search, URL safety, citation/price relationship,
+  outages, bounds, duplicate lookups, image-route result persistence and billing).
+- Web: npm run test:market; npm run test:processing; npm run test:market:browser.
+- Browser fixtures test real UI actions at 390px and 1440px, save/reload, optional
+  price selection and missing-price preservation. Store/provider responses are mocked.
+- Production build was checked with a dummy Stripe publishable key used solely for
+  compilation; that build is not a release artifact for payments.
+- The local image API has a GEMINI_API_KEY (dotenv syntax must be parsed; simple
+  KEY=value text searches miss this configuration). Do not infer DigitalOcean's
+  key/configuration from the local environment. Live Google Search calls returned
+  HTTP 200 with grounding metadata. Several responses had misleading/invented
+  product URLs or non-US/non-store sources; these were rejected as intended.
+  A successful direct product-price quote has not yet been verified live.
+
+Migration 202611190002 was applied to production xfqmknrtozlxoscotcqa and read back.
+All 210 existing items retained the same content fingerprint.
+Production migration evidence is stored privately in .market-deploy-20261119.local.
+Publication status is recorded after CI/deployment verification.

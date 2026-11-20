@@ -3,7 +3,6 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Elements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
 import { useAuth } from "@/context/AuthContext";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase, logoutUser } from "@/lib/supabase";
@@ -11,7 +10,7 @@ import CheckoutForm from "./CheckoutForm.tsx";
 import { Navigate, useNavigate } from "react-router-dom";
 import { getStripePlans } from "../../lib/stripe";
 import LogoIcon from "@/assets/logo.png";
-import { STRIPE_PUBLISHABLE_KEY } from "../../config/stripe";
+import { stripePromise } from "@/lib/stripe";
 import {
   Check,
   Sparkles,
@@ -33,7 +32,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
 
 const planVisuals = [
   { icon: Package, bg: "bg-brand-50 text-brand-700", ring: "ring-brand-100" },

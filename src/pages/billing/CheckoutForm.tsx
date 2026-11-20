@@ -1,11 +1,12 @@
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { usePaymentAvailability } from './usePaymentAvailability';
 import { useTranslation } from 'react-i18next';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { createStripeSubscriptionCupons, syncStripeSubscription, billingRequest } from '@/lib/stripe';
+import { createStripeSubscriptionCupons, syncStripeSubscription, billingRequest, billingErrorMessage } from '@/lib/stripe';
 
 type CheckoutFormProps = {
   userId: string | undefined;
@@ -32,6 +33,11 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
   const stripe = useStripe();
   const elements = useElements();
   const { currentUser } = useAuth();
+  const unavailable = usePaymentAvailability();
+  const busy = useRef(false);
+  const completedSetup = useRef<string | undefined>(undefined);
+  const paidSubscription = useRef<string | null>(null);
+  const [country, setCountry] = useState('US');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
@@ -63,6 +69,15 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
     
     return Math.max(0, originalPrice - discount);
   }, [originalPrice, appliedCoupon]);
+
+  useEffect(() => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError(null);
+    setError(null);
+    paidSubscription.current = null;
+    completedSetup.current = undefined;
+  }, [planId]);
 
   const discountAmount = originalPrice - finalPrice;
 
@@ -112,43 +127,58 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!stripe || !elements || !userId) {
+    if (!stripe || !elements || !userId || busy.current || unavailable) {
       return;
     }
 
+    busy.current = true;
     setLoading(true);
     setError(null);
 
     try {
-      const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
-        type: 'card',
-        card: elements.getElement(CardElement)!,
-        billing_details: {
-          name: nameOnCard,
-          email: currentUser?.email,
-          address: {
-            line1: address,
-            city: city,
-            state: state,
-            postal_code: zipCode,
-            country: 'US'
+      if (!paidSubscription.current) {
+        const card = elements.getElement(CardElement);
+        if (!card) throw new Error(t('billingRecovery.unavailable'));
+        const { error: stripeError, paymentMethod } = await stripe.createPaymentMethod({
+          type: 'card',
+          card,
+          billing_details: {
+            name: nameOnCard,
+            email: currentUser?.email,
+            address: {
+              line1: address,
+              city: city,
+              state: state,
+              postal_code: zipCode,
+              country
+            }
           }
+        });
+
+        if (stripeError) {
+          setError(stripeError.message || 'subscription.checkout.paymentFailed');
+          return;
         }
-      });
 
-      if (stripeError) {
-        setError(stripeError.message || 'subscription.checkout.paymentFailed');
-        return;
+        const result = await createStripeSubscriptionCupons(planId, appliedCoupon?.coupon?.id, {
+          firstName, lastName, address, city, state, zipCode, country, nameOnCard,
+        }, paymentMethod.id);
+        if (result.setupClientSecret) {
+          const setup = await stripe.confirmCardSetup(result.setupClientSecret, { payment_method: paymentMethod.id });
+          if (setup.error) throw setup.error;
+          if (setup.setupIntent?.status !== 'succeeded') throw new Error(t('records.paymentPending'));
+          completedSetup.current = setup.setupIntent.id;
+        }
+        if (result.paymentStatus === 'processing') throw new Error(t('records.paymentPending'));
+        if (result.clientSecret && result.paymentStatus !== 'succeeded') {
+          const confirmation = await stripe.confirmCardPayment(result.clientSecret, { payment_method: paymentMethod.id });
+          if (confirmation.error) throw confirmation.error;
+          if (confirmation.paymentIntent?.status !== 'succeeded') throw new Error(t('records.paymentPending'));
+        }
+        if (!result.clientSecret && !['active', 'trialing'].includes(result.status)) throw new Error(t('records.paymentPending'));
+        paidSubscription.current = result.subscriptionId;
       }
-
-      const result = await createStripeSubscriptionCupons(planId, appliedCoupon?.coupon?.id, {
-        firstName, lastName, address, city, state, zipCode, nameOnCard,
-      }, paymentMethod.id);
-      if (result.clientSecret && result.paymentStatus !== 'succeeded') {
-        const confirmation = await stripe.confirmCardPayment(result.clientSecret, { payment_method: paymentMethod.id });
-        if (confirmation.error) throw confirmation.error;
-      }
-      const saved = await syncStripeSubscription(result.subscriptionId);
+      const saved = await syncStripeSubscription(paidSubscription.current!, completedSetup.current);
       if (!['active', 'trialing'].includes(saved.status)) throw new Error(t('records.paymentIncomplete'));
 
       if ((window as any).ReactNativeWebView) {
@@ -159,9 +189,9 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         window.location.href = '/home';
       }
     } catch (err) {
-      setError('subscription.checkout.unexpectedError');
-      console.error(err);
+      setError(paidSubscription.current ? t('billingRecovery.syncPending') : billingErrorMessage(err));
     } finally {
+      busy.current = false;
       setLoading(false);
     }
   };
@@ -228,6 +258,13 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
             required
           />
         </div>
+      </div>
+
+      <div className="min-w-0 space-y-2">
+        <Label htmlFor="billingCountry">{t("billingRecovery.country")}</Label>
+        <select id="billingCountry" value={country} onChange={event => setCountry(event.target.value)} className="w-full border rounded-md p-2" required>
+          {Object.entries(t('billingRecovery.countries', { returnObjects: true }) as Record<string, string>).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+        </select>
       </div>
 
       <div className="min-w-0 space-y-2">
@@ -340,10 +377,11 @@ export default function CheckoutForm({ userId, planId, originalPrice, currency =
         <CardElement className="p-3 border rounded-md" />
       </div>
 
-      {error && <p className="text-red-500 text-sm">{t(error)}</p>}
+      {unavailable && <p role="alert" className="text-red-500 text-sm">{t("billingRecovery.unavailable")}</p>}
+      {error && <p role="alert" className="text-red-500 text-sm">{t(error)}</p>}
       
-      <Button type="submit" className="w-full min-h-11 h-auto whitespace-normal" disabled={!stripe || loading}>
-        {loading ? t("subscription.checkout.processing") : t("subscription.checkout.subscribe", { price: formatPrice(finalPrice) })}
+      <Button type="submit" className="w-full min-h-11 h-auto whitespace-normal" disabled={!stripe || loading || unavailable}>
+        {loading ? t("subscription.checkout.processing") : paidSubscription.current ? t("billingRecovery.resume") : t("subscription.checkout.subscribe", { price: formatPrice(finalPrice) })}
       </Button>
     </form>
   );

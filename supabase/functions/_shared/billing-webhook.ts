@@ -25,11 +25,17 @@ export async function billingWebhook(req: Request) {
   if (body.length > 1000000 || !await verifyStripeSignature(body, req.headers.get('stripe-signature') || '', secret)) return json({ error: 'INVALID_SIGNATURE' }, 400);
   try {
     const event = JSON.parse(body);
-    if (!['payment_intent.succeeded', 'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type)) return json({ received: true });
-    const object = event.data.object;
+    if (!['payment_intent.succeeded', 'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted', 'invoice.paid', 'invoice.payment_failed', 'invoice.payment_action_required'].includes(event.type)) return json({ received: true });
+    let object = event.data.object;
+    if (event.type.startsWith('invoice.')) {
+      const reference = object.subscription || object.parent?.subscription_details?.subscription;
+      const subscriptionId = typeof reference === 'string' ? reference : reference?.id;
+      if (!subscriptionId) return json({ received: true });
+      object = await stripeRequest(`subscriptions/${encodeURIComponent(subscriptionId)}`, 'GET', { expand: ['latest_invoice.payment_intent'] });
+    }
     const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false, autoRefreshToken: false } });
     let actor = object.metadata?.actor;
-    if (!actor && event.type.startsWith('customer.subscription.')) {
+    if (!actor && event.type !== 'payment_intent.succeeded') {
       const { data, error } = await db.rpc('billing_actor_for_subscription', { p_subscription: object.id });
       if (error) throw error;
       actor = data;
@@ -43,10 +49,18 @@ export async function billingWebhook(req: Request) {
     } else {
       const { data: current, error: readError } = await db.from('subscriptions').select('stripeSubscriptionId').eq('userId', ctx.owner).maybeSingle();
       if (readError) throw readError;
-      // An event for an older subscription must not overwrite a newer checkout.
-      if (current?.stripeSubscriptionId && current.stripeSubscriptionId !== object.id) return json({ received: true, ignored: 'previous_subscription' });
       const latest = await stripeRequest(`subscriptions/${encodeURIComponent(object.id)}`, 'GET', { expand: ['latest_invoice.payment_intent'] });
-      await saveSubscription(ctx, latest);
+      if (current?.stripeSubscriptionId && current.stripeSubscriptionId !== latest.id) {
+        const previous = await stripeRequest(`subscriptions/${encodeURIComponent(current.stripeSubscriptionId)}`);
+        // Compare provider chronology, not simply unequal IDs. A newer paid
+        // checkout must recover even when the first local save failed.
+        if (latest.created < previous.created || (latest.created === previous.created && ['canceled', 'incomplete_expired'].includes(latest.status))) return json({ received: true, ignored: 'previous_subscription' });
+        if (!['canceled', 'incomplete_expired'].includes(previous.status)) throw new Error('Conflicting live subscriptions');
+        await saveSubscription(ctx, previous, undefined, previous.id);
+        await saveSubscription(ctx, latest, undefined, previous.id);
+      } else {
+        await saveSubscription(ctx, latest);
+      }
     }
     return json({ received: true });
   } catch {

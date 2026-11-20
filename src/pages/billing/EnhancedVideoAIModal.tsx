@@ -34,12 +34,11 @@ import { getStripePlans } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 import { Elements } from "@stripe/react-stripe-js";
 import TokenCheckoutForm from "./TokenCheckoutForm";
-import { loadStripe } from "@stripe/stripe-js";
-import { STRIPE_PUBLISHABLE_KEY } from "@/config/stripe";
+import { stripePromise } from "@/lib/stripe";
 import { API_BASE_URL } from "@/config/api";
 import { useTranslation } from "react-i18next";
 
-const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
+
 const planIcons = [Coins, Zap, Star, Crown];
 
 interface EnhancedVideoAIModalProps {

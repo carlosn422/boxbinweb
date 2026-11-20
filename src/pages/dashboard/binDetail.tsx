@@ -1,3 +1,5 @@
+import { MarketReferences } from '@/components/ai/MarketReferences';
+import type { MarketResearch } from '@/lib/marketResearch';
 import { uploadInventoryImage } from '@/services/storageService';
 import i18n from 'i18next';
 import { createInventoryRecord, updateInventoryRecord, deleteInventoryRecord, inventoryError } from '@/services/inventoryService';
@@ -144,6 +146,7 @@ export interface Item {
   cuantity: string;
   value: string;
   quantity?: string | number;
+  market_research?: MarketResearch | null;
 }
 
 const BinDetailsScreen: React.FC = () => {
@@ -1602,6 +1605,8 @@ const BinDetailsScreen: React.FC = () => {
                       )}
                     </div>
 
+                    <MarketReferences research={item.market_research} />
+
                     {/* Card Footer Divider & Actions */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-[11px] text-slate-400 font-medium">
@@ -1726,6 +1731,7 @@ const BinDetailsScreen: React.FC = () => {
                           ))}
                         </div>
                       )}
+                      <MarketReferences research={item.market_research} />
                     </div>
                   </div>
 

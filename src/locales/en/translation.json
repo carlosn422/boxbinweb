@@ -1033,5 +1033,71 @@
     "paymentIncomplete": "Complete the payment before continuing.",
     "profileFailed": "Your profile could not be synced. Please sign in again to retry.",
     "imageSaveFailed": "The image could not be saved. The item was not created; please try again."
+  },
+  "billingRecovery": {
+    "busy": "Another payment request is in progress. Wait a moment, then try again.",
+    "recoveryPending": "We are checking your previous payment. Please try again shortly; do not start a second purchase.",
+    "subscriptionExists": "You already have a subscription. Open Subscription & Plans to manage it.",
+    "subscriptionEnded": "This subscription has ended. Choose a plan to subscribe again.",
+    "cardDeclined": "Your card was declined. Try another card or contact your bank.",
+    "unavailable": "Card payments are temporarily unavailable. Please try again later.",
+    "syncPending": "Your payment was received, but activation is still being confirmed. Try again to check its status without paying again.",
+    "cardHelp": "Save a card for future subscription renewals. If an invoice is outstanding, we will also attempt to pay it with this card.",
+    "saveCard": "Save card and resolve pending payment",
+    "resume": "Check payment status",
+    "country": "Billing country",
+    "countries": {
+      "US": "United States",
+      "MX": "Mexico",
+      "CA": "Canada",
+      "ES": "Spain",
+      "AR": "Argentina",
+      "CO": "Colombia",
+      "CL": "Chile",
+      "PE": "Peru",
+      "BR": "Brazil",
+      "GB": "United Kingdom",
+      "FR": "France",
+      "DE": "Germany",
+      "IT": "Italy",
+      "AU": "Australia",
+      "NZ": "New Zealand"
+    },
+    "planDetailsUnavailable": "Your subscription was loaded, but its plan details are temporarily unavailable. You can still manage your payment method.",
+    "loadFailed": "We could not load your subscription. Please try again.",
+    "paymentRequired": "Your subscription has an outstanding payment. Update your card to complete it.",
+    "updateCard": "Update payment card",
+    "choosePlan": "Choose a plan",
+    "cardUpdated": "Your payment method and subscription are up to date.",
+    "status": {
+      "active": "Active",
+      "trialing": "Trial",
+      "past_due": "Past due",
+      "unpaid": "Unpaid",
+      "incomplete": "Payment pending",
+      "incomplete_expired": "Checkout expired",
+      "canceled": "Canceled",
+      "paused": "Paused"
+    }
+  },
+  "market": {
+    "resultsSource": "Source: store results page; confirm the exact listing and price.",
+    "searchNotice": "Includes Amazon and eBay price research in USD for up to 8 different products per batch, subject to available results. Search usage is included in the token estimate.",
+    "references": "Market references",
+    "not_found": "No sourced price found",
+    "unavailable": "Price search unavailable",
+    "not_checked": "Price search not completed",
+    "disclaimer": "US listing prices from web search, excluding shipping and taxes. Comparable items may differ in model and condition. Prices can change; confirm at the store.",
+    "checkedAt": "Searched: {{date}}",
+    "similar": "Comparable item",
+    "search": "Search {{store}}",
+    "inventoryValue": "Use a reference as inventory value (optional)",
+    "unassigned": "Leave value unassigned",
+    "condition": {
+      "new": "New",
+      "used": "Used",
+      "refurbished": "Refurbished",
+      "unknown": "Condition unspecified"
+    }
   }
 }
