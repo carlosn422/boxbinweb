@@ -1081,23 +1081,31 @@
     }
   },
   "market": {
-    "resultsSource": "Source: store results page; confirm the exact listing and price.",
-    "searchNotice": "Includes Amazon and eBay price research in USD for up to 8 different products per batch, subject to available results. Search usage is included in the token estimate.",
+    "resultsSource": "Store results page",
+    "searchNotice": "We compare Amazon and eBay separately in USD, for up to 8 products per batch. Some items may have no available price.",
     "references": "Market references",
     "not_found": "No sourced price found",
     "unavailable": "Price search unavailable",
     "not_checked": "Price search not completed",
-    "disclaimer": "US listing prices from web search, excluding shipping and taxes. Comparable items may differ in model and condition. Prices can change; confirm at the store.",
+    "disclaimer": "Prices of similar products, not an appraisal of your item. Confirm the model, condition, shipping and final price at the store.",
     "checkedAt": "Searched: {{date}}",
-    "similar": "Comparable item",
+    "similar": "Similar product",
     "search": "Search {{store}}",
-    "inventoryValue": "Use a reference as inventory value (optional)",
-    "unassigned": "Leave value unassigned",
+    "inventoryValue": "Inventory value (optional)",
+    "unassigned": "I will assign a value later",
     "condition": {
       "new": "New",
       "used": "Used",
       "refurbished": "Refurbished",
       "unknown": "Condition unspecified"
-    }
+    },
+    "directSource": "Product listing",
+    "sourceHint": "A results-page link may contain several products. Find the matching item before using its price.",
+    "storeEmpty": "No verified price available on {{store}} for this item.",
+    "storeUnavailable": "We could not consult {{store}} right now. You can open the store below.",
+    "storePending": "{{store}} was not consulted for this item. You can search manually below.",
+    "priceCount_one": "{{count}} price",
+    "priceCount_other": "{{count}} prices",
+    "removePhoto": "Remove {{name}}"
   }
 }

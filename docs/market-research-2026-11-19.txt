@@ -4,7 +4,8 @@ Implementation
 - Web requests marketResearch=true for both image token estimation and processing.
 - BinventoryQRAPI/src/services/market-research.js runs Google Search grounding after
   visual identification. No Amazon/eBay credentials or browser scraping are used.
-- At most 8 distinct product lookups, 2 concurrent requests, 30 seconds per lookup,
+- At most 8 distinct products, with separate Amazon and eBay lookups (16
+  requests maximum), 2 concurrent requests, 30 seconds per lookup,
   60 seconds overall. Duplicate products share research. Unsearched items are
   explicitly marked not_checked. Failed searches never discard image detections.
 - Only positive USD prices with a grounding support covering the numeric price
@@ -43,7 +44,7 @@ Verification
 - API: npm run test:market (search, URL safety, citation/price relationship,
   outages, bounds, duplicate lookups, image-route result persistence and billing).
 - Web: npm run test:market; npm run test:processing; npm run test:market:browser.
-- Browser fixtures test real UI actions at 390px and 1440px, save/reload, optional
+- Browser fixtures test real UI actions at 390px, 768px, 844px landscape and 1440px, save/reload, optional
   price selection and missing-price preservation. Store/provider responses are mocked.
 - Production build was checked with a dummy Stripe publishable key used solely for
   compilation; that build is not a release artifact for payments.
@@ -58,3 +59,18 @@ Migration 202611190002 was applied to production xfqmknrtozlxoscotcqa and read b
 All 210 existing items retained the same content fingerprint.
 Production migration evidence is stored privately in .market-deploy-20261119.local.
 Publication status is recorded after CI/deployment verification.
+
+November 20 follow-up
+- Enlarged the photo modal to 1240px / 94dvh with safe-area limits and a single
+  scrolling results region. Upload previews show full photos up to 520px wide.
+- Added separate Amazon/eBay sections, per-store search status and compact source
+  labels. No available result in one store is not substituted with another store.
+- Fixed Markdown bold-price extraction while retaining citation byte offsets.
+- API search-token estimation includes both store calls. Existing references are
+  unchanged; reanalyzing a photo invokes the new per-store search.
+- Initial web release 00f8501 was deployed by GitHub Actions run 44667966704;
+  public my.boxbin.app assets confirmed the feature. API revision v1 was confirmed
+  live after its automatic deployment. The optional explicit DigitalOcean workflow
+  was removed: its registry credential lacks app:read/app:update (HTTP 403), and
+  the API's existing automatic deployment is functional.
+- Follow-up API revision: market-research-20261120-v3. Verify /health after release.

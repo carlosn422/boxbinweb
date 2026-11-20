@@ -1,3 +1,4 @@
+import './photo-analysis.css';
 import { MarketReferences } from '@/components/ai/MarketReferences';
 import { readMarketResearch } from '@/lib/marketResearch';
 import { readTokenBalance } from '@/services/recordService';
@@ -636,7 +637,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
 
   // Render Detected Items View
   const renderResultsView = () => (
-    <div className="space-y-4">
+    <div className="photo-analysis-results">
       {isUploading ? (
         <div className="flex flex-col items-center justify-center py-12 space-y-3">
           <Loader2 className="w-8 h-8 text-brand-600 animate-spin" />
@@ -660,13 +661,13 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-h-[55vh] overflow-y-auto pr-1">
+          <div className="photo-results-scroll">
             {detectedItems.map((item) => (
               <div
                 key={item.id}
-                className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-all overflow-hidden flex flex-col justify-between"
+                className="photo-item-card"
               >
-                <div className="relative aspect-[16/10] bg-slate-100 overflow-hidden border-b border-slate-100">
+                <div className="photo-item-image">
                   <img
                     src={item.image_url}
                     alt={item.label}
@@ -695,9 +696,9 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                   )}
                 </div>
 
-                <div className="p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                <div className="photo-item-content">
                   <div>
-                    <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate" title={item.label}>
+                    <h4 className="font-bold text-slate-900 break-words" title={item.label}>
                       {item.label}
                     </h4>
                     <p className="text-xs text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
@@ -711,7 +712,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                         onChange={event => setDetectedItems(previous => previous.map(detected => detected.id === item.id
                           ? { ...detected, selectedOffer: event.target.value === '' ? undefined : Number(event.target.value) } : detected))}>
                         <option value="">{t('market.unassigned')}</option>
-                        {readMarketResearch(item.market_research)?.offers.map((offer, index) => <option key={offer.url} value={index}>
+                        {readMarketResearch(item.market_research)?.offers.map((offer, index) => <option key={`${offer.url}:${offer.price}:${index}`} value={index}>
                           {offer.marketplace === 'amazon' ? 'Amazon' : 'eBay'} · ${offer.price.toFixed(2)} USD · {t(`market.condition.${offer.condition}`)}
                         </option>)}
                       </select>
@@ -758,7 +759,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+          <div className="photo-results-footer">
             <Button
               variant="outline"
               size="sm"
@@ -804,7 +805,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
 
   // Render Upload View
   const renderUploadView = () => (
-    <div className="space-y-4">
+    <div className="photo-upload-view space-y-4">
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -817,9 +818,9 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
       >
         {selectedImages.length > 0 ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-48 overflow-y-auto p-1">
+            <div className="photo-upload-previews">
               {imagePreviews.map((preview, index) => (
-                <div key={index} className="relative group aspect-square rounded-xl overflow-hidden border border-slate-200 bg-white shadow-2xs">
+                <figure key={index} className="photo-upload-preview">
                   <img
                     src={preview.url}
                     alt={preview.name}
@@ -829,11 +830,13 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                     type="button"
                     onClick={() => removeImage(index)}
                     disabled={isUploading}
-                    className="absolute top-1 right-1 w-5 h-5 bg-red-600/90 hover:bg-red-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    aria-label={t('market.removePhoto', { name: preview.name })}
+                    className="photo-upload-remove"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-4 h-4" />
                   </button>
-                </div>
+                  <figcaption title={preview.name}>{preview.name}</figcaption>
+                </figure>
               ))}
             </div>
 
@@ -948,7 +951,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
         </DialogTrigger>
       )}
 
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/80 shadow-2xl p-5 sm:p-6 bg-white">
+      <DialogContent className="photo-analysis-dialog rounded-2xl border border-slate-200/80 shadow-2xl bg-white">
         <DialogHeader className="pb-3 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-orange-600 shrink-0">
@@ -978,7 +981,7 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
           </div>
         </DialogHeader>
 
-        <div className="pt-3">
+        <div className="photo-analysis-body" data-results={showResults && !showTokenPurchase}>
           {showTokenPurchase
             ? renderTokenPurchaseView()
             : showResults

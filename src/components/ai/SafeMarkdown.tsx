@@ -40,12 +40,13 @@ export function SafeMarkdown({
   return <div className="space-y-2 break-words">{blocks}</div>;
 }
 export function SearchSuggestions({
-  html
+  html, compact = false
 }: {
   html: string;
+  compact?: boolean;
 }) {
   useTranslation();
   // Google's supplied widget stays in a separate, opaque origin without scripts or top navigation.
   const policy = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'">`;
-  return <iframe title={ct('searchSuggestions')} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" srcDoc={policy + html} className="w-full h-28 border-0 bg-white rounded" />;
+  return <iframe title={ct('searchSuggestions')} sandbox="allow-popups allow-popups-to-escape-sandbox" referrerPolicy="no-referrer" srcDoc={policy + html} className={`w-full ${compact ? 'h-20' : 'h-28'} border-0 bg-white rounded`} />;
 }

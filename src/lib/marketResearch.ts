@@ -17,6 +17,7 @@ export interface MarketResearch {
   status: 'found' | 'not_found' | 'unavailable' | 'not_checked';
   offers: MarketOffer[];
   searchSuggestions?: string;
+  stores?: Partial<Record<'amazon' | 'ebay', { status: MarketResearch['status']; checkedAt: string; searchSuggestions?: string }>>;
 }
 
 export function readMarketResearch(value: unknown): MarketResearch | null {
@@ -38,7 +39,15 @@ export function readMarketResearch(value: unknown): MarketResearch | null {
   }).slice(0, 4).map(offer => ({ ...offer, title: typeof offer.title === 'string' ? offer.title.slice(0, 200) : offer.marketplace,
     match: 'similar' as const, sourceType: offer.sourceType === 'results' ? 'results' as const : 'listing' as const,
     condition: ['new', 'used', 'refurbished'].includes(offer.condition) ? offer.condition : 'unknown' as const }));
-  return { version: 1, market: 'US', currency: 'USD', query: typeof data.query === 'string' ? data.query.slice(0, 240) : '',
+  const stores: MarketResearch['stores'] = {};
+  for (const name of ['amazon', 'ebay'] as const) {
+    const store = data.stores?.[name];
+    if (!store || typeof store !== 'object') continue;
+    stores[name] = { status: ['found', 'not_found', 'unavailable', 'not_checked'].includes(store.status) ? store.status : 'not_checked',
+      checkedAt: typeof store.checkedAt === 'string' && Number.isFinite(Date.parse(store.checkedAt)) ? store.checkedAt : '',
+      ...(typeof store.searchSuggestions === 'string' && store.searchSuggestions.length <= 50000 ? { searchSuggestions: store.searchSuggestions } : {}) };
+  }
+  return { version: 1, market: 'US', currency: 'USD', query: typeof data.query === 'string' ? data.query.slice(0, 240) : '', stores,
     checkedAt: typeof data.checkedAt === 'string' && Number.isFinite(Date.parse(data.checkedAt)) ? data.checkedAt : '',
     status: offers.length ? 'found' : ['unavailable', 'not_checked'].includes(data.status) ? data.status : 'not_found', offers,
     ...(typeof data.searchSuggestions === 'string' && data.searchSuggestions.length <= 50000 ? { searchSuggestions: data.searchSuggestions } : {}) };

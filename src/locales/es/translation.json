@@ -1081,23 +1081,31 @@
     }
   },
   "market": {
-    "resultsSource": "Fuente: página de resultados de la tienda; confirma la publicación y su precio.",
-    "searchNotice": "Incluye búsqueda de precios en USD en Amazon y eBay para hasta 8 productos diferentes por lote, según los resultados disponibles. La estimación de tokens incluye la búsqueda.",
+    "resultsSource": "Página de resultados",
+    "searchNotice": "Comparamos Amazon y eBay por separado en USD, para hasta 8 productos por lote. Algunos artículos pueden no tener un precio disponible.",
     "references": "Referencias de mercado",
     "not_found": "Sin precio respaldado por una fuente",
     "unavailable": "Búsqueda de precios no disponible",
     "not_checked": "Búsqueda de precios no completada",
-    "disclaimer": "Precios de publicaciones de EE. UU. consultados en la web, sin envío ni impuestos. Los artículos similares pueden variar en modelo y estado. El precio puede cambiar; confírmalo en la tienda.",
+    "disclaimer": "Son precios de productos similares, no un avalúo de tu artículo. Confirma el modelo, estado, envío y precio final en la tienda.",
     "checkedAt": "Consulta: {{date}}",
-    "similar": "Artículo similar",
+    "similar": "Producto similar",
     "search": "Buscar en {{store}}",
-    "inventoryValue": "Usar una referencia como valor de inventario (opcional)",
-    "unassigned": "Dejar valor sin asignar",
+    "inventoryValue": "Valor de inventario (opcional)",
+    "unassigned": "Asignaré un valor después",
     "condition": {
       "new": "Nuevo",
       "used": "Usado",
       "refurbished": "Reacondicionado",
       "unknown": "Estado sin especificar"
-    }
+    },
+    "directSource": "Publicación del producto",
+    "sourceHint": "Un enlace de resultados puede incluir varios productos. Localiza el artículo que coincide antes de usar su precio.",
+    "storeEmpty": "Sin precio verificado en {{store}} para este artículo.",
+    "storeUnavailable": "No pudimos consultar {{store}} en este momento. Puedes abrir la tienda abajo.",
+    "storePending": "No se consultó {{store}} para este artículo. Puedes buscarlo manualmente abajo.",
+    "priceCount_one": "{{count}} precio",
+    "priceCount_other": "{{count}} precios",
+    "removePhoto": "Quitar {{name}}"
   }
 }
