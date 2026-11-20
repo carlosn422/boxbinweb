@@ -1,0 +1,89 @@
+name: Deploy BoxBin photo API
+
+on:
+  push:
+    branches: [task/supabase]
+    paths: [.github/workflows/deploy-boxbin-api.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: boxbin-photo-api-production
+  cancel-in-progress: false
+
+jobs:
+  deploy-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify target, deploy and check the public API
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          node --input-type=module <<'JS'
+          import { appendFileSync } from 'node:fs';
+          const token = process.env.DIGITALOCEAN_TOKEN;
+          if (!token) throw new Error('DigitalOcean credential is missing');
+          const host = 'boxbinapi-iv6wi.ondigitalocean.app';
+          const repo = 'carlosn422/BinventoryQRAPI';
+          const branch = 'task/supabase';
+          const revision = 'market-research-20261119-v1';
+          async function api(path, method = 'GET', body) {
+            const response = await fetch('https://api.digitalocean.com/v2' + path, {
+              method, redirect: 'error', signal: AbortSignal.timeout(30000),
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              ...(body ? { body: JSON.stringify(body) } : {})
+            });
+            if (!response.ok) throw new Error(`DigitalOcean ${method} returned HTTP ${response.status}; app:read and app:update permissions are required`);
+            return response.json();
+          }
+          // Never print app specifications or environment variables: they can hold secrets.
+          const matches = [];
+          for (let page = 1; page <= 10; page++) {
+            const result = await api(`/apps?per_page=100&page=${page}`);
+            for (const app of result.apps || []) {
+              let ingress;
+              try { ingress = new URL(app.default_ingress).hostname; } catch { continue; }
+              if (ingress === host) matches.push(app);
+            }
+            if (!result.links?.pages?.next) break;
+          }
+          if (matches.length !== 1) throw new Error('Expected exactly one BoxBin API application; no changes made');
+          const app = matches[0];
+          const services = app.spec?.services || [];
+          if (!services.length || services.some(service => service.github?.repo?.toLowerCase() !== repo.toLowerCase() || service.github?.branch !== branch))
+            throw new Error('BoxBin API source does not match the reviewed repository and branch; no changes made');
+          if (!/^[0-9a-f-]{36}$/i.test(app.id)) throw new Error('Invalid application identifier');
+          console.log(`Verified target: ${host}; source: ${repo}@${branch}`);
+          const current = await fetch(`https://${host}/health`, { signal: AbortSignal.timeout(15000), headers: { 'Cache-Control': 'no-cache' } }).then(r => r.json()).catch(() => null);
+          if (current?.revision === revision) {
+            console.log(`Already active: ${revision}`);
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `API already active: ${revision}\n`);
+          } else {
+            const created = await api(`/apps/${app.id}/deployments`, 'POST', { force_build: true });
+            const id = created.deployment?.id;
+            if (!/^[0-9a-f-]{36}$/i.test(id || '')) throw new Error('Deployment identifier missing');
+            console.log(`Deployment created: ${id}`);
+            let active = false;
+            let lastPhase;
+            for (let attempt = 0; attempt < 48; attempt++) {
+              const { deployment } = await api(`/apps/${app.id}/deployments/${id}`);
+              if (deployment.phase !== lastPhase) console.log(`Deployment phase: ${deployment.phase}`);
+              lastPhase = deployment.phase;
+              if (deployment.phase === 'ACTIVE') { active = true; break; }
+              if (['ERROR', 'CANCELED', 'SUPERSEDED'].includes(deployment.phase)) throw new Error(`Deployment ended: ${deployment.phase}`);
+              await new Promise(resolve => setTimeout(resolve, 15000));
+            }
+            if (!active) throw new Error('Timed out waiting for ACTIVE deployment');
+            const response = await fetch(`https://${host}/health`, { signal: AbortSignal.timeout(15000), headers: { 'Cache-Control': 'no-cache' } });
+            const health = await response.json();
+            if (!response.ok || health.revision !== revision) throw new Error('Public API does not serve the expected revision');
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `API active: ${revision}\n\nDeployment: ${id}\n`);
+            console.log(`Public revision verified: ${revision}`);
+          }
+          JS
