@@ -1030,6 +1030,7 @@
     "quotaBarVoice": "Voice {{left}}m",
     "quotaBarTokens": "{{tokens}} tokens",
     "tokensUsedNotice": "Monthly quota reached · Used {{spent}} tokens ({{balance}} left)",
+    "tokensUsedPlanNotIncludedNotice": "Not included in your plan · Used {{spent}} tokens ({{balance}} left)",
     "tokensRequiredCta": "Need {{tokens}} tokens or a higher plan to continue.",
     "buyTokensAction": "Buy AI Tokens",
     "upgradePlanAction": "Upgrade Plan",

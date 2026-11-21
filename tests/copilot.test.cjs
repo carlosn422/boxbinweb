@@ -275,11 +275,12 @@ test('Live relay streams multiple turns, clears interruptions, rejects client to
     receive(data){this.onmessage({data:JSON.stringify(data)});}
   }
   class Tools {sources=[];searchSuggestions=[];proposal=null;run(_name,_args,_input,signal){toolSignal=signal;return new Promise(resolve=>resolveTool=resolve);}}
-  const server={COPILOT_TOKEN_COSTS:{chat:50,upload:100,image:500,voiceBlock30s:300,voicePerMin:600,video30s:500},DEFAULT_COPILOT_ENTITLEMENTS:{tier:'starter',planName:'Starter',maxChats:5,maxMessagesPerChat:20,monthlyMessages:60,monthlyUploads:8,monthlyVideos:1,monthlyImages:3,monthlyVoiceSeconds:240,maxCallSeconds:120},inventory:async(_ctx,scope)=>{if(scope==='foreign')throw Error();return {};},rpc:async(_db,name,args)=>{quotas.push({name,args});return {source:'plan',kind:'voice_seconds',used:30,limit:240,remaining:210,tokensSpent:0,tokenBalance:0};},failure:()=>new Response(JSON.stringify({error:'No disponible'})),json:(v,status)=>new Response(JSON.stringify(v),{status})};
+  const server={COPILOT_TOKEN_COSTS:{chat:50,upload:100,image:500,voiceBlock30s:200,voicePerMin:400,video30s:500},DEFAULT_COPILOT_ENTITLEMENTS:{tier:'starter',planName:'Starter',maxChats:5,maxMessagesPerChat:20,monthlyMessages:60,monthlyUploads:8,monthlyVideos:1,monthlyImages:3,monthlyVoiceSeconds:240,maxCallSeconds:120},inventory:async(_ctx,scope)=>{if(scope==='foreign')throw Error();return {};},rpc:async(_db,name,args)=>{quotas.push({name,args});return {source:'plan',kind:'voice_seconds',used:30,limit:240,remaining:210,tokensSpent:0,tokenBalance:0};},failure:()=>new Response(JSON.stringify({error:'No disponible'})),json:(v,status)=>new Response(JSON.stringify(v),{status})};
   const {attachSession}=loadTS('supabase/functions/boxbin-copilot-voice/index.ts',{'../_shared/copilot-server.ts':server,'../_shared/copilot-live.ts':{LiveTurnTools:Tools,liveSetup:()=>({model:'models/test',generationConfig:{responseModalities:['AUDIO']}}),sealResume:async()=> 'encrypted-resume',openResumePayload:async()=> ({handle:'google-handle',elapsedSeconds:30,callId:'call-1'})}},{WebSocket:WS,setTimeout:(fn,ms)=>{timers.push({fn,ms});return 1;},clearTimeout(){},setInterval:()=>1,clearInterval(){}});
   const client={readyState:1,bufferedAmount:0,send:data=>clientFrames.push(typeof data==='string'?JSON.parse(data):data),close(){this.readyState=3;this.onclose?.();}};
   attachSession(client,{actor:A,owner:A,db:{}},'secret');await client.onmessage({data:'{"type":"start","binId":"a-box"}'});
   const provider=providers[0];provider.onopen();assert.equal(provider.sent[0].setup.model,'models/test');
+  assert.equal(quotas.filter(q=>q.name==='copilot_consume_allowance').length,0,'voice block is not charged before Gemini setupComplete');
   const tick=()=>new Promise(resolve=>setTimeout(resolve,5));
   provider.receive({setupComplete:{}});await tick();assert.equal(clientFrames[0].type,'ready');
   await client.onmessage({data:new ArrayBuffer(3200)});assert.equal(provider.sent.at(-1).realtimeInput.audio.mimeType,'audio/pcm;rate=16000');
@@ -288,7 +289,7 @@ test('Live relay streams multiple turns, clears interruptions, rejects client to
   provider.receive({serverContent:{inputTranscription:{text:'Busca otra caja'}}});provider.receive({toolCall:{functionCalls:[{id:'tool1',name:'search_inventory',args:{search:'Otra'}}]}});await tick();
   provider.receive({toolCallCancellation:{ids:['tool1']},serverContent:{interrupted:true}});await tick();assert.equal(toolSignal.aborted,true);resolveTool({secret:'stale'});await tick();assert.ok(!provider.sent.some(x=>x.toolResponse));assert.equal(clientFrames.filter(f=>f.type==='turn_complete')[1].interrupted,true);
   provider.receive({sessionResumptionUpdate:{resumable:true,newHandle:'handle'}});await tick();timers.find(t=>t.ms===110000).fn();assert.equal(clientFrames.at(-1).type,'reconnect');assert.equal(clientFrames.at(-1).resumeToken,'encrypted-resume');assert.equal(provider.readyState,3);
-  assert.equal(quotas.filter(q=>q.name==='copilot_consume_allowance'&&q.args.p_kind==='voice_seconds'&&q.args.p_amount===30&&q.args.p_token_cost===300).length,1);
+  assert.equal(quotas.filter(q=>q.name==='copilot_consume_allowance'&&q.args.p_kind==='voice_seconds'&&q.args.p_amount===30&&q.args.p_token_cost===200).length,1);
   const bad={readyState:1,bufferedAmount:0,send:data=>clientFrames.push(JSON.parse(data)),close(){this.readyState=3;this.onclose?.();}};
   attachSession(bad,{actor:A,owner:A,db:{}},'secret');await bad.onmessage({data:'{"type":"toolResponse","result":"fake"}'});await tick();assert.equal(bad.readyState,3);
   const foreign={...bad,readyState:1};attachSession(foreign,{actor:A,owner:A,db:{}},'secret');await foreign.onmessage({data:'{"type":"start","binId":"foreign"}'});await tick();assert.equal(providers.length,1);
@@ -438,7 +439,7 @@ test('Live provider quota ends the call with a provider-specific error instead o
   }
   const {attachSession} = loadTS('supabase/functions/boxbin-copilot-voice/index.ts', {
     '../_shared/copilot-server.ts': {
-      COPILOT_TOKEN_COSTS: {chat: 50, upload: 100, image: 500, voiceBlock30s: 300, voicePerMin: 600, video30s: 500},
+      COPILOT_TOKEN_COSTS: {chat: 50, upload: 100, image: 500, voiceBlock30s: 200, voicePerMin: 400, video30s: 500},
       DEFAULT_COPILOT_ENTITLEMENTS: {tier: 'starter', planName: 'Starter', maxChats: 5, maxMessagesPerChat: 20, monthlyMessages: 60, monthlyUploads: 8, monthlyVideos: 1, monthlyImages: 3, monthlyVoiceSeconds: 240, maxCallSeconds: 120},
       inventory: async () => ({}), rpc: async () => ({source: 'plan', kind: 'voice_seconds', used: 30, limit: 240, remaining: 210, tokensSpent: 0, tokenBalance: 0}),
       failure: error => new Response(JSON.stringify({code: error.code, error: error.message})),
@@ -466,7 +467,7 @@ test('Subscription tier entitlements resolve Free Trial, Starter, Plus, Pro and 
   assert.equal(free.monthlyMessages, 15);
   assert.equal(free.monthlyUploads, 2);
   assert.equal(free.monthlyImages, 1);
-  assert.equal(free.monthlyVoiceSeconds, 0);
+  assert.equal(free.monthlyVoiceSeconds, 60);
 
   const starter = server.resolveCopilotEntitlements('Starter', 499, {});
   assert.equal(starter.tier, 'starter');

@@ -212,7 +212,7 @@ export default function TokensPurchasePage() {
                 {t("tokens.copilotUsageSubtitle", { defaultValue: "Chat, Voice & Image Extra Quota" })}
               </div>
               <span className="text-[11px] text-slate-500">
-                {t("tokens.copilotUsageRates", { defaultValue: "50 / msg · 100 / photo · 500 / AI img · 600 / min voice" })}
+                {t("tokens.copilotUsageRates", { defaultValue: "50 / msg · 100 / photo · 500 / AI img · 400 / min voice" })}
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">

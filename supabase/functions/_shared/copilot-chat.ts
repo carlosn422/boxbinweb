@@ -291,7 +291,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       monthlyVoiceSeconds: 240,
       maxCallSeconds: 120
     };
-    const tokenCosts = COPILOT_TOKEN_COSTS || { chat: 50, upload: 100, image: 500, voiceBlock30s: 300, voicePerMin: 600, video30s: 500 };
+    const tokenCosts = COPILOT_TOKEN_COSTS || { chat: 50, upload: 100, image: 500, voiceBlock30s: 200, voicePerMin: 400, video30s: 500 };
     const copilot = limits?.copilot || fallbackEntitlements;
     const kind = input.image ? 'upload' : 'chat';
     const monthlyLimit = input.image ? copilot.monthlyUploads : copilot.monthlyMessages;

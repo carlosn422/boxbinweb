@@ -16,8 +16,8 @@ export const COPILOT_TOKEN_COSTS = {
   chat: 50,
   upload: 100,
   image: 500,
-  voiceBlock30s: 300,
-  voicePerMin: 600,
+  voiceBlock30s: 200,
+  voicePerMin: 400,
   video30s: 500,
 } as const;
 
@@ -29,7 +29,7 @@ const DEFAULTS: Record<CopilotTier, Omit<CopilotPlanLimits, 'tier'>> = {
     monthlyUploads: 2,
     monthlyVideos: 0,
     monthlyImages: 1,
-    monthlyVoiceMinutes: 0,
+    monthlyVoiceMinutes: 1,
     maxCallMinutes: 2,
   },
   starter: {

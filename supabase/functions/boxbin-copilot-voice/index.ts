@@ -46,6 +46,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
   let queue = Promise.resolve(), queuedBytes = 0, turns = 0;
   let callId: string = crypto.randomUUID();
   let elapsedSeconds = 0;
+  let initialBlockCharged = false;
   let latestUsage: any = null;
   let setupTimer: ReturnType<typeof setTimeout> | undefined;
   let billingTicker: ReturnType<typeof setInterval> | undefined;
@@ -187,9 +188,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
         throw new CopilotError('COPILOT_CALL_TIME_LIMIT', 429);
       }
       await rpc(ctx.db, 'copilot_take_quota', { p_actor: ctx.actor, p_kind: 'live_connections', p_limit: 60 });
-      if (!resumed) {
-        await chargeVoiceBlock(0);
-      }
+      initialBlockCharged = Boolean(resumed);
       if (closed) return;
       const setup = liveSetup(initial, input.history, handle, language);
       turn = newTurn();
@@ -221,8 +220,13 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       throw new CopilotError(quota ? 'COPILOT_PROVIDER_QUOTA' : 'COPILOT_UNAVAILABLE', quota ? 429 : 503);
     }
     if (value.setupComplete) {
-      ready = true;
       clearTimeout(setupTimer);
+      if (!initialBlockCharged) {
+        initialBlockCharged = true;
+        await chargeVoiceBlock(0);
+        if (closed) return;
+      }
+      ready = true;
       send({ type: 'ready' });
       if (latestUsage) send({ type: 'usage', usage: latestUsage, elapsedSeconds, maxCallSeconds: entitlements.maxCallSeconds });
       startBillingTicker();

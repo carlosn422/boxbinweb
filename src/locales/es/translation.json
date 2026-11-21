@@ -1030,6 +1030,7 @@
     "quotaBarVoice": "Voz {{left}}m",
     "quotaBarTokens": "{{tokens}} tokens",
     "tokensUsedNotice": "Cuota mensual agotada · Se usaron {{spent}} tokens (quedan {{balance}})",
+    "tokensUsedPlanNotIncludedNotice": "No incluido en tu plan · Se usaron {{spent}} tokens (quedan {{balance}})",
     "tokensRequiredCta": "Necesitas {{tokens}} tokens o mejorar tu plan para continuar.",
     "buyTokensAction": "Comprar Tokens IA",
     "upgradePlanAction": "Mejorar Plan",

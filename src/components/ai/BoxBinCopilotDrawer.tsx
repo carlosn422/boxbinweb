@@ -161,7 +161,8 @@ export function BoxBinCopilotDrawer() {
       };
     });
     if (billing.source === 'tokens' && billing.tokensSpent > 0) {
-      toast.info(ct('tokensUsedNotice', { spent: billing.tokensSpent, balance: billing.tokenBalance.toLocaleString() }));
+      const noticeKey = billing.limit === 0 ? 'tokensUsedPlanNotIncludedNotice' : 'tokensUsedNotice';
+      toast.info(ct(noticeKey, { spent: billing.tokensSpent, balance: billing.tokenBalance.toLocaleString() }));
     }
   }, []);
   const voiceProposalMessage = [...messages].reverse().find(message => message.sender === 'copilot' && message.actionProposal && message.actionProposal.status !== 'executed' && message.actionProposal.status !== 'cancelled');
