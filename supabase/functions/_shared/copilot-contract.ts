@@ -1,5 +1,5 @@
 export class CopilotError extends Error {
-  constructor(public code: string, public status = 400) {
+  constructor(public code: string, public status = 400, public details?: Record<string, unknown>) {
     super(code);
   }
 }

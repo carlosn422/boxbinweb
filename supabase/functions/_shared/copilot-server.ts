@@ -13,14 +13,132 @@ export const json = (data: unknown, status = 200) => new Response(JSON.stringify
     'Cache-Control': 'no-store'
   }
 });
+export const COPILOT_TOKEN_COSTS = {
+  chat: 50,
+  upload: 100,
+  image: 500,
+  voiceBlock30s: 300,
+  voicePerMin: 600,
+  video30s: 500
+} as const;
+
+export type CopilotTier = 'free' | 'starter' | 'plus' | 'pro';
+
+export interface CopilotEntitlements {
+  tier: CopilotTier;
+  planName: string;
+  maxChats: number;
+  maxMessagesPerChat: number;
+  monthlyMessages: number;
+  monthlyUploads: number;
+  monthlyVideos: number;
+  monthlyImages: number;
+  monthlyVoiceSeconds: number;
+  maxCallSeconds: number;
+  periodStart?: string;
+  periodEnd?: string;
+}
+
+export const COPILOT_TIER_DEFAULTS: Record<CopilotTier, Omit<CopilotEntitlements, 'tier' | 'planName' | 'periodStart' | 'periodEnd'>> = {
+  free: {
+    maxChats: 2,
+    maxMessagesPerChat: 20,
+    monthlyMessages: 15,
+    monthlyUploads: 2,
+    monthlyVideos: 0,
+    monthlyImages: 1,
+    monthlyVoiceSeconds: 0,
+    maxCallSeconds: 120
+  },
+  starter: {
+    maxChats: 5,
+    maxMessagesPerChat: 30,
+    monthlyMessages: 60,
+    monthlyUploads: 8,
+    monthlyVideos: 1,
+    monthlyImages: 3,
+    monthlyVoiceSeconds: 240,
+    maxCallSeconds: 120
+  },
+  plus: {
+    maxChats: 10,
+    maxMessagesPerChat: 36,
+    monthlyMessages: 150,
+    monthlyUploads: 20,
+    monthlyVideos: 2,
+    monthlyImages: 7,
+    monthlyVoiceSeconds: 600,
+    maxCallSeconds: 300
+  },
+  pro: {
+    maxChats: 20,
+    maxMessagesPerChat: 44,
+    monthlyMessages: 350,
+    monthlyUploads: 50,
+    monthlyVideos: 5,
+    monthlyImages: 15,
+    monthlyVoiceSeconds: 1200,
+    maxCallSeconds: 600
+  }
+};
+
+export function inferCopilotTier(planName = '', unitAmount = 0): CopilotTier {
+  const name = planName.toLowerCase();
+  if (/\bpro\b|enterprise|business/.test(name)) return 'pro';
+  if (/\bplus\b/.test(name)) return 'plus';
+  if (/\bstarter\b|\bbasic\b|\bbásico\b/.test(name)) return 'starter';
+  if (/\bfree\b|\btrial\b|\bgratis\b/.test(name)) return 'free';
+  if (unitAmount >= 1200) return 'pro';
+  if (unitAmount >= 700) return 'plus';
+  if (unitAmount > 0) return 'starter';
+  return 'free';
+}
+
+export function resolveCopilotEntitlements(
+  planName: string,
+  unitAmount: number,
+  metadata: Record<string, unknown> = {}
+): CopilotEntitlements {
+  const tier = inferCopilotTier(planName, unitAmount);
+  const base = COPILOT_TIER_DEFAULTS[tier];
+  const metaInt = (key: string, fallback: number, min: number, max: number) => {
+    const raw = metadata[key];
+    if (raw == null || raw === '') return fallback;
+    const n = Number(raw);
+    if (!Number.isSafeInteger(n) || n < min || n > max) return fallback;
+    return n;
+  };
+  const voiceMins = metaInt('ai_voice_mins_month', Math.round(base.monthlyVoiceSeconds / 60), 0, 10000);
+  const maxCallMins = metaInt('ai_max_call_mins', Math.round(base.maxCallSeconds / 60), 1, 60);
+  return {
+    tier,
+    planName: planName || (tier === 'free' ? 'Free Trial' : tier[0].toUpperCase() + tier.slice(1)),
+    maxChats: metaInt('ai_chats', base.maxChats, 1, 200),
+    maxMessagesPerChat: metaInt('ai_msgs_per_chat', base.maxMessagesPerChat, 2, 50),
+    monthlyMessages: metaInt('ai_msgs_month', base.monthlyMessages, 0, 100000),
+    monthlyUploads: metaInt('ai_uploads_month', base.monthlyUploads, 0, 100000),
+    monthlyVideos: metaInt('ai_videos_month', base.monthlyVideos, 0, 10000),
+    monthlyImages: metaInt('ai_images_month', base.monthlyImages, 0, 10000),
+    monthlyVoiceSeconds: voiceMins * 60,
+    maxCallSeconds: maxCallMins * 60
+  };
+}
+
+export const DEFAULT_COPILOT_ENTITLEMENTS: CopilotEntitlements = resolveCopilotEntitlements('Starter', 499, {});
+
 const messages: Record<string, string> = {
   COPILOT_UNAUTHORIZED: 'Inicia sesión para usar el copiloto.',
   COPILOT_INVALID: 'Revisa los datos de la solicitud.',
   COPILOT_NOT_FOUND: 'El registro no existe o no pertenece a tu cuenta.',
   COPILOT_QUOTA: 'Se alcanzó un límite de uso del asistente. Intenta más tarde.',
   COPILOT_DAILY_QUOTA: 'Alcanzaste el límite diario de BoxBin para chat y voz. Se renueva a las 00:00 UTC.',
-  COPILOT_VOICE_QUOTA: 'Alcanzaste el límite diario de conexiones de voz. Se renueva a las 00:00 UTC. Puedes usar el chat si aún tienes consultas disponibles.',
-  COPILOT_IMAGE_QUOTA: 'Alcanzaste el límite diario de imágenes. Se renueva a las 00:00 UTC.',
+  COPILOT_VOICE_QUOTA: 'Alcanzaste el límite de conexiones de voz. Intenta más tarde o compra tokens para continuar.',
+  COPILOT_IMAGE_QUOTA: 'Alcanzaste el límite de imágenes incluidas en tu plan.',
+  COPILOT_INSUFFICIENT_TOKENS: 'Agotaste la cuota mensual de tu plan y no tienes suficientes tokens IA para esta acción.',
+  COPILOT_CHAT_LIMIT: 'Alcanzaste el límite de chats guardados de tu plan para este ciclo. Podrás borrar chats anteriores cuando se renueve tu suscripción.',
+  COPILOT_DELETE_LOCKED: 'Los chats creados en este ciclo solo se pueden borrar cuando se renueve tu suscripción.',
+  COPILOT_MESSAGE_LIMIT: 'Alcanzaste el límite de mensajes por conversación de tu plan. Abre un chat nuevo o compra tokens IA.',
+  COPILOT_CALL_TIME_LIMIT: 'Esta llamada alcanzó el tiempo máximo permitido por sesión. Puedes iniciar una nueva llamada.',
   COPILOT_PROVIDER_QUOTA: 'El proveedor de IA alcanzó su cuota o límite de solicitudes. Intenta más tarde; si continúa, el administrador debe revisar la cuota del servicio.',
   COPILOT_AUDIO_RATE: 'Se interrumpió la llamada porque el audio llegó demasiado rápido. Inicia una nueva llamada.',
   COPILOT_PLAN_LIMIT: 'Tu plan no permite agregar más registros en este destino.',
@@ -40,7 +158,8 @@ export function failure(error: unknown) {
   });
   return json({
     error: messages[e.code] || 'No se pudo completar la solicitud. Intenta nuevamente.',
-    code: e.code
+    code: e.code,
+    ...(e.details || {})
   }, e.status);
 }
 export async function readBody(req: Request) {
@@ -113,10 +232,16 @@ export async function rpc(db: any, name: string, args: Record<string, unknown>):
     const code = Object.keys(messages).find(c => error.message?.includes(c));
     if (code === 'COPILOT_QUOTA') {
       const kind = args.p_kind;
-      const quotaCode = name === 'copilot_claim_image' || kind === 'image' ? 'COPILOT_IMAGE_QUOTA'
-        : kind === 'live_connections' ? 'COPILOT_VOICE_QUOTA'
+      const quotaCode = name === 'copilot_claim_image' || name === 'copilot_claim_image_v2' || kind === 'image' ? 'COPILOT_IMAGE_QUOTA'
+        : kind === 'live_connections' || kind === 'voice_seconds' ? 'COPILOT_VOICE_QUOTA'
         : kind === 'chat' ? 'COPILOT_DAILY_QUOTA' : 'COPILOT_QUOTA';
       throw new CopilotError(quotaCode, 429);
+    }
+    if (code === 'COPILOT_INSUFFICIENT_TOKENS') {
+      throw new CopilotError('COPILOT_INSUFFICIENT_TOKENS', 402, {
+        ...(typeof args.p_token_cost === 'number' ? { requiredTokens: args.p_token_cost } : {}),
+        ...(typeof args.p_kind === 'string' ? { kind: args.p_kind } : {})
+      });
     }
     throw new CopilotError(code || 'COPILOT_UNAVAILABLE', code === 'COPILOT_QUOTA' || code === 'COPILOT_BUSY' ? 429 : code ? 400 : 503);
   }
@@ -135,15 +260,38 @@ async function stripeGet(path: string) {
   if (!res.ok) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
   return await res.json();
 }
+export interface PlanLimits {
+  items: number;
+  bins: number;
+  locations: number;
+  copilot: CopilotEntitlements;
+}
 const planCache = new Map<string, {
   expires: number;
-  limits: {
-    items: number;
-    bins: number;
-    locations: number;
-  };
+  limits: PlanLimits;
 }>();
-export async function plan(ctx: Context) {
+function utcMonthWindow(now = new Date()) {
+  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+  return { periodStart: start.toISOString(), periodEnd: end.toISOString() };
+}
+async function syncEntitlements(ctx: Context, copilot: CopilotEntitlements) {
+  if (!ctx.db?.rpc) return;
+  try {
+    await ctx.db.rpc('copilot_sync_entitlements', {
+      p_actor: ctx.actor,
+      p_tier: copilot.tier,
+      p_plan_name: copilot.planName,
+      p_max_chats: copilot.maxChats,
+      p_max_messages_per_chat: copilot.maxMessagesPerChat,
+      p_period_start: copilot.periodStart || null,
+      p_period_end: copilot.periodEnd || null
+    });
+  } catch (e) {
+    console.error('Failed to sync copilot entitlements', e);
+  }
+}
+export async function plan(ctx: Context): Promise<PlanLimits> {
   const {
     data,
     error
@@ -154,22 +302,54 @@ export async function plan(ctx: Context) {
     const cached = planCache.get(cacheKey);
     if (cached && cached.expires > Date.now()) return cached.limits;
     if (!sub.planId || !/^price_[A-Za-z0-9]+$/.test(sub.planId)) continue;
-    // Legacy subscriptions imported from the former billing store do not have
-    // a Stripe subscription id. Their active status is the migrated
-    // entitlement; requiring a Stripe lookup here would reject every one of
-    // those users before the Copilot request reaches Gemini.
+    // Free plans activated via activate_free and legacy migrated rows do not
+    // have a Stripe subscription id. Read the Stripe price when available so
+    // Free Trial / legacy plans receive accurate tier quotas without failing
+    // if a legacy price id was removed in Stripe.
     if (!sub.stripeSubscriptionId && sub.status === 'active') {
-      const limits = { items: 100, bins: 100, locations: 1000000 };
+      let price: any = null;
+      try {
+        price = await stripeGet(`prices/${sub.planId}?expand[]=product`);
+      } catch {
+        price = null;
+      }
+      const metadata = record(price?.product?.metadata);
+      const cap = (key: string, fallback: number) => {
+        const value = metadata[key];
+        if (value == null || value === '') return fallback;
+        const n = Number(value);
+        return Number.isSafeInteger(n) && n >= 0 && n <= 1000000 ? n : fallback;
+      };
+      const cycle = utcMonthWindow();
+      const baseCopilot = price
+        ? resolveCopilotEntitlements(String(price.product?.name || 'Free Trial'), Number(price.unit_amount || 0), metadata)
+        : resolveCopilotEntitlements('Free Trial', 0, {});
+      const copilot: CopilotEntitlements = { ...baseCopilot, ...cycle };
+      const limits: PlanLimits = {
+        items: cap('items', 100) || 100,
+        bins: cap('bins', 100),
+        locations: cap('locations', 1000000) || 1000000,
+        copilot
+      };
+      if (planCache.size > 200) planCache.clear();
       planCache.set(cacheKey, { expires: Date.now() + 30000, limits });
+      await syncEntitlements(ctx, copilot);
       return limits;
     }
     const price = await stripeGet(`prices/${sub.planId}?expand[]=product`);
     if (!price) continue;
     if (price.unit_amount === 0 && (price.active === false || price.product?.active === false)) continue;
+    let cycle = utcMonthWindow();
     if (price.unit_amount !== 0) {
       if (!/^sub_[A-Za-z0-9]+$/.test(sub.stripeSubscriptionId || '')) continue;
       const live = await stripeGet(`subscriptions/${sub.stripeSubscriptionId}?expand[]=customer`);
       if (!live || !['active', 'trialing'].includes(live.status) || live.customer?.metadata?.userId !== ctx.owner || !live.items?.data?.some((i: any) => i.price?.id === sub.planId)) continue;
+      if (typeof live.current_period_start === 'number' && typeof live.current_period_end === 'number') {
+        cycle = {
+          periodStart: new Date(live.current_period_start * 1000).toISOString(),
+          periodEnd: new Date(live.current_period_end * 1000).toISOString()
+        };
+      }
     } else if (sub.status && sub.status !== 'active' && sub.status !== 'trialing') continue;
     const metadata = record(price.product?.metadata);
     const cap = (key: string, fallback: number) => {
@@ -179,16 +359,22 @@ export async function plan(ctx: Context) {
       if (!Number.isSafeInteger(n) || n < 0 || n > 1000000) throw new CopilotError('COPILOT_CONFIGURATION', 503);
       return n;
     };
-    const limits = {
+    const copilot: CopilotEntitlements = {
+      ...resolveCopilotEntitlements(String(price.product?.name || ''), Number(price.unit_amount || 0), metadata),
+      ...cycle
+    };
+    const limits: PlanLimits = {
       items: cap('items', 100) || 100,
       bins: cap('bins', 100),
-      locations: cap('locations', 50) || 1000000
+      locations: cap('locations', 50) || 1000000,
+      copilot
     };
     if (planCache.size > 200) planCache.clear();
     planCache.set(cacheKey, {
       expires: Date.now() + 30000,
       limits
     });
+    await syncEntitlements(ctx, copilot);
     return limits;
   }
   throw new CopilotError('COPILOT_SUBSCRIPTION', 403);

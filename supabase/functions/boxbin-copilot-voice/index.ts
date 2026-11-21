@@ -1,6 +1,8 @@
-import { authenticate, failure, inventory, json, plan, rpc, type Context } from '../_shared/copilot-server.ts';
+import { authenticate, COPILOT_TOKEN_COSTS, DEFAULT_COPILOT_ENTITLEMENTS, failure, inventory, json, plan, rpc, type Context, type CopilotEntitlements } from '../_shared/copilot-server.ts';
 import { CopilotError, detectLanguage, prepareInput, record, text, type CopilotLanguage } from '../_shared/copilot-contract.ts';
-import { LiveTurnTools, liveSetup, openResume, sealResume } from '../_shared/copilot-live.ts';
+import { LiveTurnTools, liveSetup, openResumePayload, sealResume } from '../_shared/copilot-live.ts';
+
+const VOICE_BILLING_BLOCK_SECONDS = 30;
 
 // Only audio/control frames cross this relay. Model config, tools and tool results
 // are always constructed by the authenticated server, never supplied by the client.
@@ -13,7 +15,7 @@ export async function handler(req: Request): Promise<Response> {
     const bearer = protocols.find(p => p.startsWith('bearer.'))?.slice(7) || queryJwt || undefined;
     if (!protocols.includes('boxbin-live-v1') || !bearer || bearer.length > 8000 || !/^[a-zA-Z0-9_.-]+$/.test(bearer)) throw new CopilotError('COPILOT_UNAUTHORIZED', 401);
     const ctx = await authenticate(new Request(req.url, { headers: { Authorization: `Bearer ${bearer}` } }));
-    await plan(ctx);
+    const limits = await plan(ctx);
     const key = Deno.env.get('GEMINI_API_KEY');
     if (!key) throw new CopilotError('COPILOT_CONFIGURATION', 503);
     // Explicitly negotiate the application subprotocol requested by the
@@ -29,12 +31,12 @@ export async function handler(req: Request): Promise<Response> {
     });
     const edgeRuntime = (globalThis as { EdgeRuntime?: { waitUntil?: (promise: Promise<unknown>) => void } }).EdgeRuntime;
     edgeRuntime?.waitUntil?.(socketClosed);
-    attachSession(socket, ctx, key, Math.max(20000, 130000 - (Date.now() - startedAt)));
+    attachSession(socket, ctx, key, Math.max(20000, 130000 - (Date.now() - startedAt)), limits?.copilot);
     return response;
   } catch (error) { return failure(error); }
 }
 
-export function attachSession(socket: WebSocket, ctx: Context, key: string, duration = 130000) {
+export function attachSession(socket: WebSocket, ctx: Context, key: string, duration = 130000, entitlements: CopilotEntitlements = DEFAULT_COPILOT_ENTITLEMENTS) {
   let language: CopilotLanguage = 'en';
   const localized = (en: string, es: string) => language === 'es' ? es : en;
   let provider: WebSocket | undefined;
@@ -42,13 +44,17 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
   let scope: string | null = null, initial: any, checkpoint: string | null = null;
   let lastInput = Date.now(), lastPcm = Date.now(), audioCredit = 64000;
   let queue = Promise.resolve(), queuedBytes = 0, turns = 0;
+  let callId: string = crypto.randomUUID();
+  let elapsedSeconds = 0;
+  let latestUsage: any = null;
   let setupTimer: ReturnType<typeof setTimeout> | undefined;
+  let billingTicker: ReturnType<typeof setInterval> | undefined;
   let turn: ReturnType<typeof newTurn> | undefined;
   const cancelled = new Set<string>();
   const pending = new Set<string>();
   const jobs = new Map<string, AbortController>();
   function newTurn() {
-    return { id: crypto.randomUUID(), input: '', output: '', audio: 0, quota: null as Promise<unknown> | null, tools: new LiveTurnTools(ctx, scope, initial), abort: new AbortController() };
+    return { id: crypto.randomUUID(), input: '', output: '', audio: 0, tools: new LiveTurnTools(ctx, scope, initial), abort: new AbortController() };
   }
   const send = (data: unknown) => {
     if (closed || socket.readyState !== WebSocket.OPEN) return;
@@ -64,15 +70,52 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
   function close() {
     if (closed) return;
     closed = true; ready = false;
-    clearTimeout(idle); clearTimeout(rotation); clearTimeout(deadline); clearTimeout(setupTimer); clearInterval(silence);
+    clearTimeout(idle); clearTimeout(rotation); clearTimeout(deadline); clearTimeout(setupTimer); clearInterval(silence); clearInterval(billingTicker);
     turn?.abort.abort(); for (const job of jobs.values()) job.abort();
     provider?.close(); socket.close(1000);
   }
   async function fail(error: unknown) {
     if (closed) return;
     const detail = await failure(error).json();
-    send({ type: 'error', code: detail.code, message: detail.error });
+    send({ type: 'error', code: detail.code, message: detail.error, ...(typeof detail.requiredTokens === 'number' ? { requiredTokens: detail.requiredTokens } : {}) });
     close();
+  }
+  async function chargeVoiceBlock(blockIndex: number) {
+    const usage = await rpc(ctx.db, 'copilot_consume_allowance', {
+      p_actor: ctx.actor,
+      p_kind: 'voice_seconds',
+      p_amount: VOICE_BILLING_BLOCK_SECONDS,
+      p_monthly_limit: entitlements.monthlyVoiceSeconds,
+      p_token_cost: COPILOT_TOKEN_COSTS.voiceBlock30s,
+      p_receipt: `copilot:voice:${callId}:block:${blockIndex}`
+    });
+    latestUsage = usage || null;
+    return usage;
+  }
+  function startBillingTicker() {
+    clearInterval(billingTicker);
+    billingTicker = setInterval(() => {
+      if (!ready || closed) return;
+      elapsedSeconds += VOICE_BILLING_BLOCK_SECONDS;
+      if (elapsedSeconds >= entitlements.maxCallSeconds) {
+        send({
+          type: 'ended',
+          code: 'COPILOT_CALL_TIME_LIMIT',
+          message: localized(
+            `This call reached the ${Math.round(entitlements.maxCallSeconds / 60)}-minute session limit. You can start another call.`,
+            `Esta llamada alcanzó el límite de ${Math.round(entitlements.maxCallSeconds / 60)} minutos por sesión. Puedes iniciar otra llamada.`
+          )
+        });
+        close();
+        return;
+      }
+      const blockIndex = Math.floor(elapsedSeconds / VOICE_BILLING_BLOCK_SECONDS);
+      void chargeVoiceBlock(blockIndex).then(usage => {
+        if (!closed && usage) {
+          send({ type: 'usage', usage, elapsedSeconds, maxCallSeconds: entitlements.maxCallSeconds });
+        }
+      }).catch(error => { void fail(error); });
+    }, VOICE_BILLING_BLOCK_SECONDS * 1000);
   }
   function complete(interrupted = false) {
     if (!turn) return;
@@ -88,7 +131,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       } });
     }
     turn = newTurn();
-    if (turns >= 10) { send({ type: 'ended', message: localized('This 10-turn call ended. Start another call or open a new chat.', 'Terminó esta llamada de 10 turnos. Puedes iniciar otra llamada o abrir un chat nuevo.') }); close(); }
+    if (turns >= 20) { send({ type: 'ended', message: localized('This voice session ended. Start another call or open a new chat.', 'Terminó esta sesión de voz. Puedes iniciar otra llamada o abrir un chat nuevo.') }); close(); }
   }
   function rotate(force = false) {
     rotating = true;
@@ -136,8 +179,17 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       const input = prepareInput({ query: 'Voice conversation', language: data.language, binId: data.binId, chatHistory: data.chatHistory });
       scope = input.binId; language = input.language;
       initial = await inventory(ctx, scope); // Verify scope before any provider connection.
-      const handle = data.resumeToken ? await openResume(data.resumeToken, ctx, scope, language) : undefined;
-      await rpc(ctx.db, 'copilot_take_quota', { p_actor: ctx.actor, p_kind: 'live_connections', p_limit: 30 });
+      const resumed = data.resumeToken ? await openResumePayload(data.resumeToken, ctx, scope, language) : undefined;
+      const handle = resumed?.handle;
+      if (resumed?.callId) callId = resumed.callId;
+      if (typeof resumed?.elapsedSeconds === 'number') elapsedSeconds = resumed.elapsedSeconds;
+      if (elapsedSeconds >= entitlements.maxCallSeconds) {
+        throw new CopilotError('COPILOT_CALL_TIME_LIMIT', 429);
+      }
+      await rpc(ctx.db, 'copilot_take_quota', { p_actor: ctx.actor, p_kind: 'live_connections', p_limit: 60 });
+      if (!resumed) {
+        await chargeVoiceBlock(0);
+      }
       if (closed) return;
       const setup = liveSetup(initial, input.history, handle, language);
       turn = newTurn();
@@ -168,16 +220,19 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       const quota = value.error.code === 429 || value.error.code === 402 || value.error.status === 'RESOURCE_EXHAUSTED';
       throw new CopilotError(quota ? 'COPILOT_PROVIDER_QUOTA' : 'COPILOT_UNAVAILABLE', quota ? 429 : 503);
     }
-    if (value.setupComplete) { ready = true; clearTimeout(setupTimer); send({ type: 'ready' }); }
+    if (value.setupComplete) {
+      ready = true;
+      clearTimeout(setupTimer);
+      send({ type: 'ready' });
+      if (latestUsage) send({ type: 'usage', usage: latestUsage, elapsedSeconds, maxCallSeconds: entitlements.maxCallSeconds });
+      startBillingTicker();
+    }
     if (value.goAway) rotate();
     const content = value.serverContent;
     if (content?.interrupted) { send({ type: 'interrupted' }); complete(true); }
     if (closed || !turn) return;
     if (content?.inputTranscription?.text || content?.outputTranscription?.text || content?.modelTurn || value.toolCall) {
       checkpoint = null; // A checkpoint is reusable only while idle.
-      turn.quota ??= rpc(ctx.db, 'copilot_take_quota', { p_actor: ctx.actor, p_kind: 'chat', p_limit: 100 });
-      await turn.quota;
-      if (closed) return;
     }
     if (content?.inputTranscription?.text) {
       turn.input += content.inputTranscription.text;
@@ -226,7 +281,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
     }
     if (content?.turnComplete && !content.interrupted) complete();
     if (value.sessionResumptionUpdate?.resumable && value.sessionResumptionUpdate.newHandle && !turn?.input && !turn?.output && !turn?.audio && !pending.size) {
-      checkpoint = await sealResume(value.sessionResumptionUpdate.newHandle, ctx, scope, language);
+      checkpoint = await sealResume(value.sessionResumptionUpdate.newHandle, ctx, scope, language, { elapsedSeconds, callId });
     }
     if (rotating) rotate();
   }

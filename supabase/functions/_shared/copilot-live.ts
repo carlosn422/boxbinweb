@@ -92,19 +92,31 @@ async function resumeKey() {
   return await crypto.subtle.importKey('raw', digest, 'AES-GCM', false, ['encrypt', 'decrypt']);
 }
 const binding = (ctx: Context, scope: string | null, language: CopilotLanguage) => new TextEncoder().encode(JSON.stringify([ctx.actor, ctx.owner, scope, liveModel(), language]));
-export async function sealResume(handle: string, ctx: Context, scope: string | null, language: CopilotLanguage = 'en') {
+export interface ResumePayload {
+  handle: string;
+  elapsedSeconds?: number;
+  callId?: string;
+}
+export async function sealResume(handle: string, ctx: Context, scope: string | null, language: CopilotLanguage = 'en', meta?: { elapsedSeconds?: number; callId?: string }) {
   if (!handle || handle.length > 16000) throw new CopilotError('COPILOT_INVALID');
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const bytes = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: binding(ctx, scope, language) }, await resumeKey(), new TextEncoder().encode(JSON.stringify({ handle, expires: Date.now() + 300000 })));
+  const bytes = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: binding(ctx, scope, language) }, await resumeKey(), new TextEncoder().encode(JSON.stringify({ handle, ...(meta || {}), expires: Date.now() + 300000 })));
   return btoa(String.fromCharCode(...iv, ...new Uint8Array(bytes)));
 }
-export async function openResume(token: string, ctx: Context, scope: string | null, language: CopilotLanguage = 'en') {
+export async function openResumePayload(token: string, ctx: Context, scope: string | null, language: CopilotLanguage = 'en'): Promise<ResumePayload> {
   try {
     if (typeof token !== 'string' || token.length > 24000) throw new Error();
     const bytes = Uint8Array.from(atob(token), c => c.charCodeAt(0));
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: bytes.slice(0, 12), additionalData: binding(ctx, scope, language) }, await resumeKey(), bytes.slice(12));
     const value = JSON.parse(new TextDecoder().decode(plain));
     if (value.expires < Date.now() || typeof value.handle !== 'string') throw new Error();
-    return value.handle as string;
+    return {
+      handle: value.handle as string,
+      ...(typeof value.elapsedSeconds === 'number' && Number.isFinite(value.elapsedSeconds) && value.elapsedSeconds >= 0 ? { elapsedSeconds: value.elapsedSeconds } : {}),
+      ...(typeof value.callId === 'string' && value.callId.length <= 120 ? { callId: value.callId } : {})
+    };
   } catch { throw new CopilotError('COPILOT_INVALID'); }
+}
+export async function openResume(token: string, ctx: Context, scope: string | null, language: CopilotLanguage = 'en') {
+  return (await openResumePayload(token, ctx, scope, language)).handle;
 }

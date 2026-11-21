@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
+import { resolvePlanCopilotLimits } from "@/lib/copilotPlans";
 
 
 
@@ -517,6 +518,24 @@ export default function BillingPage() {
                             </span>
                           </div>
                         )}
+
+                        {(() => {
+                          const ai = resolvePlanCopilotLimits(plan.product?.name || "", plan.unit_amount || 0, plan.metadata || {});
+                          return (
+                            <div className="pt-2 mt-1 border-t border-slate-100 space-y-1 text-[11px] text-slate-600">
+                              <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                                <Sparkles className="w-3 h-3 text-brand-600" />
+                                <span>BoxBin Copilot AI / mo</span>
+                              </div>
+                              <div className="flex flex-wrap justify-between gap-1">
+                                <span>{ai.monthlyMessages} msgs · {ai.maxChats} chats ({ai.maxMessagesPerChat}/chat)</span>
+                              </div>
+                              <div className="flex flex-wrap justify-between gap-1">
+                                <span>{ai.monthlyUploads} photos · {ai.monthlyImages} AI imgs · {ai.monthlyVoiceMinutes}m voice</span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Standard Feature Highlights */}

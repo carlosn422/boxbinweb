@@ -38,6 +38,10 @@
 .copilot-context > span:first-child svg { color: #a27a14; }
 .copilot-context > span:last-child:not(:first-child) { color: #82796a; font-variant-numeric: tabular-nums; }
 .copilot-context button { color: var(--brand-ink); font-size: 11px; }
+.copilot-quota-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; font-size: 11px; color: #6e6350; }
+.copilot-quota-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border-radius: 7px; border: 1px solid #ece3d4; background: #faf6ee; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.copilot-quota-tokens { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 7px; border: 1px solid #f0d477; background: #fff8dc; color: #755817; font-weight: 600; font-variant-numeric: tabular-nums; cursor: pointer; }
+.copilot-quota-tokens:hover { background: #fff0b3; }
 .copilot-history { background: #fffcf7; }
 .copilot-messages { padding: 20px 24px 28px; scrollbar-width: thin; scrollbar-color: #dfd5c5 transparent; }
 .copilot-thread { display: flex; flex-direction: column; gap: 24px; width: 100%; max-width: 620px; margin-inline: auto; }

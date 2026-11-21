@@ -52,6 +52,7 @@ import PaymentMethodForm from "./PaymentMethodForm";
 import { stripePromise } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import { useTranslation } from "react-i18next";
+import { resolvePlanCopilotLimits } from "@/lib/copilotPlans";
 
 
 
@@ -237,6 +238,11 @@ export default function ActiveSubscriptionPage() {
   const binsLimit = subscription?.metadata?.bins || "—";
   const itemsLimit = subscription?.metadata?.items || "—";
   const locationsLimit = subscription?.metadata?.locations || "—";
+  const copilotLimits = resolvePlanCopilotLimits(
+    subscription?.plan || "",
+    Math.round((subscription?.price || 0) * 100),
+    subscription?.metadata || {}
+  );
 
   return (
     <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
@@ -467,6 +473,37 @@ export default function ActiveSubscriptionPage() {
                   </div>
                 </div>
 
+                {/* Copilot AI Monthly Allowances */}
+                <div className="border border-slate-200/70 rounded-lg p-3.5 bg-slate-50/40 space-y-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-brand-600" />
+                      BoxBin Copilot AI Included / Month
+                    </h4>
+                    <span className="text-[11px] text-slate-500">
+                      + AI Tokens for extra usage
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-slate-700">
+                    <div className="rounded-md border border-slate-200/70 bg-white px-2.5 py-2">
+                      <div className="text-[10px] text-slate-500 uppercase">Saved Chats</div>
+                      <div className="font-bold text-slate-900">{copilotLimits.maxChats} <span className="font-normal text-slate-500">({copilotLimits.maxMessagesPerChat} msgs/chat)</span></div>
+                    </div>
+                    <div className="rounded-md border border-slate-200/70 bg-white px-2.5 py-2">
+                      <div className="text-[10px] text-slate-500 uppercase">Text Queries</div>
+                      <div className="font-bold text-slate-900">{copilotLimits.monthlyMessages} <span className="font-normal text-slate-500">/mo</span></div>
+                    </div>
+                    <div className="rounded-md border border-slate-200/70 bg-white px-2.5 py-2">
+                      <div className="text-[10px] text-slate-500 uppercase">Photos &amp; AI Imgs</div>
+                      <div className="font-bold text-slate-900">{copilotLimits.monthlyUploads} <span className="font-normal text-slate-500">up ·</span> {copilotLimits.monthlyImages} <span className="font-normal text-slate-500">gen</span></div>
+                    </div>
+                    <div className="rounded-md border border-slate-200/70 bg-white px-2.5 py-2">
+                      <div className="text-[10px] text-slate-500 uppercase">Voice &amp; Video</div>
+                      <div className="font-bold text-slate-900">{copilotLimits.monthlyVoiceMinutes}m <span className="font-normal text-slate-500">voice ·</span> {copilotLimits.monthlyVideos} <span className="font-normal text-slate-500">vid</span></div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Plan Highlights */}
                 <div className="border border-slate-200/70 rounded-lg p-3.5 bg-white space-y-2.5">
                   <h4 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">
@@ -533,7 +570,7 @@ export default function ActiveSubscriptionPage() {
                 </Badge>
               </div>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Scan video footage and camera photos to auto-populate boxes and smart containers with automatic categorization.
+                Use AI Tokens to scan video/photos and unlock extra BoxBin Copilot chat messages, image uploads, AI illustrations, and voice call minutes once your monthly plan quota is used.
               </p>
               <Button
                 variant="outline"
@@ -667,6 +704,7 @@ export default function ActiveSubscriptionPage() {
                     const isSelected = selectedPlan === plan.id;
                     const isUpgradingThis = upgradingToPlan === plan.id;
                     const priceFormatted = ((plan.unit_amount || 0) / 100).toFixed(2);
+                    const tierCopilot = resolvePlanCopilotLimits(plan.product?.name || "", plan.unit_amount || 0, plan.metadata || {});
 
                     return (
                       <div
@@ -736,6 +774,12 @@ export default function ActiveSubscriptionPage() {
                                 <span><strong>{plan.metadata.locations}</strong> Locations</span>
                               </div>
                             )}
+                            <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-500">
+                              <Sparkles className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                              <span>
+                                <strong>{tierCopilot.monthlyMessages}</strong> AI msgs · <strong>{tierCopilot.maxChats}</strong> chats · <strong>{tierCopilot.monthlyVoiceMinutes}m</strong> voice · <strong>{tierCopilot.monthlyImages}</strong> AI imgs/mo
+                              </span>
+                            </div>
                           </div>
                         </div>
 

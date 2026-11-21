@@ -11,9 +11,11 @@ import {
   type CopilotDocument,
 } from "@/lib/copilotDocument";
 import {
+  CopilotServiceError,
   generateCopilotImage,
   retrieveCopilotImage,
   type ActionProposal,
+  type CopilotBillingInfo,
 } from "@/services/boxbinCopilotService";
 import {
   Download,
@@ -46,6 +48,8 @@ interface Props {
   locationName?: string;
   onClose: () => void;
   onComplete: (data: Record<string, any>, message: string) => void;
+  onBuyTokens?: () => void;
+  onBillingUpdate?: (billing?: CopilotBillingInfo) => void;
 }
 
 const fieldClass = "w-full rounded-xl border border-slate-200 bg-white p-2 text-xs sm:text-sm focus:border-slate-400 focus:outline-none transition-colors";
@@ -66,6 +70,8 @@ export function CopilotArtifactEditor({
   locationName,
   onClose,
   onComplete,
+  onBuyTokens,
+  onBillingUpdate,
 }: Props) {
   useTranslation();
   const isImage = proposal.type === "generate_image";
@@ -79,6 +85,7 @@ export function CopilotArtifactEditor({
   const working = useRef(false);
   const mounted = useRef(true);
   const [error, setError] = useState("");
+  const [needsTokens, setNeedsTokens] = useState(false);
   const [reviewed, setReviewed] = useState(false);
   const [preview, setPreview] = useState<{ blob: Blob; url: string; version: string }>();
 
@@ -126,10 +133,16 @@ export function CopilotArtifactEditor({
     working.current = true;
     setBusy(true);
     setError("");
+    setNeedsTokens(false);
     try {
       await operation();
     } catch (e: any) {
-      if (mounted.current) setError(e?.message || ct('fileError'));
+      if (mounted.current) {
+        setError(e?.message || ct('fileError'));
+        if (e instanceof CopilotServiceError && e.code === 'COPILOT_INSUFFICIENT_TOKENS') {
+          setNeedsTokens(true);
+        }
+      }
     } finally {
       working.current = false;
       if (mounted.current) setBusy(false);
@@ -140,6 +153,7 @@ export function CopilotArtifactEditor({
     run(async () => {
       const result = await generateCopilotImage(prompt, ratio, requestId);
       if (!mounted.current) return;
+      onBillingUpdate?.(result.billing);
       const dataUrl = `data:${result.mimeType};base64,${result.base64}`;
       setImage(dataUrl);
       patch({ image: dataUrl, imageCaption: ct('aiCaption') });
@@ -459,9 +473,14 @@ export function CopilotArtifactEditor({
         </div>
 
         {error && (
-          <p role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5 shrink-0 my-2 shadow-2xs">
-            {error}
-          </p>
+          <div role="alert" className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-2.5 shrink-0 my-2 shadow-2xs flex flex-wrap items-center justify-between gap-2">
+            <span>{error}</span>
+            {needsTokens && onBuyTokens && (
+              <Button type="button" size="sm" onClick={onBuyTokens} className="h-7 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs px-3">
+                {ct('buyTokensAction')}
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Mobile / Tablet View Switcher Segmented Control */}

@@ -1,5 +1,5 @@
 import { actionTypes, actionData, languageInstruction, responseLanguage, type CopilotLanguage, CopilotError, identifier, prepareInput, inventoryForModel, publicProduct, requestsWebPrices, sourcesFromGrounding, SYSTEM, text, validateAnswer, type Source } from './copilot-contract.ts';
-import { authenticate, candidateText, cors, failure, gemini, inventory, json, plan, readBody, rpc, type Context } from './copilot-server.ts';
+import { authenticate, candidateText, COPILOT_TOKEN_COSTS, cors, DEFAULT_COPILOT_ENTITLEMENTS, failure, gemini, inventory, json, plan, readBody, rpc, type Context } from './copilot-server.ts';
 import { streamReply } from './copilot-stream.ts';
 export interface ChatStream {
   context: Context;
@@ -199,7 +199,63 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     const body = await readBody(req);
     const op = body.operation || 'chat';
     if (stream && op !== 'chat') throw new CopilotError('COPILOT_INVALID');
-    if (op === 'context') return json(await inventory(ctx, identifier(body.binId) || null, text(body.search, 200), body.offset ?? 0, 100, responseLanguage(body.language)));
+    if (op === 'context') {
+      const inv = await inventory(ctx, identifier(body.binId) || null, text(body.search, 200), body.offset ?? 0, 100, responseLanguage(body.language));
+      if (!body.search && !body.offset) {
+        try {
+          const limits = await plan(ctx);
+          const copilot = limits?.copilot || DEFAULT_COPILOT_ENTITLEMENTS;
+          const summary = await rpc(ctx.db, 'copilot_usage_summary', { p_actor: ctx.actor });
+          if (summary && typeof summary === 'object') {
+            return json({
+              ...inv,
+              copilotQuota: {
+                subscriptionActive: true,
+                tier: copilot.tier,
+                planName: copilot.planName,
+                periodStart: copilot.periodStart || null,
+                periodEnd: copilot.periodEnd || null,
+                limits: {
+                  maxChats: copilot.maxChats,
+                  maxMessagesPerChat: copilot.maxMessagesPerChat,
+                  monthlyMessages: copilot.monthlyMessages,
+                  monthlyUploads: copilot.monthlyUploads,
+                  monthlyVideos: copilot.monthlyVideos,
+                  monthlyImages: copilot.monthlyImages,
+                  monthlyVoiceSeconds: copilot.monthlyVoiceSeconds,
+                  maxCallSeconds: copilot.maxCallSeconds
+                },
+                usage: {
+                  month: summary.month,
+                  chat: Number(summary.chat || 0),
+                  upload: Number(summary.upload || 0),
+                  image: Number(summary.image || 0),
+                  voiceSeconds: Number(summary.voiceSeconds || 0)
+                },
+                tokenBalance: Number(summary.tokenBalance || 0),
+                tokenCosts: COPILOT_TOKEN_COSTS
+              }
+            });
+          }
+        } catch (error) {
+          if (error instanceof CopilotError && error.code === 'COPILOT_SUBSCRIPTION') {
+            return json({
+              ...inv,
+              copilotQuota: {
+                subscriptionActive: false,
+                tier: 'free',
+                planName: 'None',
+                limits: DEFAULT_COPILOT_ENTITLEMENTS,
+                usage: { month: '', chat: 0, upload: 0, image: 0, voiceSeconds: 0 },
+                tokenBalance: 0,
+                tokenCosts: COPILOT_TOKEN_COSTS
+              }
+            });
+          }
+        }
+      }
+      return json(inv);
+    }
     if (op === 'document') {
       await plan(ctx);
       return json(await document(ctx, identifier(body.binId) || null, text(body.title), responseLanguage(body.language), typeof body.timeZone === 'string' ? body.timeZone : undefined));
@@ -213,16 +269,41 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
         p_request_id: identifier(body.requestId, true),
         p_type: type,
         p_data: data,
-        p_limits: limits
+        p_limits: {
+          items: limits.items,
+          bins: limits.bins,
+          locations: limits.locations
+        }
       }));
     }
     if (op !== 'chat') throw new CopilotError('COPILOT_INVALID');
     const input = prepareInput(body);
-    await plan(ctx);
-    await rpc(ctx.db, 'copilot_take_quota', {
+    const limits = await plan(ctx);
+    const fallbackEntitlements = DEFAULT_COPILOT_ENTITLEMENTS || {
+      tier: 'starter',
+      planName: 'Starter',
+      maxChats: 5,
+      maxMessagesPerChat: 20,
+      monthlyMessages: 60,
+      monthlyUploads: 8,
+      monthlyVideos: 1,
+      monthlyImages: 3,
+      monthlyVoiceSeconds: 240,
+      maxCallSeconds: 120
+    };
+    const tokenCosts = COPILOT_TOKEN_COSTS || { chat: 50, upload: 100, image: 500, voiceBlock30s: 300, voicePerMin: 600, video30s: 500 };
+    const copilot = limits?.copilot || fallbackEntitlements;
+    const kind = input.image ? 'upload' : 'chat';
+    const monthlyLimit = input.image ? copilot.monthlyUploads : copilot.monthlyMessages;
+    const tokenCost = input.image ? tokenCosts.upload : tokenCosts.chat;
+    const receiptId = identifier(body.requestId) || crypto.randomUUID();
+    const billing = await rpc(ctx.db, 'copilot_consume_allowance', {
       p_actor: ctx.actor,
-      p_kind: 'chat',
-      p_limit: 100
+      p_kind: kind,
+      p_amount: 1,
+      p_monthly_limit: monthlyLimit,
+      p_token_cost: tokenCost,
+      p_receipt: `copilot:${kind}:${receiptId}`
     });
     const initial = await inventory(ctx, input.binId, '', 0, 50, input.language);
     const allowWeb = requestsWebPrices(input.query, input.history);
@@ -378,7 +459,8 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }
     return json({
       ...answer,
-      searchSuggestions
+      searchSuggestions,
+      ...(billing ? { billing } : {})
     });
   } catch (error) {
     return failure(error);

@@ -2,17 +2,19 @@ import { copilotText as ct, copilotLanguage, copilotError } from '@/lib/copilotI
 import { supabase, supabaseUrl } from '@/lib/supabase';
 import { CopilotAudioPlayer } from './copilotAudioPlayer';
 import { CopilotMicrophone } from './copilotMicrophone';
-import type { CopilotResponse } from './boxbinCopilotService';
+import type { CopilotBillingInfo, CopilotResponse } from './boxbinCopilotService';
 
 export type LiveState = 'connecting' | 'listening' | 'responding' | 'reconnecting' | 'ended';
 export interface LiveTranscript { id: string; input: string; output: string }
 export interface LiveTurn { id: string; input: string; interrupted: boolean; answer: CopilotResponse }
+export interface LiveUsageUpdate { usage: CopilotBillingInfo; elapsedSeconds: number; maxCallSeconds: number }
 
 export interface VoiceCallbacks {
   onState: (state: LiveState) => void;
   onTranscript: (turn: LiveTranscript) => void;
   onTurn: (turn: LiveTurn) => void;
-  onWarning: (message: string) => void;
+  onWarning: (message: string, detail?: { code?: string; requiredTokens?: number }) => void;
+  onUsage?: (update: LiveUsageUpdate) => void;
   history: () => { sender: string; text: string }[];
 }
 
@@ -103,6 +105,14 @@ export class CopilotVoiceStream {
           if (typeof data.id !== 'string' || typeof data.input !== 'string' || typeof data.answer?.reply !== 'string' || !Array.isArray(data.answer.suggestedActions) || !Array.isArray(data.answer.suggestedQuestions)) throw new Error();
           this.callbacks.onTurn(data);
           this.silenced = false;
+        } else if (data.type === 'usage') {
+          if (data.usage) {
+            this.callbacks.onUsage?.({
+              usage: data.usage,
+              elapsedSeconds: typeof data.elapsedSeconds === 'number' ? data.elapsedSeconds : 0,
+              maxCallSeconds: typeof data.maxCallSeconds === 'number' ? data.maxCallSeconds : 120
+            });
+          }
         } else if (data.type === 'reconnect') {
           this.ready = false; this.player.clear(); this.microphone.mute(true);
           this.callbacks.onState('reconnecting');
@@ -110,7 +120,13 @@ export class CopilotVoiceStream {
           if (++this.reconnects > 8) { this.fail(ct('callLimit')); return; }
           void this.connect(this.binId, data.resumeToken).catch(() => this.fail(ct('renewCallError')));
         } else if (data.type === 'error' || data.type === 'ended') {
-          this.fail(data.code ? copilotError(data.code) : typeof data.message === 'string' ? data.message : ct('callFinished'));
+          this.fail(
+            data.code ? copilotError(data.code) : typeof data.message === 'string' ? data.message : ct('callFinished'),
+            {
+              code: typeof data.code === 'string' ? data.code : undefined,
+              requiredTokens: typeof data.requiredTokens === 'number' ? data.requiredTokens : undefined
+            }
+          );
         }
       } catch { this.fail(ct('callInterrupted')); }
     };
@@ -133,9 +149,9 @@ export class CopilotVoiceStream {
     this.socket.send(JSON.stringify({ type: 'text', text }));
     return true;
   }
-  private fail(message: string) {
+  private fail(message: string, detail?: { code?: string; requiredTokens?: number }) {
     if (this.stopped) return;
-    this.callbacks.onWarning(message);
+    this.callbacks.onWarning(message, detail);
     this.stop();
   }
 

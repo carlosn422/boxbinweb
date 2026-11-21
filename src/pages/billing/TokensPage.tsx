@@ -202,41 +202,41 @@ export default function TokensPurchasePage() {
             </div>
           </div>
 
-          {/* Card 2: Video Scanning */}
+          {/* Card 2: Copilot Extra Usage */}
           <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs flex items-center justify-between">
             <div>
               <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block">
-                {t("tokens.videoIngestionTitle", { defaultValue: "Video Ingestion" })}
+                {t("tokens.copilotUsageTitle", { defaultValue: "BoxBin Copilot AI" })}
               </span>
               <div className="text-sm font-bold text-slate-900 mt-0.5">
-                {t("tokens.videoScanTitle", { defaultValue: "Multi-Item Video Scan" })}
+                {t("tokens.copilotUsageSubtitle", { defaultValue: "Chat, Voice & Image Extra Quota" })}
               </div>
               <span className="text-[11px] text-slate-500">
-                {t("tokens.videoScanDesc", { defaultValue: "100 tokens / 30s warehouse clip" })}
-              </span>
-            </div>
-            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-              <Video className="h-5 w-5" />
-            </div>
-          </div>
-
-          {/* Card 3: Neural Detection */}
-          <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs flex items-center justify-between">
-            <div>
-              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block">
-                {t("tokens.visionModelTitle", { defaultValue: "Vision Model" })}
-              </span>
-              <div className="text-sm font-bold text-slate-900 mt-0.5">
-                {t("tokens.visionTaggingTitle", { defaultValue: "Neural Object Tagging" })}
-              </div>
-              <span className="text-[11px] text-slate-500">
-                {t("tokens.visionTaggingDesc", {
-                  defaultValue: "Instant box classification & labeling",
-                })}
+                {t("tokens.copilotUsageRates", { defaultValue: "50 / msg · 100 / photo · 500 / AI img · 600 / min voice" })}
               </span>
             </div>
             <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
               <Bot className="h-5 w-5" />
+            </div>
+          </div>
+
+          {/* Card 3: Video & Vision Scanning */}
+          <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-2xs flex items-center justify-between">
+            <div>
+              <span className="text-[11px] font-medium text-slate-500 uppercase tracking-wider block">
+                {t("tokens.videoIngestionTitle", { defaultValue: "Video & Photo Scan" })}
+              </span>
+              <div className="text-sm font-bold text-slate-900 mt-0.5">
+                {t("tokens.videoScanTitle", { defaultValue: "Multi-Item Container Scan" })}
+              </div>
+              <span className="text-[11px] text-slate-500">
+                {t("tokens.videoScanRates", {
+                  defaultValue: "500 tokens / 30s video · 100 tokens / photo scan",
+                })}
+              </span>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+              <Video className="h-5 w-5" />
             </div>
           </div>
         </div>

@@ -275,8 +275,8 @@ test('Live relay streams multiple turns, clears interruptions, rejects client to
     receive(data){this.onmessage({data:JSON.stringify(data)});}
   }
   class Tools {sources=[];searchSuggestions=[];proposal=null;run(_name,_args,_input,signal){toolSignal=signal;return new Promise(resolve=>resolveTool=resolve);}}
-  const server={inventory:async(_ctx,scope)=>{if(scope==='foreign')throw Error();return {};},rpc:async(_db,name,args)=>{quotas.push({name,args});},failure:()=>new Response(JSON.stringify({error:'No disponible'})),json:(v,status)=>new Response(JSON.stringify(v),{status})};
-  const {attachSession}=loadTS('supabase/functions/boxbin-copilot-voice/index.ts',{'../_shared/copilot-server.ts':server,'../_shared/copilot-live.ts':{LiveTurnTools:Tools,liveSetup:()=>({model:'models/test',generationConfig:{responseModalities:['AUDIO']}}),sealResume:async()=> 'encrypted-resume',openResume:async()=> 'google-handle'}},{WebSocket:WS,setTimeout:(fn,ms)=>{timers.push({fn,ms});return 1;},clearTimeout(){},setInterval:()=>1,clearInterval(){}});
+  const server={COPILOT_TOKEN_COSTS:{chat:50,upload:100,image:500,voiceBlock30s:300,voicePerMin:600,video30s:500},DEFAULT_COPILOT_ENTITLEMENTS:{tier:'starter',planName:'Starter',maxChats:5,maxMessagesPerChat:20,monthlyMessages:60,monthlyUploads:8,monthlyVideos:1,monthlyImages:3,monthlyVoiceSeconds:240,maxCallSeconds:120},inventory:async(_ctx,scope)=>{if(scope==='foreign')throw Error();return {};},rpc:async(_db,name,args)=>{quotas.push({name,args});return {source:'plan',kind:'voice_seconds',used:30,limit:240,remaining:210,tokensSpent:0,tokenBalance:0};},failure:()=>new Response(JSON.stringify({error:'No disponible'})),json:(v,status)=>new Response(JSON.stringify(v),{status})};
+  const {attachSession}=loadTS('supabase/functions/boxbin-copilot-voice/index.ts',{'../_shared/copilot-server.ts':server,'../_shared/copilot-live.ts':{LiveTurnTools:Tools,liveSetup:()=>({model:'models/test',generationConfig:{responseModalities:['AUDIO']}}),sealResume:async()=> 'encrypted-resume',openResumePayload:async()=> ({handle:'google-handle',elapsedSeconds:30,callId:'call-1'})}},{WebSocket:WS,setTimeout:(fn,ms)=>{timers.push({fn,ms});return 1;},clearTimeout(){},setInterval:()=>1,clearInterval(){}});
   const client={readyState:1,bufferedAmount:0,send:data=>clientFrames.push(typeof data==='string'?JSON.parse(data):data),close(){this.readyState=3;this.onclose?.();}};
   attachSession(client,{actor:A,owner:A,db:{}},'secret');await client.onmessage({data:'{"type":"start","binId":"a-box"}'});
   const provider=providers[0];provider.onopen();assert.equal(provider.sent[0].setup.model,'models/test');
@@ -288,7 +288,7 @@ test('Live relay streams multiple turns, clears interruptions, rejects client to
   provider.receive({serverContent:{inputTranscription:{text:'Busca otra caja'}}});provider.receive({toolCall:{functionCalls:[{id:'tool1',name:'search_inventory',args:{search:'Otra'}}]}});await tick();
   provider.receive({toolCallCancellation:{ids:['tool1']},serverContent:{interrupted:true}});await tick();assert.equal(toolSignal.aborted,true);resolveTool({secret:'stale'});await tick();assert.ok(!provider.sent.some(x=>x.toolResponse));assert.equal(clientFrames.filter(f=>f.type==='turn_complete')[1].interrupted,true);
   provider.receive({sessionResumptionUpdate:{resumable:true,newHandle:'handle'}});await tick();timers.find(t=>t.ms===110000).fn();assert.equal(clientFrames.at(-1).type,'reconnect');assert.equal(clientFrames.at(-1).resumeToken,'encrypted-resume');assert.equal(provider.readyState,3);
-  assert.equal(quotas.filter(q=>q.args.p_kind==='chat').length,2);
+  assert.equal(quotas.filter(q=>q.name==='copilot_consume_allowance'&&q.args.p_kind==='voice_seconds'&&q.args.p_amount===30&&q.args.p_token_cost===300).length,1);
   const bad={readyState:1,bufferedAmount:0,send:data=>clientFrames.push(JSON.parse(data)),close(){this.readyState=3;this.onclose?.();}};
   attachSession(bad,{actor:A,owner:A,db:{}},'secret');await bad.onmessage({data:'{"type":"toolResponse","result":"fake"}'});await tick();assert.equal(bad.readyState,3);
   const foreign={...bad,readyState:1};attachSession(foreign,{actor:A,owner:A,db:{}},'secret');await foreign.onmessage({data:'{"type":"start","binId":"foreign"}'});await tick();assert.equal(providers.length,1);
@@ -438,10 +438,12 @@ test('Live provider quota ends the call with a provider-specific error instead o
   }
   const {attachSession} = loadTS('supabase/functions/boxbin-copilot-voice/index.ts', {
     '../_shared/copilot-server.ts': {
-      inventory: async () => ({}), rpc: async () => {},
+      COPILOT_TOKEN_COSTS: {chat: 50, upload: 100, image: 500, voiceBlock30s: 300, voicePerMin: 600, video30s: 500},
+      DEFAULT_COPILOT_ENTITLEMENTS: {tier: 'starter', planName: 'Starter', maxChats: 5, maxMessagesPerChat: 20, monthlyMessages: 60, monthlyUploads: 8, monthlyVideos: 1, monthlyImages: 3, monthlyVoiceSeconds: 240, maxCallSeconds: 120},
+      inventory: async () => ({}), rpc: async () => ({source: 'plan', kind: 'voice_seconds', used: 30, limit: 240, remaining: 210, tokensSpent: 0, tokenBalance: 0}),
       failure: error => new Response(JSON.stringify({code: error.code, error: error.message})),
     },
-    '../_shared/copilot-live.ts': {LiveTurnTools: class {}, liveSetup: () => ({})},
+    '../_shared/copilot-live.ts': {LiveTurnTools: class {}, liveSetup: () => ({}), openResumePayload: async () => ({handle: 'h'})},
   }, {WebSocket: WS, setTimeout: () => 1, clearTimeout(){}, setInterval: () => 1, clearInterval(){}});
   const client = {readyState: 1, bufferedAmount: 0, send: data => frames.push(JSON.parse(data)), close(){this.readyState = 3;}};
   attachSession(client, {actor: A, owner: A, db: {}}, 'test-key');
@@ -451,4 +453,141 @@ test('Live provider quota ends the call with a provider-specific error instead o
   assert.equal(frames.at(-1).code, 'COPILOT_PROVIDER_QUOTA');
   assert.equal(client.readyState, 3);
   assert.equal(provider.readyState, 3);
+});
+
+test('Subscription tier entitlements resolve Free Trial, Starter, Plus, Pro and Stripe metadata overrides', () => {
+  const server = loadTS('supabase/functions/_shared/copilot-server.ts', {
+    'https://esm.sh/@supabase/supabase-js@2.109.0': {createClient(){}}
+  });
+  const free = server.resolveCopilotEntitlements('Free Trial', 0, {});
+  assert.equal(free.tier, 'free');
+  assert.equal(free.maxChats, 2);
+  assert.equal(free.maxMessagesPerChat, 20);
+  assert.equal(free.monthlyMessages, 15);
+  assert.equal(free.monthlyUploads, 2);
+  assert.equal(free.monthlyImages, 1);
+  assert.equal(free.monthlyVoiceSeconds, 0);
+
+  const starter = server.resolveCopilotEntitlements('Starter', 499, {});
+  assert.equal(starter.tier, 'starter');
+  assert.equal(starter.maxChats, 5);
+  assert.equal(starter.maxMessagesPerChat, 30);
+  assert.equal(starter.monthlyMessages, 60);
+  assert.equal(starter.monthlyVoiceSeconds, 240);
+
+  const plus = server.resolveCopilotEntitlements('Plus', 799, {});
+  assert.equal(plus.tier, 'plus');
+  assert.equal(plus.maxChats, 10);
+  assert.equal(plus.maxMessagesPerChat, 36);
+  assert.equal(plus.monthlyMessages, 150);
+  assert.equal(plus.monthlyVoiceSeconds, 600);
+
+  const pro = server.resolveCopilotEntitlements('Pro', 1400, {});
+  assert.equal(pro.tier, 'pro');
+  assert.equal(pro.maxChats, 20);
+  assert.equal(pro.maxMessagesPerChat, 44);
+  assert.equal(pro.monthlyMessages, 350);
+  assert.equal(pro.monthlyImages, 15);
+  assert.equal(pro.monthlyVoiceSeconds, 1200);
+
+  const custom = server.resolveCopilotEntitlements('Pro', 1400, {ai_chats: '30', ai_msgs_month: '500', ai_voice_mins_month: '30'});
+  assert.equal(custom.maxChats, 30);
+  assert.equal(custom.monthlyMessages, 500);
+  assert.equal(custom.monthlyVoiceSeconds, 1800);
+});
+
+test('PostgreSQL: cycle quotas, AI token fallback, renewal-only chat deletion, and cycle reset', async () => {
+  const db = await fixture();
+  try {
+    const cycle1Start = new Date(Date.now() - 60_000).toISOString();
+    const cycle1End = new Date(Date.now() + 29 * 86400_000).toISOString();
+    // Sync Free Trial entitlements (2 chats, 10 msgs/chat in this test) for active cycle 1
+    await db.query('select copilot_sync_entitlements($1,$2,$3,$4,$5,$6,$7)', [A, 'free', 'Free Trial', 2, 10, cycle1Start, cycle1End]);
+
+    // Cycle chat allowance: limit = 1, cost = 50 tokens
+    const first = (await db.query('select copilot_consume_allowance($1,$2,$3,$4,$5,$6) r', [A, 'chat', 1, 1, 50, 'copilot:chat:r1'])).rows[0].r;
+    assert.equal(first.source, 'plan');
+    assert.equal(first.used, 1);
+    assert.equal(first.remaining, 0);
+    assert.equal(first.tokensSpent, 0);
+
+    // Exhausted free quota with 0 tokens -> COPILOT_INSUFFICIENT_TOKENS
+    await assert.rejects(
+      () => db.query('select copilot_consume_allowance($1,$2,$3,$4,$5,$6)', [A, 'chat', 1, 1, 50, 'copilot:chat:r2']),
+      /COPILOT_INSUFFICIENT_TOKENS/
+    );
+
+    // Chat slots per plan (Free = 2): 3rd fails, AND deleting a chat created in the current cycle is BLOCKED until renewal!
+    await db.exec(`set role authenticated;set request.jwt.claim.sub='${A}';`);
+    await db.query('insert into copilot_chats(id,"userId",title) values($1,$2,$3)', ['f1', A, 'Chat 1']);
+    await db.query('insert into copilot_chats(id,"userId",title) values($1,$2,$3)', ['f2', A, 'Chat 2']);
+    await assert.rejects(() => db.query('insert into copilot_chats(id,"userId",title) values($1,$2,$3)', ['f3', A, 'Chat 3']), /COPILOT_CHAT_LIMIT/);
+    await assert.rejects(() => db.query('delete from copilot_chats where id=$1', ['f1']), /COPILOT_DELETE_LOCKED/);
+    // With 0 tokens, exceeding maxMessagesPerChat (10 + 1 welcome = 11) is rejected
+    const twelveMsgs = Array.from({length: 12}, (_, i) => ({id: 'm'+i, sender: 'user', text: 'hi'}));
+    await assert.rejects(() => db.query('update copilot_chats set messages=$1::jsonb where id=$2', [JSON.stringify(twelveMsgs), 'f2']), /COPILOT_MESSAGE_LIMIT/);
+    await db.exec('reset role');
+
+    // User purchases 4000 AI-Tokens ($1 pack) -> unlocks extra chat, photo upload, voice 30s, AI image, and thread extension!
+    await db.query('select billing_credit_tokens($1,$2,$3,$4)', [A, 'pi_pack_4000', 'price_4000', 4000]);
+
+    // Token holder CAN add messages beyond free thread cap (up to 50) without needing to delete locked chats
+    await db.exec(`set role authenticated;set request.jwt.claim.sub='${A}';`);
+    await db.query('update copilot_chats set messages=$1::jsonb where id=$2', [JSON.stringify(twelveMsgs), 'f2']);
+    await db.exec('reset role');
+
+    const extraChat = (await db.query('select copilot_consume_allowance($1,$2,$3,$4,$5,$6) r', [A, 'chat', 1, 1, 50, 'copilot:chat:r2'])).rows[0].r;
+    assert.equal(extraChat.source, 'tokens');
+    assert.equal(extraChat.tokensSpent, 50);
+    assert.equal(Number(extraChat.tokenBalance), 3950);
+
+    const extraPhoto = (await db.query('select copilot_consume_allowance($1,$2,$3,$4,$5,$6) r', [A, 'upload', 1, 0, 100, 'copilot:upload:u1'])).rows[0].r;
+    assert.equal(extraPhoto.source, 'tokens');
+    assert.equal(extraPhoto.tokensSpent, 100);
+    assert.equal(Number(extraPhoto.tokenBalance), 3850);
+
+    const extraVoice = (await db.query('select copilot_consume_allowance($1,$2,$3,$4,$5,$6) r', [A, 'voice_seconds', 30, 0, 300, 'copilot:voice:v1:block:0'])).rows[0].r;
+    assert.equal(extraVoice.source, 'tokens');
+    assert.equal(extraVoice.tokensSpent, 300);
+    assert.equal(Number(extraVoice.tokenBalance), 3550);
+
+    // Image generation v2: 1 free, then 500 tokens, replay-safe
+    const imgFree = (await db.query('select copilot_claim_image_v2($1,$2,$3,$4,$5) r', [A, 'img-free-1', 'h1', 1, 500])).rows[0].r;
+    assert.equal(imgFree.billing.source, 'plan');
+    await db.query('update copilot_images set result=$1, busy_until=now() where actor=$2 and request_id=$3', [{base64:'ok'}, A, 'img-free-1']);
+
+    const imgPaid = (await db.query('select copilot_claim_image_v2($1,$2,$3,$4,$5) r', [A, 'img-paid-1', 'h2', 1, 500])).rows[0].r;
+    assert.equal(imgPaid.billing.source, 'tokens');
+    assert.equal(imgPaid.billing.tokensSpent, 500);
+    assert.equal(Number(imgPaid.billing.tokenBalance), 3050);
+
+    // Retrying same image request after lease expires does NOT double-charge tokens
+    await db.query("update copilot_images set busy_until=now()-interval '1 minute' where actor=$1 and request_id=$2", [A, 'img-paid-1']);
+    const imgRetry = (await db.query('select copilot_claim_image_v2($1,$2,$3,$4,$5) r', [A, 'img-paid-1', 'h2', 1, 500])).rows[0].r;
+    assert.equal(imgRetry.billing.tokensSpent, 0);
+    assert.equal(Number(imgRetry.billing.tokenBalance), 3050);
+
+    // Subscription RENEWS -> period_start advances past f1/f2 creation date:
+    // 1) Old chats CAN now be deleted to free up slots
+    // 2) Monthly free allowance resets to 0 for the new cycle!
+    const cycle2Start = new Date(Date.now() + 86400_000).toISOString();
+    const cycle2End = new Date(Date.now() + 31 * 86400_000).toISOString();
+    await db.query('select copilot_sync_entitlements($1,$2,$3,$4,$5,$6,$7)', [A, 'free', 'Free Trial', 2, 10, cycle2Start, cycle2End]);
+
+    await db.exec(`set role authenticated;set request.jwt.claim.sub='${A}';`);
+    await db.query('delete from copilot_chats where id=$1', ['f1']);
+    await db.query('insert into copilot_chats(id,"userId",title) values($1,$2,$3)', ['f3', A, 'New Cycle Chat']);
+    await db.exec('reset role');
+
+    const renewedSummary = (await db.query('select copilot_usage_summary($1) r', [A])).rows[0].r;
+    assert.equal(renewedSummary.chat, 0);
+    assert.equal(renewedSummary.image, 0);
+    assert.equal(Number(renewedSummary.tokenBalance), 3050);
+
+    const renewedFree = (await db.query('select copilot_consume_allowance($1,$2,$3,$4,$5,$6) r', [A, 'chat', 1, 1, 50, 'copilot:chat:r3'])).rows[0].r;
+    assert.equal(renewedFree.source, 'plan');
+    assert.equal(renewedFree.tokensSpent, 0);
+  } finally {
+    await db.close();
+  }
 });

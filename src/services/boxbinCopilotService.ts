@@ -16,6 +16,59 @@ export interface ActionProposal {
   status?: "pending" | "executed" | "cancelled";
   resultMessage?: string;
 }
+export interface CopilotBillingInfo {
+  source: 'plan' | 'tokens';
+  kind: 'chat' | 'upload' | 'image' | 'voice_seconds';
+  used: number;
+  limit: number;
+  remaining: number;
+  tokensSpent: number;
+  tokenBalance: number;
+}
+export interface CopilotQuotaInfo {
+  subscriptionActive: boolean;
+  tier: 'free' | 'starter' | 'plus' | 'pro';
+  planName: string;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  limits: {
+    maxChats: number;
+    maxMessagesPerChat: number;
+    monthlyMessages: number;
+    monthlyUploads: number;
+    monthlyVideos: number;
+    monthlyImages: number;
+    monthlyVoiceSeconds: number;
+    maxCallSeconds: number;
+  };
+  usage: {
+    month: string;
+    chat: number;
+    upload: number;
+    image: number;
+    voiceSeconds: number;
+  };
+  tokenBalance: number;
+  tokenCosts: {
+    chat: number;
+    upload: number;
+    image: number;
+    voiceBlock30s: number;
+    voicePerMin: number;
+    video30s: number;
+  };
+}
+export class CopilotServiceError extends Error {
+  code?: string;
+  requiredTokens?: number;
+  kind?: string;
+  constructor(message: string, code?: string, requiredTokens?: number, kind?: string) {
+    super(message);
+    this.code = code;
+    this.requiredTokens = requiredTokens;
+    this.kind = kind;
+  }
+}
 export interface CopilotResponse {
   reply: string;
   suggestedActions: CopilotAction[];
@@ -27,6 +80,7 @@ export interface CopilotResponse {
     url: string;
   }[];
   searchSuggestions?: string[];
+  billing?: CopilotBillingInfo;
 }
 export interface ChatMessage {
   id: string;
@@ -119,15 +173,15 @@ function saveLocalSessions(userId: string, sessions: CopilotChatSession[]) {
       ...s,
       messages: persistedMessages(s.messages)
     }))));
-  } catch {/* Supabase remains authoritative; browser cache is optional. */}
+  } catch {/* Supabase remains authoritative; browser cache is optional. */ }
 }
-export async function loadCopilotSessions(userId: string): Promise<CopilotChatSession[]> {
+export async function loadCopilotSessions(userId: string, maxChats = 50): Promise<CopilotChatSession[]> {
   const {
     data,
     error
   } = await supabase.from('copilot_chats').select('*').eq('userId', userId).order('updatedAt', {
     ascending: false
-  }).limit(MAX_CHATS_PER_USER);
+  }).limit(Math.max(MAX_CHATS_PER_USER, maxChats));
   if (error) throw new Error(ct('historyError'));
   // Import the previous local-only implementation once, preserving conversations without photos.
   const marker = `boxbin_copilot_imported_${userId}`;
@@ -135,7 +189,7 @@ export async function loadCopilotSessions(userId: string): Promise<CopilotChatSe
   let imported = false;
   try {
     imported = localStorage.getItem(marker) === '1';
-  } catch {/* optional cache */}
+  } catch {/* optional cache */ }
   if (!imported && !data?.length && legacy.length) {
     const rows = legacy.map(s => ({
       id: s.id,
@@ -155,12 +209,12 @@ export async function loadCopilotSessions(userId: string): Promise<CopilotChatSe
     if (importError) throw new Error(ct('historyImportError'));
     try {
       localStorage.setItem(marker, '1');
-    } catch {/* server rows prevent reimport */}
+    } catch {/* server rows prevent reimport */ }
     return loadCopilotSessions(userId);
   }
   try {
     localStorage.setItem(marker, '1');
-  } catch {/* optional cache */}
+  } catch {/* optional cache */ }
   const sessions = (data || []).map(s => ({
     ...s,
     messages: persistedMessages(s.messages || []).map(m => ({
@@ -178,10 +232,10 @@ export const welcomeMessage = (): ChatMessage => ({
   text: ct('welcome'),
   suggestedQuestions: [ct('questionTools'), ct('questionValue'), ct('questionGarage')]
 });
-export async function createCopilotSession(userId: string, title = ct('inventoryQuery'), binId?: string): Promise<string> {
+export async function createCopilotSession(userId: string, title = ct('inventoryQuery'), binId?: string, maxChats = MAX_CHATS_PER_USER): Promise<string> {
   if (!userId) throw new Error(ct('signIn'));
-  const sessions = await loadCopilotSessions(userId);
-  if (sessions.length >= MAX_CHATS_PER_USER) throw new Error(ct('chatLimit'));
+  const sessions = await loadCopilotSessions(userId, maxChats);
+  if (sessions.length >= maxChats) throw new CopilotServiceError(ct('chatLimitDynamic', { max: maxChats }), 'COPILOT_CHAT_LIMIT');
   const id = `session-${crypto.randomUUID()}`;
   const session: CopilotChatSession = {
     id,
@@ -200,7 +254,10 @@ export async function createCopilotSession(userId: string, title = ct('inventory
     ...session,
     binId: binId || null
   });
-  if (error) throw new Error(ct('createChatError'));
+  if (error) {
+    if (error.message?.includes('COPILOT_CHAT_LIMIT')) throw new CopilotServiceError(ct('chatLimitDynamic', { max: maxChats }), 'COPILOT_CHAT_LIMIT');
+    throw new Error(ct('createChatError'));
+  }
   saveLocalSessions(userId, [session, ...sessions]);
   return id;
 }
@@ -233,7 +290,12 @@ export async function deleteCopilotSession(userId: string, sessionId: string): P
   const {
     error
   } = await supabase.from('copilot_chats').delete().eq('id', sessionId).eq('userId', userId).select('id').single();
-  if (error) throw new Error(ct('deleteChatError'));
+  if (error) {
+    if (error.message?.includes('COPILOT_DELETE_LOCKED')) {
+      throw new CopilotServiceError(ct('COPILOT_DELETE_LOCKED'), 'COPILOT_DELETE_LOCKED');
+    }
+    throw new Error(ct('deleteChatError'));
+  }
   saveLocalSessions(userId, loadLocalSessions(userId).filter(s => s.id !== sessionId));
 }
 async function invoke<T = any>(name: string, body: Record<string, unknown>): Promise<T> {
@@ -247,7 +309,7 @@ async function invoke<T = any>(name: string, body: Record<string, unknown>): Pro
     let detail: any;
     try {
       detail = await error.context?.json();
-    } catch {/* offline/invalid response */}
+    } catch {/* offline/invalid response */ }
     // Keep the user-facing message curated, but leave a safe diagnostic in
     // DevTools so a 503 can be tied to the server contract without exposing
     // provider responses or credentials.
@@ -257,7 +319,12 @@ async function invoke<T = any>(name: string, body: Record<string, unknown>): Pro
       code: detail?.code
     });
     // Only display the curated error contract from our server, never provider exceptions.
-    throw new Error(copilotError(detail?.code));
+    throw new CopilotServiceError(
+      copilotError(detail?.code),
+      typeof detail?.code === 'string' ? detail.code : undefined,
+      typeof detail?.requiredTokens === 'number' ? detail.requiredTokens : undefined,
+      typeof detail?.kind === 'string' ? detail.kind : undefined
+    );
   }
   if (!data || data.error) throw new Error(ct('responseUnavailable'));
   return data;
@@ -272,11 +339,12 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
   sender: string;
   text: string;
   actionProposal?: ActionProposal;
-}[], context: any, onChunk: (text: string) => void): Promise<CopilotResponse> {
+}[], context: any, onChunk: (text: string) => void, requestId?: string): Promise<CopilotResponse> {
   const response = await invoke<CopilotResponse>('boxbin-copilot', {
     query,
     chatHistory,
     binId: context.binId || null,
+    ...(requestId ? { requestId } : {}),
     context: {
       attachedImageBase64: context.attachedImageBase64,
       attachedImageMime: context.attachedImageMime
@@ -332,6 +400,7 @@ export const prepareInventoryDocument = (
 export function generateCopilotImage(prompt: string, aspectRatio: string, requestId: string): Promise<{
   base64: string;
   mimeType: string;
+  billing?: CopilotBillingInfo;
 }> {
   return invoke('boxbin-image', {
     prompt,

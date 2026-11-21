@@ -5,7 +5,7 @@ import { copilotText as ct, copilotLanguage } from '@/lib/copilotI18n';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Box, MapPin, Package, Search, PencilLine, FileText, ArrowLeft, ChevronDown, ChevronRight, MessageSquare, ShieldCheck, Bot, Check, Phone, PhoneOff, Square, History, Loader2, Mic, MicOff, Paperclip, Plus, Send, Sparkles, Trash2, X, AudioLines, Captions } from 'lucide-react';
+import { Box, Coins, Lock, MapPin, Package, Search, PencilLine, FileText, ArrowLeft, ChevronDown, ChevronRight, MessageSquare, ShieldCheck, Bot, Check, Phone, PhoneOff, Square, History, Loader2, Mic, MicOff, Paperclip, Plus, Send, Sparkles, Trash2, X, AudioLines, Captions } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { CopilotProposalFields } from './CopilotProposalFields';
@@ -15,7 +15,7 @@ import { CopilotArtifactEditor } from './CopilotArtifactEditor';
 import { SafeMarkdown, SearchSuggestions } from './SafeMarkdown';
 import { CopilotVoiceStream, type LiveState } from '@/services/copilotVoiceStream';
 import { voiceService } from '@/services/voiceService';
-import { type ActionProposal, type ChatMessage, type CopilotChatSession, MAX_CHATS_PER_USER, MAX_FILES_PER_USER, MAX_MESSAGES_PER_CHAT, loadCopilotSessions, welcomeMessage, createCopilotSession, saveSessionMessages, deleteCopilotSession, fetchLiveInventoryContext, streamQueryToBoxBinCopilot, prepareInventoryDocument, executeCreateItem, executeCreateBin, executeMoveItem, executeAssignLocation, executeCreateLocation, executeUpdateItem, executeUpdateBin, executeUpdateLocation } from '@/services/boxbinCopilotService';
+import { CopilotServiceError, type ActionProposal, type ChatMessage, type CopilotBillingInfo, type CopilotChatSession, type CopilotQuotaInfo, MAX_CHATS_PER_USER, MAX_FILES_PER_USER, MAX_MESSAGES_PER_CHAT, loadCopilotSessions, welcomeMessage, createCopilotSession, saveSessionMessages, deleteCopilotSession, fetchLiveInventoryContext, streamQueryToBoxBinCopilot, prepareInventoryDocument, executeCreateItem, executeCreateBin, executeMoveItem, executeAssignLocation, executeCreateLocation, executeUpdateItem, executeUpdateBin, executeUpdateLocation } from '@/services/boxbinCopilotService';
 const titles = (): Record<string, string> => ({
   update_item: ct('updateItem'),
   update_bin: ct('updateBin'),
@@ -118,7 +118,8 @@ export function BoxBinCopilotDrawer() {
     };
   }, [isOpen]);
   const [filesCount, setFilesCount] = useState(0),
-    [savingError, setSavingError] = useState('');
+    [savingError, setSavingError] = useState(''),
+    [billingCta, setBillingCta] = useState<{ code: string; requiredTokens?: number } | null>(null);
   const bottom = useRef<HTMLDivElement>(null),
     messagesContainer = useRef<HTMLDivElement>(null),
     fileInput = useRef<HTMLInputElement>(null),
@@ -127,8 +128,42 @@ export function BoxBinCopilotDrawer() {
     callEpoch = useRef(0),
     contextRequest = useRef(0);
   identity.current = userId;
+  const quota: CopilotQuotaInfo | undefined = context?.copilotQuota;
+  const maxChats = quota?.limits.maxChats ?? MAX_CHATS_PER_USER;
+  const baseMaxMessagesPerChat = quota?.limits.maxMessagesPerChat ?? MAX_MESSAGES_PER_CHAT;
+  const maxMessagesPerChat = quota && quota.tokenBalance >= quota.tokenCosts.chat ? Math.max(baseMaxMessagesPerChat, 50) : baseMaxMessagesPerChat;
+  const renewalDateLabel = quota?.periodEnd
+    ? new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : 'en-US', { dateStyle: 'medium' }).format(new Date(quota.periodEnd))
+    : '';
+  const isChatDeleteLocked = (chat: CopilotChatSession) => {
+    if (!quota?.periodStart || !chat.createdAt) return false;
+    const createdMs = new Date(chat.createdAt).getTime();
+    const startMs = new Date(quota.periodStart).getTime();
+    return Number.isFinite(createdMs) && Number.isFinite(startMs) && createdMs >= startMs;
+  };
   const locked = busy || !!artifact || callActive;
-  const limitReached = messages.filter(m => !m.id.startsWith('welcome-')).length >= MAX_MESSAGES_PER_CHAT;
+  const limitReached = messages.filter(m => !m.id.startsWith('welcome-')).length >= maxMessagesPerChat;
+  const applyBillingUpdate = useCallback((billing?: CopilotBillingInfo) => {
+    if (!billing) return;
+    setContext((prev: any) => {
+      if (!prev?.copilotQuota) return prev;
+      const usageKey = billing.kind === 'voice_seconds' ? 'voiceSeconds' : billing.kind;
+      return {
+        ...prev,
+        copilotQuota: {
+          ...prev.copilotQuota,
+          tokenBalance: billing.tokenBalance,
+          usage: {
+            ...prev.copilotQuota.usage,
+            [usageKey]: billing.used
+          }
+        }
+      };
+    });
+    if (billing.source === 'tokens' && billing.tokensSpent > 0) {
+      toast.info(ct('tokensUsedNotice', { spent: billing.tokensSpent, balance: billing.tokenBalance.toLocaleString() }));
+    }
+  }, []);
   const voiceProposalMessage = [...messages].reverse().find(message => message.sender === 'copilot' && message.actionProposal && message.actionProposal.status !== 'executed' && message.actionProposal.status !== 'cancelled');
   const voiceProposal = voiceProposalMessage?.actionProposal;
   const scrollToBottom = useCallback((smooth = false) => {
@@ -267,7 +302,7 @@ export function BoxBinCopilotDrawer() {
     setBusy(true);
     const turn = ++epoch.current;
     try {
-      const id = await createCopilotSession(userId, focus ? `📦 ${name || ct('bin')}` : undefined, focus || undefined);
+      const id = await createCopilotSession(userId, focus ? `📦 ${name || ct('bin')}` : undefined, focus || undefined, maxChats);
       if (turn !== epoch.current) return;
       const rows = await refreshSessions();
       const s = rows.find(x => x.id === id);
@@ -316,7 +351,7 @@ export function BoxBinCopilotDrawer() {
     setVoiceMode('voice');
     setShowCaptions(true);
     setLiveCaption({ input: '', output: '' });
-    setVoiceWarning(''); setMicMuted(false);
+    setVoiceWarning(''); setBillingCta(null); setMicMuted(false);
     const callId = ++callEpoch.current;
     let id = sessionId;
     liveMessages.current = messages;
@@ -342,7 +377,7 @@ export function BoxBinCopilotDrawer() {
       livePartial.current = null;
       liveMessages.current = list;
       setMessages(list); save(list);
-      if (list.filter(m => !m.id.startsWith('welcome-')).length >= MAX_MESSAGES_PER_CHAT) {
+      if (list.filter(m => !m.id.startsWith('welcome-')).length >= maxMessagesPerChat) {
         voiceStream.current?.stop();
         setVoiceWarning(ct('messageLimit'));
       }
@@ -370,9 +405,15 @@ export function BoxBinCopilotDrawer() {
         ]);
       },
       onTurn: complete,
-      onWarning: message => {
+      onUsage: ({ usage }) => {
+        if (identity.current === userId) applyBillingUpdate(usage);
+      },
+      onWarning: (message, detail) => {
         if (identity.current === userId) {
           setVoiceWarning(message);
+          if (detail?.code === 'COPILOT_INSUFFICIENT_TOKENS' || detail?.code === 'COPILOT_SUBSCRIPTION') {
+            setBillingCta({ code: detail.code, requiredTokens: detail.requiredTokens });
+          }
           const lower = message.toLowerCase();
           if (
             lower.includes('finalizada') ||
@@ -390,7 +431,7 @@ export function BoxBinCopilotDrawer() {
     const prepared = call.prepare(); // Activate microphone/audio in this click.
     try {
       // Attach rejection handling immediately while the session is created.
-      const created = id ? Promise.resolve(id) : createCopilotSession(userId, ct('voiceConversation'), binId || undefined);
+      const created = id ? Promise.resolve(id) : createCopilotSession(userId, ct('voiceConversation'), binId || undefined, maxChats);
       const [chatId] = await Promise.all([created, prepared]);
       if (!isCurrentCall() || voiceStream.current !== call) { call.stop(); return; }
       id = chatId; setSessionId(chatId);
@@ -421,6 +462,7 @@ export function BoxBinCopilotDrawer() {
     }
     busyRef.current = true;
     setBusy(true);
+    setBillingCta(null);
     const turn = ++epoch.current;
     voiceService.stopListening();
     const photo = attached;
@@ -445,7 +487,7 @@ export function BoxBinCopilotDrawer() {
     let id = sessionId;
     try {
       if (!id) {
-        id = await createCopilotSession(userId, text.slice(0, 32) || ct('imageQuery'), binId || undefined);
+        id = await createCopilotSession(userId, text.slice(0, 32) || ct('imageQuery'), binId || undefined, maxChats);
         if (turn !== epoch.current) return;
         setSessionId(id);
       }
@@ -457,8 +499,9 @@ export function BoxBinCopilotDrawer() {
         partial += delta;
         setMessages([...previous, user, { ...placeholder, text: partial }]);
       };
-      const response = await streamQueryToBoxBinCopilot(user.text, history, requestContext, onText);
+      const response = await streamQueryToBoxBinCopilot(user.text, history, requestContext, onText, user.id);
       if (turn !== epoch.current) return;
+      applyBillingUpdate(response.billing);
       const completed: ChatMessage = {
         ...placeholder,
         text: response.reply,
@@ -476,6 +519,13 @@ export function BoxBinCopilotDrawer() {
     } catch (e) {
       if (turn !== epoch.current) return;
       cancelVoice();
+      if (e instanceof CopilotServiceError && (e.code === 'COPILOT_INSUFFICIENT_TOKENS' || e.code === 'COPILOT_SUBSCRIPTION')) {
+        setMessages(previous);
+        setQuery(text);
+        if (photo) setAttached(photo);
+        setBillingCta({ code: e.code, requiredTokens: e.requiredTokens });
+        return;
+      }
       const list = [...previous, user, {
         ...placeholder,
         isStreaming: false,
@@ -601,7 +651,7 @@ export function BoxBinCopilotDrawer() {
   };
   const pickFile = (file?: File) => {
     if (!file || locked) return;
-    if (filesCount >= MAX_FILES_PER_USER) {
+    if (!quota && filesCount >= MAX_FILES_PER_USER) {
       toast.error(ct('photoLimit'));
       return;
     }
@@ -731,14 +781,44 @@ export function BoxBinCopilotDrawer() {
             <span className="flex min-w-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5"><Box className="size-3.5 shrink-0 text-brand-200" /><span className="truncate">{binId ? context?.activeBin?.name || ct('selectedBin') : ct('globalInventory')}</span></span>
             {binId ? <button disabled={locked} className="ml-auto min-h-9 shrink-0 text-brand-200 underline-offset-4 hover:underline disabled:opacity-50" onClick={() => void newSession()}>{ct('openGlobalChat')}</button> : context && <span className="ml-auto shrink-0 text-slate-400">{ct('itemsCount', { count: context.inventoryMetrics.totalItems })}</span>}
           </div>
+          {quota && quota.subscriptionActive && (
+            <div className="copilot-quota-bar">
+              <span className="copilot-quota-pill">{ct('quotaBarMsgs', { left: Math.max(0, quota.limits.monthlyMessages - quota.usage.chat), limit: quota.limits.monthlyMessages })}</span>
+              <span className="copilot-quota-pill">{ct('quotaBarPhotos', { left: Math.max(0, quota.limits.monthlyUploads - quota.usage.upload), limit: quota.limits.monthlyUploads })}</span>
+              <span className="copilot-quota-pill">{ct('quotaBarImages', { left: Math.max(0, quota.limits.monthlyImages - quota.usage.image), limit: quota.limits.monthlyImages })}</span>
+              <span className="copilot-quota-pill">{ct('quotaBarVoice', { left: Math.max(0, Math.ceil((quota.limits.monthlyVoiceSeconds - quota.usage.voiceSeconds) / 60)) })}</span>
+              <button
+                type="button"
+                className="copilot-quota-tokens"
+                onClick={() => { setIsOpen(false); navigate('/tokensai'); }}
+              >
+                <Coins className="size-3 shrink-0" />
+                <span>{ct('quotaBarTokens', { tokens: quota.tokenBalance.toLocaleString() })}</span>
+              </button>
+            </div>
+          )}
         </header>
         {historyOpen ? <div className="copilot-history min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
-          <div className="mb-4 flex items-center gap-2"><MessageSquare className="size-4 text-slate-400" /><h3 className="text-sm font-semibold text-slate-800">{ct('conversations', { count: sessions.length, max: MAX_CHATS_PER_USER })}</h3></div>
+          <div className="mb-1 flex items-center gap-2"><MessageSquare className="size-4 text-slate-400" /><h3 className="text-sm font-semibold text-slate-800">{ct('conversations', { count: sessions.length, max: maxChats })}</h3></div>
+          <p className="mb-4 text-xs text-slate-500">{renewalDateLabel ? ct('historyDeleteHintRenewal', { date: renewalDateLabel }) : ct('historyDeleteHint')}</p>
           {!sessions.length && <p className="py-12 text-center text-sm text-slate-500">{ct('historyEmpty')}</p>}
-          <div className="space-y-2">{sessions.map(s => <div key={s.id} className={`flex min-w-0 items-center gap-1 rounded-2xl border bg-white p-2 ${s.id === sessionId ? 'border-brand-300 ring-2 ring-brand-50' : 'border-slate-200'}`}>
-            <button disabled={locked} onClick={() => selectSession(s)} className="min-w-0 flex-1 rounded-xl p-2 text-left"><span className="block truncate text-sm font-medium text-slate-800">{s.title}</span><span className="mt-1 block text-xs text-slate-500">{ct('chatCount', { count: s.messageCount })}</span></button>
-            <Button aria-label={ct('deleteChat', { title: s.title })} size="icon" variant="ghost" className="size-11 shrink-0 rounded-xl text-slate-400 hover:text-red-600" disabled={locked} onClick={() => void removeSession(s.id)}><Trash2 className="size-4" /></Button>
-          </div>)}</div>
+          <div className="space-y-2">{sessions.map(s => {
+            const deleteLocked = isChatDeleteLocked(s);
+            return <div key={s.id} className={`flex min-w-0 items-center gap-1 rounded-2xl border bg-white p-2 ${s.id === sessionId ? 'border-brand-300 ring-2 ring-brand-50' : 'border-slate-200'}`}>
+              <button disabled={locked} onClick={() => selectSession(s)} className="min-w-0 flex-1 rounded-xl p-2 text-left"><span className="block truncate text-sm font-medium text-slate-800">{s.title}</span><span className="mt-1 block text-xs text-slate-500">{ct('chatCount', { count: s.messageCount })}</span></button>
+              <Button
+                aria-label={deleteLocked ? ct('deleteLockedUntil', { date: renewalDateLabel || '—' }) : ct('deleteChat', { title: s.title })}
+                title={deleteLocked ? ct('deleteLockedUntil', { date: renewalDateLabel || '—' }) : ct('deleteChat', { title: s.title })}
+                size="icon"
+                variant="ghost"
+                className={`size-11 shrink-0 rounded-xl ${deleteLocked ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-600'}`}
+                disabled={locked || deleteLocked}
+                onClick={() => void removeSession(s.id)}
+              >
+                {deleteLocked ? <Lock className="size-4" /> : <Trash2 className="size-4" />}
+              </Button>
+            </div>;
+          })}</div>
         </div> : <>
           {callActive && voiceMode === 'voice' ? <section aria-label={ct('voiceMode')} className="copilot-voice">
             <div className="copilot-voice-stage">
@@ -843,7 +923,35 @@ export function BoxBinCopilotDrawer() {
               <p className="copilot-call-hint">{ct(voiceMode === 'voice' ? 'voiceReviewHint' : 'textCallHint')}</p>
             </div>}
             {voiceWarning && <p role="status" className="mb-2 text-xs leading-relaxed text-amber-800">{voiceWarning}</p>}
-            {limitReached && <p className="mb-2 text-xs text-amber-800">{ct('maxMessages')}</p>}
+            {billingCta && (
+              <div role="alert" className="mb-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-950 space-y-2">
+                <p className="leading-relaxed">
+                  {ct(billingCta.code)}
+                  {billingCta.requiredTokens ? ` (${ct('tokensRequiredCta', { tokens: billingCta.requiredTokens })})` : ''}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => { setIsOpen(false); navigate('/tokensai'); }}
+                    className="h-8 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs px-3 gap-1.5"
+                  >
+                    <Coins className="size-3.5 text-amber-400" />
+                    <span>{ct('buyTokensAction')}</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setIsOpen(false); navigate('/subscription'); }}
+                    className="h-8 rounded-lg border-amber-300 bg-white hover:bg-amber-100/60 text-amber-950 text-xs px-3"
+                  >
+                    {ct('upgradePlanAction')}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {limitReached && <p className="mb-2 text-xs text-amber-800">{ct('maxMessagesDynamic', { max: maxMessagesPerChat })}</p>}
             <form className={callActive && voiceMode === 'voice' ? 'hidden' : 'copilot-composer'} onSubmit={e => { e.preventDefault(); if (callActive) sendLiveText(); else void send(); }}>
               {attached && <div className="mb-2 flex min-w-0 items-center gap-2 rounded-xl border bg-white p-2 text-xs"><img src={attached.previewUrl} className="size-10 shrink-0 rounded-lg object-cover" alt={ct('photoToSend')} /><span className="min-w-0 flex-1 truncate">{attached.name}</span><Button type="button" size="icon" variant="ghost" className="size-11" aria-label={ct('removePhoto')} disabled={locked} onClick={() => setAttached(undefined)}><X className="size-4" /></Button></div>}
               <textarea ref={composer} rows={1} aria-label={ct('queryLabel')} value={query} maxLength={6000}
@@ -853,7 +961,7 @@ export function BoxBinCopilotDrawer() {
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && window.matchMedia('(pointer:fine)').matches) { e.preventDefault(); if (callActive) sendLiveText(); else void send(); } }}
                 className="block max-h-28 min-h-12 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-base leading-relaxed text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50 sm:text-sm" />
               <div className="copilot-composer-toolbar">
-                <div className="copilot-composer-tools"><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ''; }} /><Button type="button" size="icon" variant="ghost" className="copilot-tool-button" aria-label={ct('attachPhoto')} title={ct('attachPhoto')} disabled={locked || limitReached || filesCount >= MAX_FILES_PER_USER} onClick={() => fileInput.current?.click()}><Paperclip className="size-4" /></Button><Button type="button" size="icon" variant="ghost" className="copilot-tool-button" aria-label={ct(listening ? 'stopDictation' : 'dictateQuery')} title={ct(listening ? 'stopDictation' : 'dictateQuery')} aria-pressed={listening} disabled={locked || limitReached} onClick={() => { if (!voiceService.isSupported()) { toast.error(ct('unsupportedDictation')); return; } voiceService.toggleListening(t => setQuery(t), setListening, language); }}>{listening ? <MicOff className="size-4 text-red-600" /> : <Mic className="size-4" />}</Button><button type="button" aria-label={ct('startCall')} disabled={busy || !!artifact || limitReached || !!attached} className="copilot-call-button flex min-h-11 min-w-0 items-center gap-1.5 rounded-xl px-2 text-xs font-medium disabled:opacity-50" onClick={() => void startCall()}><Phone className="size-4 shrink-0" /><span>{ct('callAction')}</span></button></div>
+                <div className="copilot-composer-tools"><input ref={fileInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={e => { pickFile(e.target.files?.[0]); e.target.value = ''; }} /><Button type="button" size="icon" variant="ghost" className="copilot-tool-button" aria-label={ct('attachPhoto')} title={ct('attachPhoto')} disabled={locked || limitReached || (!quota && filesCount >= MAX_FILES_PER_USER)} onClick={() => fileInput.current?.click()}><Paperclip className="size-4" /></Button><Button type="button" size="icon" variant="ghost" className="copilot-tool-button" aria-label={ct(listening ? 'stopDictation' : 'dictateQuery')} title={ct(listening ? 'stopDictation' : 'dictateQuery')} aria-pressed={listening} disabled={locked || limitReached} onClick={() => { if (!voiceService.isSupported()) { toast.error(ct('unsupportedDictation')); return; } voiceService.toggleListening(t => setQuery(t), setListening, language); }}>{listening ? <MicOff className="size-4 text-red-600" /> : <Mic className="size-4" />}</Button><button type="button" aria-label={ct('startCall')} disabled={busy || !!artifact || limitReached || !!attached} className="copilot-call-button flex min-h-11 min-w-0 items-center gap-1.5 rounded-xl px-2 text-xs font-medium disabled:opacity-50" onClick={() => void startCall()}><Phone className="size-4 shrink-0" /><span>{ct('callAction')}</span></button></div>
                 <Button type="submit" size="icon" aria-label={ct('sendQuery')} disabled={limitReached || (callActive ? !query.trim() : locked || !query.trim() && !attached)} className="copilot-send">{busy ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}</Button>
               </div>
             </form>
@@ -864,7 +972,7 @@ export function BoxBinCopilotDrawer() {
       </DialogContent>
     </Dialog>
 
-    {artifact && <CopilotArtifactEditor key={artifact.msgId} requestId={artifact.msgId} proposal={artifact.proposal} userName={currentUser?.displayName || ct('user')} binName={context?.activeBin?.name} locationName={context?.activeBin?.location?.name} onClose={() => setArtifact(null)} onComplete={(data, resultMessage) => {
+    {artifact && <CopilotArtifactEditor key={artifact.msgId} requestId={artifact.msgId} proposal={artifact.proposal} userName={currentUser?.displayName || ct('user')} binName={context?.activeBin?.name} locationName={context?.activeBin?.location?.name} onClose={() => setArtifact(null)} onBuyTokens={() => { setArtifact(null); setIsOpen(false); navigate('/tokensai'); }} onBillingUpdate={applyBillingUpdate} onComplete={(data, resultMessage) => {
       void completeProposal(artifact.msgId, {
         ...artifact.proposal,
         data
