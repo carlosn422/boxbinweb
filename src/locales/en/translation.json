@@ -658,7 +658,18 @@
     "selectPackageBtn": "Select Package",
     "package": "Package",
     "allocated": "Allocated:",
-    "usd": "USD"
+    "usd": "USD",
+    "copilotUsageTitle": "BoxBin Copilot AI",
+    "copilotUsageSubtitle": "Chat, Voice & Image Extra Quota",
+    "copilotUsageRates": "50 / msg · 100 / photo · 500 / AI img · 400 / min voice",
+    "videoScanRates": "500 tokens / 30s video · 100 tokens / photo scan",
+    "balanceApproxSummary": "≈ {{voice}} min voice · {{chats}} chats · {{photos}} photos",
+    "approxUsageTitle": "Approx. enough for (mix freely)",
+    "approxVoiceLabel": "Voice calls",
+    "approxMinUnit": "min",
+    "approxChatLabel": "Copilot chats",
+    "approxPhotosLabel": "Photo scans",
+    "approxMediaLabel": "AI imgs / 30s videos"
   },
   "smartLabels": {
     "title": "Smart Labels",

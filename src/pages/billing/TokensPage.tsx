@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { getStripePlans } from "../../lib/stripe";
 import { stripePromise } from "@/lib/stripe";
+import { COPILOT_TOKEN_COSTS } from '@/lib/copilotPlans';
 import {
   Check,
   Sparkles,
@@ -16,6 +17,10 @@ import {
   Coins,
   Video,
   Bot,
+  Phone,
+  MessageSquare,
+  Camera,
+  Image as ImageIcon,
   ChevronLeft,
   ShieldCheck,
   AlertCircle,
@@ -27,6 +32,20 @@ import TokenCheckoutForm from "./TokenCheckoutForm.tsx";
 import { useNavigate } from "react-router-dom";
 
 
+
+function estimateTokenUsage(tokens: number) {
+  const safe = Math.max(0, Math.floor(tokens));
+  const voiceMinutesRaw = Math.floor(safe / COPILOT_TOKEN_COSTS.voiceBlock30s) * 0.5;
+  const voiceMinutes = Number.isInteger(voiceMinutesRaw)
+    ? voiceMinutesRaw.toLocaleString()
+    : voiceMinutesRaw.toFixed(1);
+  return {
+    voiceMinutes,
+    messages: Math.floor(safe / COPILOT_TOKEN_COSTS.chat),
+    photos: Math.floor(safe / COPILOT_TOKEN_COSTS.upload),
+    imagesOrVideos: Math.floor(safe / COPILOT_TOKEN_COSTS.image),
+  };
+}
 
 export default function TokensPurchasePage() {
   const { t } = useTranslation();
@@ -110,6 +129,7 @@ export default function TokensPurchasePage() {
 
   const isReactNative = (window as any).ReactNativeWebView;
   const currentPkg = tokenPackages.find((p) => p.id === selectedPackage);
+  const balanceEstimate = estimateTokenUsage(userTokens);
 
   return (
     <div className="min-h-screen bg-slate-50/50 selection:bg-brand-100 selection:text-brand-900 pb-12 font-sans">
@@ -193,9 +213,19 @@ export default function TokensPurchasePage() {
               <div className="text-2xl font-black text-slate-900 tracking-tight mt-0.5">
                 {userTokens.toLocaleString()}
               </div>
-              <span className="text-[11px] text-emerald-600 font-medium">
+              <span className="text-[11px] text-emerald-600 font-medium block">
                 {t("tokens.readyForAi", { defaultValue: "Ready for AI analysis" })}
               </span>
+              {userTokens > 0 && (
+                <span className="text-[11px] text-slate-500 block mt-0.5 tabular-nums">
+                  {t("tokens.balanceApproxSummary", {
+                    voice: balanceEstimate.voiceMinutes,
+                    chats: balanceEstimate.messages.toLocaleString(),
+                    photos: balanceEstimate.photos.toLocaleString(),
+                    defaultValue: `≈ {{voice}} min voice · {{chats}} chats · {{photos}} photos`,
+                  })}
+                </span>
+              )}
             </div>
             <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
               <Coins className="h-5 w-5" />
@@ -296,6 +326,7 @@ export default function TokensPurchasePage() {
                 const isHovered = hoveredPackage === pkg.id;
                 const isPopular = index === Math.floor(tokenPackages.length / 2);
                 const tokenAmount = parseInt(pkg.metadata?.tokens || "0");
+                const estimate = estimateTokenUsage(tokenAmount);
                 const priceFormatted = (pkg.unit_amount / 100).toFixed(2);
                 const pricePerToken = pkg.unit_amount / (tokenAmount || 1);
 
@@ -363,29 +394,57 @@ export default function TokensPurchasePage() {
                         </div>
                       )}
 
-                      <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>
-                            {t("tokens.featureVideoProcessing", {
-                              defaultValue: "Video file processing",
-                            })}
+                      <div className="pt-2.5 border-t border-slate-100 space-y-1.5 text-xs text-slate-600">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                          {t("tokens.approxUsageTitle", {
+                            defaultValue: "Approx. enough for (mix freely)",
+                          })}
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5">
+                            <Phone className="w-3.5 h-3.5 text-brand-600 shrink-0" />
+                            <span>
+                              {t("tokens.approxVoiceLabel", { defaultValue: "Voice calls" })}
+                            </span>
+                          </span>
+                          <span className="font-semibold text-slate-900 tabular-nums">
+                            ~{estimate.voiceMinutes}{" "}
+                            {t("tokens.approxMinUnit", { defaultValue: "min" })}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>
-                            {t("tokens.featureAutomatedDetection", {
-                              defaultValue: "Automated item detection",
-                            })}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5">
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            <span>
+                              {t("tokens.approxChatLabel", { defaultValue: "Copilot chats" })}
+                            </span>
+                          </span>
+                          <span className="font-semibold text-slate-900 tabular-nums">
+                            ~{estimate.messages.toLocaleString()}
                           </span>
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>
-                            {t("tokens.featureContainerMapping", {
-                              defaultValue: "Container smart mapping",
-                            })}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5">
+                            <Camera className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                            <span>
+                              {t("tokens.approxPhotosLabel", { defaultValue: "Photo scans" })}
+                            </span>
+                          </span>
+                          <span className="font-semibold text-slate-900 tabular-nums">
+                            ~{estimate.photos.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5">
+                            <ImageIcon className="w-3.5 h-3.5 text-violet-600 shrink-0" />
+                            <span>
+                              {t("tokens.approxMediaLabel", {
+                                defaultValue: "AI imgs / 30s videos",
+                              })}
+                            </span>
+                          </span>
+                          <span className="font-semibold text-slate-900 tabular-nums">
+                            ~{estimate.imagesOrVideos.toLocaleString()}
                           </span>
                         </div>
                       </div>
