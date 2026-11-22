@@ -203,6 +203,7 @@
 .copilot-voice-orb svg { width: 44px; height: 44px; }
 .copilot-voice-orb.is-speaking { animation: copilot-speaking 1.4s ease-in-out infinite; }
 .copilot-voice-title { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -.8px; }
+.copilot-voice-timer { display: inline-flex; align-items: center; gap: 7px; padding: 5px 12px; border: 1px solid #efdfba; border-radius: 999px; background: #fff9ed; color: #5b4514; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
 .copilot-voice-hint { max-width: 320px; margin: 0; color: #8a837b; font-size: 13px; line-height: 1.7; }
 .copilot-caption-toggle { min-height: 44px; padding: 10px 16px; gap: 8px; border-radius: 24px; background: white; color: var(--brand-ink); font-size: 12px; }
 .copilot-caption-toggle:hover { background: var(--accent); color: var(--brand-ink); }
@@ -214,6 +215,7 @@
 .copilot-call-controls { padding: 10px 14px 12px; border: 1px solid var(--border); border-radius: 24px; background: white; }
 .copilot-call-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .copilot-call-status > span { display: flex; align-items: center; gap: 8px; color: #777168; font-size: 11px; font-weight: 600; }
+.copilot-call-timer { padding: 2px 7px; border-radius: 999px; background: #faf5e8; border: 1px solid #ece0c2; color: #6b5219; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .copilot-live-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: #1fb996; }
 .copilot-live-dot.is-muted { background: #b0aaa1; }
 .copilot-mute-button { width: 44px; height: 44px; border-radius: 50%; color: var(--brand-ink); }
@@ -251,10 +253,11 @@
   .copilot-composer-toolbar { border: 0; margin: 0; padding: 0; }
   .copilot-composer textarea { min-height: 40px; }
   .copilot-voice-stage { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-content: center; column-gap: 16px; text-align: left; }
-  .copilot-voice-orb { grid-column: 1; grid-row: 1 / 3; width: 56px; height: 56px; }
+  .copilot-voice-orb { grid-column: 1; grid-row: 1 / 4; width: 56px; height: 56px; }
   .copilot-voice-title { grid-column: 2; grid-row: 1; }
-  .copilot-voice-hint { grid-column: 2; grid-row: 2; max-width: none; font-size: 11px; line-height: 1.5; }
-  .copilot-caption-toggle { grid-column: 3; grid-row: 1 / 3; }
+  .copilot-voice-timer { grid-column: 2; grid-row: 2; justify-self: start; padding: 3px 10px; font-size: 12px; }
+  .copilot-voice-hint { grid-column: 2; grid-row: 3; max-width: none; font-size: 11px; line-height: 1.5; }
+  .copilot-caption-toggle { grid-column: 3; grid-row: 1 / 4; }
   .copilot-live-captions, .copilot-voice-proposal { grid-column: 1 / -1; max-width: none; }
   .copilot-call-controls { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); column-gap: 16px; }
   .copilot-call-actions { margin-top: 0; }

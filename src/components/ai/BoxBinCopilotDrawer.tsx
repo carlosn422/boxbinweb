@@ -30,6 +30,15 @@ const titles = (): Record<string, string> => ({
   generate_image: ct('generateImage')
 });
 const errorText = (e: unknown) => e instanceof Error ? e.message : ct('operationFailed');
+function formatCallDuration(totalSeconds: number) {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const minutes = Math.floor((safe % 3600) / 60);
+  const seconds = safe % 60;
+  const mm = String(minutes).padStart(2, '0');
+  const ss = String(seconds).padStart(2, '0');
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
 function clampLauncherPosition(point: { x: number; y: number }, button: HTMLButtonElement | null) {
   if (!button) return point;
   const styles = getComputedStyle(document.documentElement);
@@ -77,20 +86,45 @@ export function BoxBinCopilotDrawer() {
   const [liveCaption, setLiveCaption] = useState({ input: '', output: '' });
   const [micMuted, setMicMuted] = useState(false);
   const [voiceWarning, setVoiceWarning] = useState('');
+  const [callElapsedSeconds, setCallElapsedSeconds] = useState(0);
+  const callStartedAtRef = useRef<number | null>(null);
   const voiceStream = useRef<CopilotVoiceStream | null>(null);
   const liveMessages = useRef<ChatMessage[]>([]);
   const livePartial = useRef<{ id: string; input: string; output: string } | null>(null);
   const liveSave = useRef<Promise<void>>(Promise.resolve());
   const callActive = liveState !== 'ended';
+  const callDurationLabel = formatCallDuration(callElapsedSeconds);
   const cancelVoice = () => {
     callEpoch.current++;
     voiceStream.current?.stop();
     voiceStream.current = null;
+    callStartedAtRef.current = null;
+    setCallElapsedSeconds(0);
     setLiveState('ended');
     setMicMuted(false);
     setVoiceMode('voice');
     setLiveCaption({ input: '', output: '' });
   };
+  useEffect(() => {
+    if (!callActive) {
+      callStartedAtRef.current = null;
+      setCallElapsedSeconds(0);
+      return;
+    }
+    if ((liveState === 'listening' || liveState === 'responding') && callStartedAtRef.current === null) {
+      callStartedAtRef.current = Date.now();
+      setCallElapsedSeconds(0);
+    }
+    if (callStartedAtRef.current === null) return;
+    const syncElapsed = () => {
+      if (callStartedAtRef.current !== null) {
+        setCallElapsedSeconds(Math.floor((Date.now() - callStartedAtRef.current) / 1000));
+      }
+    };
+    syncElapsed();
+    const timer = window.setInterval(syncElapsed, 1000);
+    return () => window.clearInterval(timer);
+  }, [callActive, liveState]);
   const [attached, setAttached] = useState<ChatMessage['attachedFile']>(),
     [artifact, setArtifact] = useState<{
       msgId: string;
@@ -352,6 +386,8 @@ export function BoxBinCopilotDrawer() {
     setVoiceMode('voice');
     setShowCaptions(true);
     setLiveCaption({ input: '', output: '' });
+    callStartedAtRef.current = null;
+    setCallElapsedSeconds(0);
     setVoiceWarning(''); setBillingCta(null); setMicMuted(false);
     const callId = ++callEpoch.current;
     let id = sessionId;
@@ -728,9 +764,10 @@ export function BoxBinCopilotDrawer() {
         className={`boxbin-copilot-float fixed z-40 touch-none ${position ? '' : 'bottom-6 right-6'}`}
       >
         {callActive && (
-          <div className="absolute -top-9 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-brand-400/40 bg-slate-950/90 px-3 py-1 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm pointer-events-none whitespace-nowrap">
+          <div className={`absolute -top-9 ${position ? 'left-1/2 -translate-x-1/2' : 'right-0'} flex items-center gap-1.5 rounded-full border border-brand-400/40 bg-slate-950/90 px-3 py-1 text-[11px] font-medium text-white shadow-lg backdrop-blur-sm pointer-events-none whitespace-nowrap`}>
             <span className={`size-2 rounded-full ${liveState === 'responding' ? 'bg-brand-400 animate-ping' : 'bg-emerald-400'}`} />
             <span>{ct(liveState === 'connecting' ? 'connecting' : liveState === 'reconnecting' ? 'reconnecting' : liveState === 'responding' ? 'speaking' : micMuted ? 'micMuted' : 'listening')}</span>
+            <span className="ml-0.5 border-l border-white/20 pl-1.5 font-mono tabular-nums text-brand-300">{callDurationLabel}</span>
           </div>
         )}
         <button
@@ -827,6 +864,10 @@ export function BoxBinCopilotDrawer() {
                 {micMuted ? <MicOff /> : <AudioLines />}
               </div>
               <h3 className="copilot-voice-title">{ct(liveState === 'connecting' ? 'connecting' : liveState === 'reconnecting' ? 'reconnecting' : liveState === 'responding' ? 'speaking' : micMuted ? 'micMuted' : 'listening')}</h3>
+              <div className="copilot-voice-timer" aria-label={callDurationLabel}>
+                <span className={`copilot-live-dot ${micMuted ? 'is-muted' : ''}`} />
+                <span>{callDurationLabel}</span>
+              </div>
               <p className="copilot-voice-hint">{ct('voiceModeHint')}</p>
               <Button type="button" variant="ghost" className="copilot-caption-toggle" aria-pressed={showCaptions} aria-label={ct(showCaptions ? 'hideCaptions' : 'showCaptions')} onClick={() => setShowCaptions(value => !value)}><Captions className="size-4" />{ct(showCaptions ? 'hideCaptions' : 'showCaptions')}</Button>
               {showCaptions && (liveCaption.input || liveCaption.output) && <div aria-live="polite" className="copilot-live-captions"><p>{liveCaption.input ? ct('you') : ct('assistant')}</p>{liveCaption.input && <p>{liveCaption.input}</p>}{liveCaption.output && <p>{liveCaption.output}</p>}</div>}
@@ -911,7 +952,7 @@ export function BoxBinCopilotDrawer() {
           <footer className="copilot-footer">
             {callActive && <div className="copilot-call-controls">
               <div className="copilot-call-status">
-                <span role="status"><span className={`copilot-live-dot ${micMuted ? 'is-muted' : ''}`} />{ct('voiceLive')}</span>
+                <span role="status"><span className={`copilot-live-dot ${micMuted ? 'is-muted' : ''}`} /><span>{ct('voiceLive')}</span><span className="copilot-call-timer">{callDurationLabel}</span></span>
                 <div className="flex items-center gap-1">
                   <Button size="icon" variant="ghost" className="copilot-mute-button" aria-label={ct(micMuted ? 'unmuteCall' : 'muteCall')} aria-pressed={micMuted} onClick={() => { voiceStream.current?.mute(!micMuted); setMicMuted(!micMuted); }}>{micMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}</Button>
                   {liveState === 'responding' && <Button size="icon" variant="ghost" className="copilot-mute-button" aria-label={ct('stopAudio')} onClick={() => voiceStream.current?.stopAudio()}><Square className="size-4" /></Button>}
