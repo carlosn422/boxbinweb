@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 # build‑args para las claves de Stripe y Supabase
-ARG VITE_API_URL=https://boxbinapi-iv6wi.ondigitalocean.app
+ARG VITE_API_URL=https://api.boxbin.app
 ARG VITE_STRIPE_PUBLISHABLE_KEY
 ARG VITE_SUPABASE_URL=https://xfqmknrtozlxoscotcqa.supabase.co
 ARG VITE_SUPABASE_ANON_KEY=sb_publishable_2y7JVetNKfSr-0bBR19srg_Thlc65NA
