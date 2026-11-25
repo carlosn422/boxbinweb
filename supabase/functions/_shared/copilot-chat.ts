@@ -1,5 +1,5 @@
-import { actionTypes, actionData, languageInstruction, responseLanguage, type CopilotLanguage, CopilotError, identifier, prepareInput, inventoryForModel, publicProduct, requestsWebPrices, sourcesFromGrounding, SYSTEM, text, validateAnswer, type Source } from './copilot-contract.ts';
-import { authenticate, candidateText, COPILOT_TOKEN_COSTS, cors, DEFAULT_COPILOT_ENTITLEMENTS, failure, gemini, inventory, json, plan, readBody, rpc, type Context } from './copilot-server.ts';
+import { actionTypes, actionData, assistantNameInstruction, DEFAULT_ASSISTANT_NAME, languageInstruction, requestsAssistantRename, responseLanguage, type CopilotLanguage, CopilotError, identifier, prepareInput, inventoryForModel, publicProduct, requestsWebPrices, sourcesFromGrounding, SYSTEM, text, validateAnswer, type Source } from './copilot-contract.ts';
+import { authenticate, candidateText, COPILOT_TOKEN_COSTS, cors, DEFAULT_COPILOT_ENTITLEMENTS, failure, gemini, getAssistantName, inventory, json, plan, readBody, rpc, setAssistantName, type Context } from './copilot-server.ts';
 import { streamReply } from './copilot-stream.ts';
 export interface ChatStream {
   context: Context;
@@ -37,6 +37,19 @@ export const tools = [{
         }
       },
       required: ['product']
+    }
+  }, {
+    name: 'set_assistant_name',
+    description: 'Save a custom name that this user wants to call you (the AI assistant). Call this immediately whenever the user tells you what name they want to give you or asks to rename you. Saves permanently for this user.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        name: {
+          type: 'STRING',
+          description: 'The new name the user wants to call you (1 to 40 characters).'
+        }
+      },
+      required: ['name']
     }
   }]
 }];
@@ -187,6 +200,55 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
   if (req.method === 'OPTIONS') return new Response('ok', {
     headers: cors
   });
+  if (!stream && req.method === 'POST' && req.headers.get('accept')?.includes('text/event-stream')) {
+    try {
+      const context = await authenticate(req);
+      const encoder = new TextEncoder();
+      const controller = new AbortController();
+      const body = new ReadableStream<Uint8Array>({
+        start(streamController) {
+          const emit = (event: string, payload: unknown) => {
+            try {
+              streamController.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
+            } catch {
+              controller.abort();
+            }
+          };
+          void handler(req, {
+            context,
+            signal: controller.signal,
+            onText: (delta) => emit('delta', { delta })
+          }).then(async (res) => {
+            const rawText = await res.text();
+            let parsed: unknown = null;
+            try { parsed = JSON.parse(rawText); } catch { parsed = { error: rawText }; }
+            if (res.ok) emit('done', parsed);
+            else emit('error', { status: res.status, ...(parsed && typeof parsed === 'object' ? parsed : {}) });
+          }).catch(async (err) => {
+            const res = failure(err);
+            const detail = await res.json().catch(() => ({ code: 'COPILOT_UNAVAILABLE' }));
+            emit('error', { status: res.status, ...detail });
+          }).finally(() => {
+            try { streamController.close(); } catch { /* already closed */ }
+          });
+        },
+        cancel() {
+          controller.abort();
+        }
+      });
+      return new Response(body, {
+        status: 200,
+        headers: {
+          ...cors,
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-cache, no-store',
+          Connection: 'keep-alive'
+        }
+      });
+    } catch (error) {
+      return failure(error);
+    }
+  }
   try {
     const deadline = Date.now() + 110000;
     const remaining = () => {
@@ -201,6 +263,9 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     if (stream && op !== 'chat') throw new CopilotError('COPILOT_INVALID');
     if (op === 'context') {
       const inv = await inventory(ctx, identifier(body.binId) || null, text(body.search, 200), body.offset ?? 0, 100, responseLanguage(body.language));
+      const assistantPref = typeof getAssistantName === 'function'
+        ? await getAssistantName(ctx)
+        : { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
       if (!body.search && !body.offset) {
         try {
           const limits = await plan(ctx);
@@ -209,6 +274,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
           if (summary && typeof summary === 'object') {
             return json({
               ...inv,
+              assistantName: assistantPref.name,
               copilotQuota: {
                 subscriptionActive: true,
                 tier: copilot.tier,
@@ -241,6 +307,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
           if (error instanceof CopilotError && error.code === 'COPILOT_SUBSCRIPTION') {
             return json({
               ...inv,
+              assistantName: assistantPref.name,
               copilotQuota: {
                 subscriptionActive: false,
                 tier: 'free',
@@ -254,7 +321,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
           }
         }
       }
-      return json(inv);
+      return json({ ...inv, assistantName: assistantPref.name });
     }
     if (op === 'document') {
       await plan(ctx);
@@ -278,7 +345,13 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }
     if (op !== 'chat') throw new CopilotError('COPILOT_INVALID');
     const input = prepareInput(body);
-    const limits = await plan(ctx);
+    const [limits, initial, assistantPref] = await Promise.all([
+      plan(ctx),
+      inventory(ctx, input.binId, '', 0, 50, input.language),
+      typeof getAssistantName === 'function'
+        ? getAssistantName(ctx)
+        : Promise.resolve({ name: DEFAULT_ASSISTANT_NAME, isCustom: false })
+    ]);
     const fallbackEntitlements = DEFAULT_COPILOT_ENTITLEMENTS || {
       tier: 'starter',
       planName: 'Starter',
@@ -305,8 +378,10 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       p_token_cost: tokenCost,
       p_receipt: `copilot:${kind}:${receiptId}`
     });
-    const initial = await inventory(ctx, input.binId, '', 0, 50, input.language);
+    let assistantName = assistantPref.name;
+    let assistantIsCustom = assistantPref.isCustom;
     const allowWeb = requestsWebPrices(input.query, input.history);
+    const needsToolPhase = initial.hasMore !== false || allowWeb || requestsAssistantRename(input.query, input.history);
     const privateValues = [ctx.actor, ctx.owner, ...initial.binsSummary.map((b: any) => b.id), ...initial.locationsSummary.flatMap((l: any) => [l.id, l.address || ''])];
     const parts: any[] = [{
       text: JSON.stringify({
@@ -331,19 +406,21 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     const searchSuggestions: string[] = [];
     let searches = 0, toolCalls = 0, evidenceSize = 0;
     const evidence: any[] = [];
-    // Bounded read-only tool loop. No model tool can write to the database.
-    for (let round = 0; round < 4 && toolCalls < 6 && evidenceSize < 120000; round++) {
+    // Bounded read-only tool loop (plus user assistant-name preference). Skipped completely
+    // when initial inventory is already complete and neither web prices nor rename is requested.
+    if (needsToolPhase) for (let round = 0; round < 4 && toolCalls < 6 && evidenceSize < 120000; round++) {
       const candidate = await gemini({
         systemInstruction: {
           parts: [{
-            text: SYSTEM + languageInstruction(input.language) + '\nThis phase only gathers evidence using read tools. If you already have sufficient data, respond READY. Do not draft the final response to the user or action proposals yet.'
+            text: SYSTEM + assistantNameInstruction(assistantName, assistantIsCustom) + languageInstruction(input.language) + '\nThis phase gathers evidence using read tools and saves a custom assistant name via set_assistant_name if the user chooses or changes your name. If you already have sufficient data and no name change is requested, respond READY. Do not draft the final response to the user or action proposals yet.'
           }]
         },
         contents,
         tools,
         generationConfig: {
           temperature: 0.1,
-          maxOutputTokens: 6000
+          maxOutputTokens: 1024,
+          thinkingConfig: { thinkingBudget: 0 }
         }
       }, false, remaining(), stream?.signal);
       const calls = candidate.content.parts.filter((p: any) => p.functionCall);
@@ -398,6 +475,22 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
               information: input.language === 'es' ? 'No se pudo verificar precios web en esta consulta.' : 'Could not verify web prices for this query.'
             };
           }
+        } else if (name === 'set_assistant_name') {
+          try {
+            const saved = typeof setAssistantName === 'function'
+              ? await setAssistantName(ctx, args.name)
+              : text(args.name, 40, true);
+            assistantName = saved;
+            assistantIsCustom = saved.toLowerCase() !== DEFAULT_ASSISTANT_NAME.toLowerCase();
+            result = { saved: true, assistantName: saved };
+          } catch {
+            result = {
+              saved: false,
+              error: input.language === 'es'
+                ? 'Nombre inválido. Pide un nombre corto de 1 a 40 caracteres.'
+                : 'Invalid name. Ask for a short name between 1 and 40 characters.'
+            };
+          }
         } else result = {
           error: input.language === 'es' ? 'Herramienta no disponible o límite de consultas alcanzado.' : 'Tool unavailable or query limit reached.'
         };
@@ -431,14 +524,15 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     const finalRequest = {
       systemInstruction: {
         parts: [{
-          text: SYSTEM + languageInstruction(input.language)
+          text: SYSTEM + assistantNameInstruction(assistantName, assistantIsCustom) + languageInstruction(input.language)
         }]
       },
       // Structured output is a separate request, with tool results as data (no tool calls).
       contents: [{ role: 'user', parts: [...parts, { text: JSON.stringify({ toolResults: evidence, instruction: input.language === 'es' ? 'Responde con los datos obtenidos. Declara búsquedas incompletas. Genera el JSON del contrato.' : 'Answer using the gathered data. State any incomplete searches. Generate the contract JSON.' }) }] }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 8192,
+        maxOutputTokens: 4096,
+        thinkingConfig: { thinkingBudget: 0 },
         responseMimeType: 'application/json',
         responseSchema
       }
@@ -459,6 +553,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }
     return json({
       ...answer,
+      assistantName,
       searchSuggestions,
       ...(billing ? { billing } : {})
     });

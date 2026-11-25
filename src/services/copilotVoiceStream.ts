@@ -4,7 +4,7 @@ import { CopilotAudioPlayer } from './copilotAudioPlayer';
 import { CopilotMicrophone } from './copilotMicrophone';
 import type { CopilotBillingInfo, CopilotResponse } from './boxbinCopilotService';
 
-export type LiveState = 'connecting' | 'listening' | 'responding' | 'reconnecting' | 'ended';
+export type LiveState = 'standby' | 'connecting' | 'listening' | 'responding' | 'reconnecting' | 'ended';
 export interface LiveTranscript { id: string; input: string; output: string }
 export interface LiveTurn { id: string; input: string; interrupted: boolean; answer: CopilotResponse }
 export interface LiveUsageUpdate { usage: CopilotBillingInfo; elapsedSeconds: number; maxCallSeconds: number }
@@ -15,6 +15,7 @@ export interface VoiceCallbacks {
   onTurn: (turn: LiveTurn) => void;
   onWarning: (message: string, detail?: { code?: string; requiredTokens?: number }) => void;
   onUsage?: (update: LiveUsageUpdate) => void;
+  onAssistantName?: (name: string) => void;
   history: () => { sender: string; text: string }[];
 }
 
@@ -90,7 +91,14 @@ export class CopilotVoiceStream {
           clearTimeout(this.timer); this.ready = true;
           this.microphone.mute(this.muted);
           if (this.muted) socket.send(JSON.stringify({ type: 'mute' }));
+          if (typeof data.assistantName === 'string' && data.assistantName.trim()) {
+            this.callbacks.onAssistantName?.(data.assistantName.trim());
+          }
           this.callbacks.onState('listening');
+        } else if (data.type === 'assistant_name') {
+          if (typeof data.assistantName === 'string' && data.assistantName.trim()) {
+            this.callbacks.onAssistantName?.(data.assistantName.trim());
+          }
         } else if (data.type === 'transcript') {
           if (typeof data.id !== 'string' || typeof data.input !== 'string' || typeof data.output !== 'string') throw new Error();
           if (data.input && data.id !== this.inputTurnId) {

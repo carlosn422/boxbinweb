@@ -1,8 +1,9 @@
 import { copilotText as ct, copilotLanguage, copilotError } from '@/lib/copilotI18n';
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAnonKey, supabaseUrl } from "@/lib/supabase";
 export const MAX_CHATS_PER_USER = 10;
 export const MAX_FILES_PER_USER = 15;
 export const MAX_MESSAGES_PER_CHAT = 20;
+export const DEFAULT_ASSISTANT_NAME = 'Boxbin';
 export interface CopilotAction {
   label: string;
   path: string;
@@ -81,6 +82,7 @@ export interface CopilotResponse {
   }[];
   searchSuggestions?: string[];
   billing?: CopilotBillingInfo;
+  assistantName?: string;
 }
 export interface ChatMessage {
   id: string;
@@ -225,11 +227,11 @@ export async function loadCopilotSessions(userId: string, maxChats = 50): Promis
   saveLocalSessions(userId, sessions);
   return sessions;
 }
-export const welcomeMessage = (): ChatMessage => ({
+export const welcomeMessage = (assistantName = DEFAULT_ASSISTANT_NAME): ChatMessage => ({
   id: `welcome-${crypto.randomUUID()}`,
   sender: 'copilot',
   timestamp: new Date(),
-  text: ct('welcome'),
+  text: ct('welcome', { name: assistantName }),
   suggestedQuestions: [ct('questionTools'), ct('questionValue'), ct('questionGarage')]
 });
 export async function createCopilotSession(userId: string, title = ct('inventoryQuery'), binId?: string, maxChats = MAX_CHATS_PER_USER): Promise<string> {
@@ -340,19 +342,110 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
   text: string;
   actionProposal?: ActionProposal;
 }[], context: any, onChunk: (text: string) => void, requestId?: string): Promise<CopilotResponse> {
-  const response = await invoke<CopilotResponse>('boxbin-copilot', {
+  const payload = {
     query,
     chatHistory,
     binId: context.binId || null,
     ...(requestId ? { requestId } : {}),
+    language: copilotLanguage(),
     context: {
       attachedImageBase64: context.attachedImageBase64,
       attachedImageMime: context.attachedImageMime
     }
+  };
+  const { data: sessionData } = await supabase.auth.getSession();
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
+    const response = await invoke<CopilotResponse>('boxbin-copilot', payload);
+    if (typeof response.reply !== 'string' || !Array.isArray(response.suggestedActions) || !Array.isArray(response.suggestedQuestions)) throw new Error(ct('invalidResponse'));
+    onChunk(response.reply);
+    return response;
+  }
+
+  const res = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/boxbin-copilot`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      apikey: supabaseAnonKey,
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream'
+    },
+    body: JSON.stringify(payload)
   });
-  if (typeof response.reply !== 'string' || !Array.isArray(response.suggestedActions) || !Array.isArray(response.suggestedQuestions)) throw new Error(ct('invalidResponse'));
-  onChunk(response.reply);
-  return response;
+
+  if (!res.ok) {
+    const detail = await res.json().catch(() => null);
+    throw new CopilotServiceError(
+      copilotError(detail?.code),
+      typeof detail?.code === 'string' ? detail.code : undefined,
+      typeof detail?.requiredTokens === 'number' ? detail.requiredTokens : undefined,
+      typeof detail?.kind === 'string' ? detail.kind : undefined
+    );
+  }
+
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('text/event-stream') || !res.body) {
+    const response = (await res.json()) as CopilotResponse;
+    if (!response || typeof response.reply !== 'string' || !Array.isArray(response.suggestedActions) || !Array.isArray(response.suggestedQuestions)) {
+      throw new Error(ct('invalidResponse'));
+    }
+    onChunk(response.reply);
+    return response;
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let finalResponse: CopilotResponse | null = null;
+  let streamedAny = false;
+
+  const handleFrame = (frame: string) => {
+    let eventName = 'message';
+    const dataLines: string[] = [];
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('event:')) eventName = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).trimStart());
+    }
+    if (!dataLines.length) return;
+    const parsed = JSON.parse(dataLines.join('\n'));
+    if (eventName === 'delta' && typeof parsed?.delta === 'string' && parsed.delta) {
+      streamedAny = true;
+      onChunk(parsed.delta);
+    } else if (eventName === 'done') {
+      finalResponse = parsed as CopilotResponse;
+    } else if (eventName === 'error') {
+      throw new CopilotServiceError(
+        copilotError(parsed?.code),
+        typeof parsed?.code === 'string' ? parsed.code : undefined,
+        typeof parsed?.requiredTokens === 'number' ? parsed.requiredTokens : undefined,
+        typeof parsed?.kind === 'string' ? parsed.kind : undefined
+      );
+    }
+  };
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+      let boundary: number;
+      while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, boundary).trim();
+        buffer = buffer.slice(boundary + 2);
+        if (frame) handleFrame(frame);
+      }
+    }
+    buffer += decoder.decode().replace(/\r\n/g, '\n');
+    if (buffer.trim()) handleFrame(buffer.trim());
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (!finalResponse || typeof (finalResponse as CopilotResponse).reply !== 'string' || !Array.isArray((finalResponse as CopilotResponse).suggestedActions) || !Array.isArray((finalResponse as CopilotResponse).suggestedQuestions)) {
+    throw new Error(ct('invalidResponse'));
+  }
+  if (!streamedAny) onChunk((finalResponse as CopilotResponse).reply);
+  return finalResponse;
 }
 async function execute(type: string, data: Record<string, any>, requestId: string) {
   const result = await invoke('boxbin-copilot', {

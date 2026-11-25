@@ -14,8 +14,9 @@ import { toast } from 'sonner';
 import { CopilotArtifactEditor } from './CopilotArtifactEditor';
 import { SafeMarkdown, SearchSuggestions } from './SafeMarkdown';
 import { CopilotVoiceStream, type LiveState } from '@/services/copilotVoiceStream';
+import { webWakeWordService } from '@/services/webWakeWordService';
 import { voiceService } from '@/services/voiceService';
-import { CopilotServiceError, type ActionProposal, type ChatMessage, type CopilotBillingInfo, type CopilotChatSession, type CopilotQuotaInfo, MAX_CHATS_PER_USER, MAX_FILES_PER_USER, MAX_MESSAGES_PER_CHAT, loadCopilotSessions, welcomeMessage, createCopilotSession, saveSessionMessages, deleteCopilotSession, fetchLiveInventoryContext, streamQueryToBoxBinCopilot, prepareInventoryDocument, executeCreateItem, executeCreateBin, executeMoveItem, executeAssignLocation, executeCreateLocation, executeUpdateItem, executeUpdateBin, executeUpdateLocation } from '@/services/boxbinCopilotService';
+import { CopilotServiceError, DEFAULT_ASSISTANT_NAME, type ActionProposal, type ChatMessage, type CopilotBillingInfo, type CopilotChatSession, type CopilotQuotaInfo, MAX_CHATS_PER_USER, MAX_FILES_PER_USER, MAX_MESSAGES_PER_CHAT, loadCopilotSessions, welcomeMessage, createCopilotSession, saveSessionMessages, deleteCopilotSession, fetchLiveInventoryContext, streamQueryToBoxBinCopilot, prepareInventoryDocument, executeCreateItem, executeCreateBin, executeMoveItem, executeAssignLocation, executeCreateLocation, executeUpdateItem, executeUpdateBin, executeUpdateLocation } from '@/services/boxbinCopilotService';
 const titles = (): Record<string, string> => ({
   update_item: ct('updateItem'),
   update_bin: ct('updateBin'),
@@ -76,7 +77,8 @@ export function BoxBinCopilotDrawer() {
     [sessionId, setSessionId] = useState<string | null>(null);
   const [binId, setBinId] = useState<string | null>(null),
     [context, setContext] = useState<any>(null),
-    [contextError, setContextError] = useState('');
+    [contextError, setContextError] = useState(''),
+    [assistantName, setAssistantName] = useState(DEFAULT_ASSISTANT_NAME);
   const [busy, setBusy] = useState(false),
     busyRef = useRef(false),
     [listening, setListening] = useState(false);
@@ -89,6 +91,8 @@ export function BoxBinCopilotDrawer() {
   const [callElapsedSeconds, setCallElapsedSeconds] = useState(0);
   const callStartedAtRef = useRef<number | null>(null);
   const voiceStream = useRef<CopilotVoiceStream | null>(null);
+  const pendingWakePromptRef = useRef('');
+  const standbyContextRef = useRef<{ callId: number; sessionId: string | null } | null>(null);
   const liveMessages = useRef<ChatMessage[]>([]);
   const livePartial = useRef<{ id: string; input: string; output: string } | null>(null);
   const liveSave = useRef<Promise<void>>(Promise.resolve());
@@ -96,6 +100,9 @@ export function BoxBinCopilotDrawer() {
   const callDurationLabel = formatCallDuration(callElapsedSeconds);
   const cancelVoice = () => {
     callEpoch.current++;
+    standbyContextRef.current = null;
+    pendingWakePromptRef.current = '';
+    webWakeWordService.stop();
     voiceStream.current?.stop();
     voiceStream.current = null;
     callStartedAtRef.current = null;
@@ -229,6 +236,9 @@ export function BoxBinCopilotDrawer() {
       const ctx = await fetchLiveInventoryContext(userId, binId);
       if (identity.current === userId && request === contextRequest.current) {
         setContext(ctx);
+        if (typeof ctx?.assistantName === 'string' && ctx.assistantName.trim()) {
+          setAssistantName(ctx.assistantName.trim());
+        }
         setContextError('');
       }
     } catch (e) {
@@ -246,6 +256,7 @@ export function BoxBinCopilotDrawer() {
     setSessions([]);
     setSessionId(null);
     setMessages([welcomeMessage()]);
+    setAssistantName(DEFAULT_ASSISTANT_NAME);
     setBinId(null);
     setContext(null);
     setAttached(undefined);
@@ -267,6 +278,7 @@ export function BoxBinCopilotDrawer() {
     return () => {
       live = false;
       epoch.current++;
+      webWakeWordService.stop();
       voiceStream.current?.stop();
       voiceService.stopListening();
     };
@@ -303,6 +315,7 @@ export function BoxBinCopilotDrawer() {
   }, [isOpen]);
   useEffect(() => {
     return () => {
+      webWakeWordService.stop();
       voiceStream.current?.stop();
       voiceService.stopListening();
     };
@@ -318,7 +331,7 @@ export function BoxBinCopilotDrawer() {
     if (previousLanguage.current === language) return;
     previousLanguage.current = language;
     voiceService.stopListening();
-    if (voiceStream.current) { cancelVoice(); setVoiceWarning(ct('languageChanged')); }
+    if (voiceStream.current || webWakeWordService.isActive()) { cancelVoice(); setVoiceWarning(ct('languageChanged')); }
   }, [language]);
   const selectSession = (s: CopilotChatSession) => {
     cancelVoice();
@@ -380,20 +393,11 @@ export function BoxBinCopilotDrawer() {
       if (identity.current === userId) setSavingError(errorText(e));
     }
   };
-  const startCall = async () => {
-    if (!userId || busyRef.current || voiceStream.current || artifact || attached || limitReached) return;
-    voiceService.stopListening();
-    setVoiceMode('voice');
-    setShowCaptions(true);
-    setLiveCaption({ input: '', output: '' });
-    callStartedAtRef.current = null;
-    setCallElapsedSeconds(0);
-    setVoiceWarning(''); setBillingCta(null); setMicMuted(false);
-    const callId = ++callEpoch.current;
-    let id = sessionId;
-    liveMessages.current = messages;
-    livePartial.current = null;
+  const connectLiveCall = async (callId: number, initialSessionId: string | null) => {
+    let id = initialSessionId;
     const isCurrentCall = () => callId === callEpoch.current && identity.current === userId;
+    if (!isCurrentCall()) return;
+    standbyContextRef.current = null;
     const save = (list: ChatMessage[]) => {
       const chatId = id;
       if (!chatId) return;
@@ -411,6 +415,9 @@ export function BoxBinCopilotDrawer() {
         sources: data.answer.sources, searchSuggestions: data.answer.searchSuggestions, isValuation: data.answer.isValuation
       }
       ];
+      if (typeof data.answer.assistantName === 'string' && data.answer.assistantName.trim()) {
+        setAssistantName(data.answer.assistantName.trim());
+      }
       livePartial.current = null;
       liveMessages.current = list;
       setMessages(list); save(list);
@@ -431,6 +438,13 @@ export function BoxBinCopilotDrawer() {
         }
         if (!isCurrentCall()) return;
         setLiveState(state);
+        if (state === 'listening' && pendingWakePromptRef.current) {
+          const initialPrompt = pendingWakePromptRef.current;
+          pendingWakePromptRef.current = '';
+          window.setTimeout(() => {
+            if (isCurrentCall()) voiceStream.current?.sendText(initialPrompt);
+          }, 120);
+        }
       },
       onTranscript: data => {
         if (!isCurrentCall()) return;
@@ -442,6 +456,9 @@ export function BoxBinCopilotDrawer() {
         ]);
       },
       onTurn: complete,
+      onAssistantName: name => {
+        if (identity.current === userId && name.trim()) setAssistantName(name.trim());
+      },
       onUsage: ({ usage }) => {
         if (identity.current === userId) applyBillingUpdate(usage);
       },
@@ -465,9 +482,8 @@ export function BoxBinCopilotDrawer() {
       }
     });
     voiceStream.current = call;
-    const prepared = call.prepare(); // Activate microphone/audio in this click.
+    const prepared = call.prepare();
     try {
-      // Attach rejection handling immediately while the session is created.
       const created = id ? Promise.resolve(id) : createCopilotSession(userId, ct('voiceConversation'), binId || undefined, maxChats);
       const [chatId] = await Promise.all([created, prepared]);
       if (!isCurrentCall() || voiceStream.current !== call) { call.stop(); return; }
@@ -477,6 +493,59 @@ export function BoxBinCopilotDrawer() {
       call.stop();
       if (isCurrentCall()) { setVoiceWarning(errorText(error)); cancelVoice(); }
     }
+  };
+  const activateFromStandby = () => {
+    if (liveState !== 'standby' || !standbyContextRef.current) return;
+    const { callId, sessionId: standbySessionId } = standbyContextRef.current;
+    webWakeWordService.stop();
+    setMicMuted(false);
+    setLiveCaption({ input: '', output: '' });
+    void connectLiveCall(callId, standbySessionId);
+  };
+  const startCall = async (options?: { skipWakeWord?: boolean }) => {
+    if (!userId || busyRef.current || voiceStream.current || webWakeWordService.isActive() || artifact || attached || limitReached) return;
+    voiceService.stopListening();
+    setVoiceMode('voice');
+    setShowCaptions(true);
+    setLiveCaption({ input: '', output: '' });
+    callStartedAtRef.current = null;
+    pendingWakePromptRef.current = '';
+    setCallElapsedSeconds(0);
+    setVoiceWarning(''); setBillingCta(null); setMicMuted(false);
+    const callId = ++callEpoch.current;
+    const initialSessionId = sessionId;
+    liveMessages.current = messages;
+    livePartial.current = null;
+
+    if (!options?.skipWakeWord && webWakeWordService.isSupported()) {
+      standbyContextRef.current = { callId, sessionId: initialSessionId };
+      setLiveState('standby');
+      let fallbackToDirect = false;
+      const started = webWakeWordService.start({
+        assistantName,
+        language,
+        onWake: ({ trailingText }) => {
+          if (callId !== callEpoch.current || identity.current !== userId) return;
+          pendingWakePromptRef.current = trailingText || '';
+          setLiveCaption({ input: '', output: '' });
+          void connectLiveCall(callId, initialSessionId);
+        },
+        onUnavailable: () => {
+          if (callId !== callEpoch.current || identity.current !== userId) return;
+          fallbackToDirect = true;
+        }
+      });
+      if (!started) {
+        if (fallbackToDirect) {
+          await connectLiveCall(callId, initialSessionId);
+        } else {
+          cancelVoice();
+        }
+      }
+      return;
+    }
+
+    await connectLiveCall(callId, initialSessionId);
   };
   const sendLiveText = () => {
     const text = query.trim();
@@ -539,6 +608,9 @@ export function BoxBinCopilotDrawer() {
       const response = await streamQueryToBoxBinCopilot(user.text, history, requestContext, onText, user.id);
       if (turn !== epoch.current) return;
       applyBillingUpdate(response.billing);
+      if (typeof response.assistantName === 'string' && response.assistantName.trim()) {
+        setAssistantName(response.assistantName.trim());
+      }
       const completed: ChatMessage = {
         ...placeholder,
         text: response.reply,
@@ -807,7 +879,7 @@ export function BoxBinCopilotDrawer() {
           <div className="copilot-header-row">
             <div className="copilot-header-identity">
               <div className="copilot-brand-icon"><Sparkles className="size-5 text-brand-200" /></div>
-              <div className="min-w-0"><DialogTitle className="truncate text-base font-semibold tracking-tight">BoxBin Copilot</DialogTitle><DialogDescription className="mt-0.5 truncate text-xs text-slate-400">{ct('assistantSubtitle')}</DialogDescription></div>
+              <div className="min-w-0"><DialogTitle className="truncate text-base font-semibold tracking-tight">{assistantName}</DialogTitle><DialogDescription className="mt-0.5 truncate text-xs text-slate-400">{ct('assistantSubtitle')}</DialogDescription></div>
             </div>
             <div className="copilot-header-actions">
               <Button size="icon" variant="ghost" className="copilot-header-action" aria-label={historyOpen ? ct('returnChat') : ct('history')} title={historyOpen ? ct('returnChat') : ct('history')} disabled={locked} onClick={() => { setHistoryOpen(!historyOpen); void refreshSessions().catch(e => setSavingError(errorText(e))); }}>{historyOpen ? <ArrowLeft className="size-4" /> : <History className="size-4" />}</Button>
@@ -861,16 +933,32 @@ export function BoxBinCopilotDrawer() {
           {callActive && voiceMode === 'voice' ? <section aria-label={ct('voiceMode')} className="copilot-voice">
             <div className="copilot-voice-stage">
               <div className={`copilot-voice-orb ${liveState === 'responding' ? 'is-speaking' : ''}`} aria-hidden="true">
-                {micMuted ? <MicOff /> : <AudioLines />}
+                {micMuted ? <MicOff /> : liveState === 'standby' ? <Mic /> : <AudioLines />}
               </div>
-              <h3 className="copilot-voice-title">{ct(liveState === 'connecting' ? 'connecting' : liveState === 'reconnecting' ? 'reconnecting' : liveState === 'responding' ? 'speaking' : micMuted ? 'micMuted' : 'listening')}</h3>
+              <h3 className="copilot-voice-title">
+                {liveState === 'standby'
+                  ? micMuted
+                    ? ct('micMuted')
+                    : ct('standbyTitle', { name: assistantName })
+                  : liveState === 'responding'
+                  ? ct('speaking', { name: assistantName })
+                  : ct(liveState === 'connecting' ? 'connecting' : liveState === 'reconnecting' ? 'reconnecting' : micMuted ? 'micMuted' : 'listening')}
+              </h3>
               <div className="copilot-voice-timer" aria-label={callDurationLabel}>
                 <span className={`copilot-live-dot ${micMuted ? 'is-muted' : ''}`} />
-                <span>{callDurationLabel}</span>
+                <span>{liveState === 'standby' ? `${ct('standbyBadge')} · ${callDurationLabel}` : callDurationLabel}</span>
               </div>
-              <p className="copilot-voice-hint">{ct('voiceModeHint')}</p>
+              <p className="copilot-voice-hint">
+                {liveState === 'standby' ? ct('standbyHint', { name: assistantName }) : ct('voiceModeHint')}
+              </p>
+              {liveState === 'standby' && (
+                <Button type="button" onClick={activateFromStandby} className="mt-1 min-h-10 rounded-full bg-brand-400 px-5 text-xs font-semibold text-slate-900 hover:bg-brand-300">
+                  <Phone className="mr-1.5 size-3.5" />
+                  <span>{ct('standbyTalkNow')}</span>
+                </Button>
+              )}
               <Button type="button" variant="ghost" className="copilot-caption-toggle" aria-pressed={showCaptions} aria-label={ct(showCaptions ? 'hideCaptions' : 'showCaptions')} onClick={() => setShowCaptions(value => !value)}><Captions className="size-4" />{ct(showCaptions ? 'hideCaptions' : 'showCaptions')}</Button>
-              {showCaptions && (liveCaption.input || liveCaption.output) && <div aria-live="polite" className="copilot-live-captions"><p>{liveCaption.input ? ct('you') : ct('assistant')}</p>{liveCaption.input && <p>{liveCaption.input}</p>}{liveCaption.output && <p>{liveCaption.output}</p>}</div>}
+              {showCaptions && (liveCaption.input || liveCaption.output) && <div aria-live="polite" className="copilot-live-captions"><p>{liveCaption.input ? ct('you') : assistantName}</p>{liveCaption.input && <p>{liveCaption.input}</p>}{liveCaption.output && <p>{liveCaption.output}</p>}</div>}
             {voiceProposal && (
               <div className="copilot-voice-proposal">
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">{ct('voiceActionReady')}</p>
@@ -911,12 +999,16 @@ export function BoxBinCopilotDrawer() {
                 <div className="copilot-welcome-icon"><Sparkles /></div>
                 <h3>{ct('welcomeTitle')}</h3>
                 <p className="copilot-welcome-subtitle">{ct('welcomeShort')}</p>
+                <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-800">
+                  <Mic className="size-3.5 shrink-0" />
+                  <span>{ct('heyStartLabel', { name: assistantName })}</span>
+                </p>
               </>}
               {messages.length === 1 ? <ResponsiveDisclosure label={t('workspaceDesign.aboutCopilot')} className="copilot-about">
-                <div className="text-sm leading-relaxed text-stone-500"><SafeMarkdown text={ct('welcome')} /></div>
+                <div className="text-sm leading-relaxed text-stone-500"><SafeMarkdown text={ct('welcome', { name: assistantName })} /></div>
               </ResponsiveDisclosure> : <details className="copilot-about-inline">
                 <summary><Sparkles aria-hidden="true" /><span>{t('workspaceDesign.aboutCopilot')}</span><ChevronDown aria-hidden="true" /></summary>
-                <div><SafeMarkdown text={ct('welcome')} /></div>
+                <div><SafeMarkdown text={ct('welcome', { name: assistantName })} /></div>
               </details>}
               {messages.length === 1 && <>
                 <div className="copilot-starters">{starterActions.slice(0, 2).map(renderStarter)}</div>
@@ -928,7 +1020,7 @@ export function BoxBinCopilotDrawer() {
                 </ResponsiveDisclosure>
               </>}
             </article> : <article key={msg.id} className={`copilot-turn ${msg.sender === 'user' ? 'copilot-turn-user' : 'copilot-turn-assistant'} ${msg.actionProposal ? 'copilot-turn-proposal' : ''}`}>
-              <div className="copilot-message-meta">{msg.sender === 'copilot' && <span className="copilot-message-avatar"><Sparkles aria-hidden="true" /></span>}<span>{ct(msg.sender === 'user' ? 'you' : 'assistant')}</span></div>
+              <div className="copilot-message-meta">{msg.sender === 'copilot' && <span className="copilot-message-avatar"><Sparkles aria-hidden="true" /></span>}<span>{msg.sender === 'user' ? ct('you') : assistantName}</span></div>
               <div className={msg.sender === 'user' ? 'copilot-message-user' : 'copilot-message-assistant'}>
                 {msg.attachedFile && <div className="mb-2 break-words text-xs">{msg.attachedFile.previewUrl && <img src={msg.attachedFile.previewUrl} alt={ct('attachedPhoto')} className="mb-1 max-h-32 rounded-xl" />}{msg.attachedFile.name}{!msg.attachedFile.previewUrl && ct('photoNotStored')}</div>}
                 {msg.isStreaming && !msg.text ? <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-500"><Loader2 className="size-4 shrink-0 animate-spin" />{ct('thinking')}</div> : <SafeMarkdown text={msg.text} />}
@@ -954,7 +1046,7 @@ export function BoxBinCopilotDrawer() {
               <div className="copilot-call-status">
                 <span role="status"><span className={`copilot-live-dot ${micMuted ? 'is-muted' : ''}`} /><span>{ct('voiceLive')}</span><span className="copilot-call-timer">{callDurationLabel}</span></span>
                 <div className="flex items-center gap-1">
-                  <Button size="icon" variant="ghost" className="copilot-mute-button" aria-label={ct(micMuted ? 'unmuteCall' : 'muteCall')} aria-pressed={micMuted} onClick={() => { voiceStream.current?.mute(!micMuted); setMicMuted(!micMuted); }}>{micMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}</Button>
+                  <Button size="icon" variant="ghost" className="copilot-mute-button" aria-label={ct(micMuted ? 'unmuteCall' : 'muteCall')} aria-pressed={micMuted} onClick={() => { const next = !micMuted; if (liveState === 'standby') webWakeWordService.setMuted(next); else voiceStream.current?.mute(next); setMicMuted(next); }}>{micMuted ? <MicOff className="size-4" /> : <Mic className="size-4" />}</Button>
                   {liveState === 'responding' && <Button size="icon" variant="ghost" className="copilot-mute-button" aria-label={ct('stopAudio')} onClick={() => voiceStream.current?.stopAudio()}><Square className="size-4" /></Button>}
                 </div>
               </div>

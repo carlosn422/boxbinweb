@@ -1,5 +1,5 @@
-import { authenticate, COPILOT_TOKEN_COSTS, DEFAULT_COPILOT_ENTITLEMENTS, failure, inventory, json, plan, rpc, type Context, type CopilotEntitlements } from '../_shared/copilot-server.ts';
-import { CopilotError, detectLanguage, prepareInput, record, text, type CopilotLanguage } from '../_shared/copilot-contract.ts';
+import { authenticate, COPILOT_TOKEN_COSTS, DEFAULT_COPILOT_ENTITLEMENTS, failure, getAssistantName, inventory, json, plan, rpc, type Context, type CopilotEntitlements } from '../_shared/copilot-server.ts';
+import { CopilotError, DEFAULT_ASSISTANT_NAME, detectLanguage, prepareInput, record, text, type CopilotLanguage } from '../_shared/copilot-contract.ts';
 import { LiveTurnTools, liveSetup, openResumePayload, sealResume } from '../_shared/copilot-live.ts';
 
 const VOICE_BILLING_BLOCK_SECONDS = 30;
@@ -42,6 +42,8 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
   let provider: WebSocket | undefined;
   let started = false, ready = false, closed = false, rotating = false;
   let scope: string | null = null, initial: any, checkpoint: string | null = null;
+  let assistantName: string = DEFAULT_ASSISTANT_NAME;
+  let assistantIsCustom = false;
   let lastInput = Date.now(), lastPcm = Date.now(), audioCredit = 64000;
   let queue = Promise.resolve(), queuedBytes = 0, turns = 0;
   let callId: string = crypto.randomUUID();
@@ -55,7 +57,18 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
   const pending = new Set<string>();
   const jobs = new Map<string, AbortController>();
   function newTurn() {
-    return { id: crypto.randomUUID(), input: '', output: '', audio: 0, tools: new LiveTurnTools(ctx, scope, initial), abort: new AbortController() };
+    return {
+      id: crypto.randomUUID(),
+      input: '',
+      output: '',
+      audio: 0,
+      tools: new LiveTurnTools(ctx, scope, initial, (savedName) => {
+        assistantName = savedName;
+        assistantIsCustom = savedName.toLowerCase() !== DEFAULT_ASSISTANT_NAME.toLowerCase();
+        send({ type: 'assistant_name', assistantName: savedName });
+      }),
+      abort: new AbortController()
+    };
   }
   const send = (data: unknown) => {
     if (closed || socket.readyState !== WebSocket.OPEN) return;
@@ -128,7 +141,8 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       send({ type: 'turn_complete', id: previous.id, input: previous.input, interrupted, answer: {
         reply: previous.output || (interrupted ? localized('Response interrupted.', 'Respuesta interrumpida.') : localized('Voice response transcript unavailable.', 'Respuesta de voz sin transcripción disponible.')),
         suggestedActions: [], suggestedQuestions: [], actionProposal: interrupted ? null : previous.tools.proposal,
-        sources: previous.tools.sources, searchSuggestions: previous.tools.searchSuggestions, isValuation: !!previous.tools.sources.length
+        sources: previous.tools.sources, searchSuggestions: previous.tools.searchSuggestions, isValuation: !!previous.tools.sources.length,
+        assistantName: previous.tools.updatedAssistantName || assistantName
       } });
     }
     turn = newTurn();
@@ -179,7 +193,15 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       started = true; clearTimeout(idle);
       const input = prepareInput({ query: 'Voice conversation', language: data.language, binId: data.binId, chatHistory: data.chatHistory });
       scope = input.binId; language = input.language;
-      initial = await inventory(ctx, scope); // Verify scope before any provider connection.
+      const [inv, pref] = await Promise.all([
+        inventory(ctx, scope), // Verify scope before any provider connection.
+        typeof getAssistantName === 'function'
+          ? getAssistantName(ctx)
+          : Promise.resolve({ name: DEFAULT_ASSISTANT_NAME, isCustom: false })
+      ]);
+      initial = inv;
+      assistantName = pref.name;
+      assistantIsCustom = pref.isCustom;
       const resumed = data.resumeToken ? await openResumePayload(data.resumeToken, ctx, scope, language) : undefined;
       const handle = resumed?.handle;
       if (resumed?.callId) callId = resumed.callId;
@@ -190,7 +212,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       await rpc(ctx.db, 'copilot_take_quota', { p_actor: ctx.actor, p_kind: 'live_connections', p_limit: 60 });
       initialBlockCharged = Boolean(resumed);
       if (closed) return;
-      const setup = liveSetup(initial, input.history, handle, language);
+      const setup = liveSetup(initial, input.history, handle, language, assistantName, assistantIsCustom);
       turn = newTurn();
       provider = new WebSocket('wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=' + encodeURIComponent(key));
       provider.binaryType = 'arraybuffer';
@@ -227,7 +249,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
         if (closed) return;
       }
       ready = true;
-      send({ type: 'ready' });
+      send({ type: 'ready', assistantName });
       if (latestUsage) send({ type: 'usage', usage: latestUsage, elapsedSeconds, maxCallSeconds: entitlements.maxCallSeconds });
       startBillingTicker();
     }

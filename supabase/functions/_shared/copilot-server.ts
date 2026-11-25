@@ -1,8 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.109.0';
-import { CopilotError, record } from './copilot-contract.ts';
+import { assistantNameText, CopilotError, DEFAULT_ASSISTANT_NAME, record } from './copilot-contract.ts';
 export const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, accept',
   'Access-Control-Allow-Methods': 'POST, OPTIONS'
 };
 export const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
@@ -332,8 +332,8 @@ export async function plan(ctx: Context): Promise<PlanLimits> {
         copilot
       };
       if (planCache.size > 200) planCache.clear();
-      planCache.set(cacheKey, { expires: Date.now() + 30000, limits });
-      await syncEntitlements(ctx, copilot);
+      planCache.set(cacheKey, { expires: Date.now() + 120000, limits });
+      void syncEntitlements(ctx, copilot);
       return limits;
     }
     const price = await stripeGet(`prices/${sub.planId}?expand[]=product`);
@@ -371,13 +371,42 @@ export async function plan(ctx: Context): Promise<PlanLimits> {
     };
     if (planCache.size > 200) planCache.clear();
     planCache.set(cacheKey, {
-      expires: Date.now() + 30000,
+      expires: Date.now() + 120000,
       limits
     });
-    await syncEntitlements(ctx, copilot);
+    void syncEntitlements(ctx, copilot);
     return limits;
   }
   throw new CopilotError('COPILOT_SUBSCRIPTION', 403);
+}
+export async function getAssistantName(ctx: Context): Promise<{ name: string; isCustom: boolean }> {
+  if (!ctx.db?.from) return { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
+  try {
+    const { data, error } = await ctx.db
+      .from('copilot_preferences')
+      .select('assistant_name')
+      .eq('actor', ctx.actor)
+      .maybeSingle();
+    if (error || !data?.assistant_name) {
+      return { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
+    }
+    const clean = String(data.assistant_name).trim();
+    if (!clean) return { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
+    return {
+      name: clean,
+      isCustom: clean.toLowerCase() !== DEFAULT_ASSISTANT_NAME.toLowerCase(),
+    };
+  } catch {
+    return { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
+  }
+}
+export async function setAssistantName(ctx: Context, rawName: unknown): Promise<string> {
+  const clean = assistantNameText(rawName);
+  const saved = await rpc(ctx.db, 'copilot_set_assistant_name', {
+    p_actor: ctx.actor,
+    p_name: clean,
+  });
+  return typeof saved === 'string' && saved.trim() ? saved.trim() : clean;
 }
 export async function inventory(ctx: Context, binId: string | null, search = '', offset = 0, limit = 50, lang = 'en') {
   return await rpc(ctx.db, 'copilot_inventory', {

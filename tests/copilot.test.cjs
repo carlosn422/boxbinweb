@@ -242,10 +242,46 @@ test('Live setup uses native audio and read-only tools; resume tokens bind ident
   const {liveSetup,sealResume,openResume}=loadTS('supabase/functions/_shared/copilot-live.ts',{'https://esm.sh/@supabase/supabase-js@2.109.0':{createClient(){}}},globals);
   const setup=liveSetup({binsSummary:[],locationsSummary:[],itemsSample:[],inventoryMetrics:{}},[]);
   assert.equal(setup.generationConfig.responseModalities[0],'AUDIO');assert.equal(setup.realtimeInputConfig.activityHandling,'START_OF_ACTIVITY_INTERRUPTS');
-  assert.deepEqual(Array.from(setup.tools[0].functionDeclarations,x=>x.name),['search_inventory','search_prices','propose_action','end_call']);
+  assert.deepEqual(Array.from(setup.tools[0].functionDeclarations,x=>x.name),['search_inventory','search_prices','set_assistant_name','propose_action','end_call']);
   assert.ok(!JSON.stringify(setup).includes('server-key'));assert.ok(!setup.systemInstruction.parts[0].text.includes('Respuesta final: JSON'));
   const ctx={actor:A,owner:A};const token=await sealResume('private-google-handle',ctx,'a-box');assert.ok(!token.includes('private-google-handle'));assert.equal(await openResume(token,ctx,'a-box'),'private-google-handle');
   await assert.rejects(()=>openResume(token,{actor:B,owner:B},'a-box'));await assert.rejects(()=>openResume(token,ctx,'b-box'));await assert.rejects(()=>openResume(token.slice(0,-5)+'xxxxx',ctx,'a-box'));
+});
+
+test('PostgreSQL & chat: assistant name defaults to Boxbin and saves custom name per user',async()=>{
+  const db=await fixture();
+  try {
+    assert.equal((await db.query('select copilot_get_assistant_name($1) name',[A])).rows[0].name,'Boxbin');
+    assert.equal((await db.query('select copilot_get_assistant_name($1) name',[B])).rows[0].name,'Boxbin');
+    assert.equal((await db.query('select copilot_set_assistant_name($1,$2) name',[A,'  Jarvis  '])).rows[0].name,'Jarvis');
+    assert.equal((await db.query('select copilot_get_assistant_name($1) name',[A])).rows[0].name,'Jarvis');
+    assert.equal((await db.query('select copilot_get_assistant_name($1) name',[B])).rows[0].name,'Boxbin');
+    await assert.rejects(()=>db.query('select copilot_set_assistant_name($1,$2)',[A,'   ']),/COPILOT_INVALID/);
+    await assert.rejects(()=>db.query('select copilot_set_assistant_name($1,$2)',[A,'x'.repeat(41)]),/COPILOT_INVALID/);
+  } finally {await db.close();}
+
+  let savedName = 'Boxbin';
+  let generation = 0;
+  const inv={activeBin:null,inventoryMetrics:{totalItems:0,totalEstimatedValue:0},binsSummary:[],locationsSummary:[],itemsSample:[],matches:{items:0},hasMore:false};
+  const server={
+    cors:{},json:(data,status=200)=>new Response(JSON.stringify(data),{status}),failure:e=>new Response(JSON.stringify({error:e.message}),{status:503}),
+    authenticate:async()=>({actor:A,owner:A,db:{}}),readBody:async req=>req.json(),plan:async()=>({items:100}),rpc:async()=>null,
+    getAssistantName:async()=>({name:savedName,isCustom:savedName!=='Boxbin'}),
+    setAssistantName:async(_ctx,name)=>{savedName=String(name).trim();return savedName;},
+    inventory:async()=>inv,
+    gemini:async()=>{
+      generation++;
+      if(generation===1)return {content:{role:'model',parts:[{functionCall:{name:'set_assistant_name',args:{name:'Luna'}}}]}};
+      if(generation===2)return {content:{role:'model',parts:[{text:'READY'}]}};
+      return {content:{parts:[{text:JSON.stringify({reply:'¡Perfecto! A partir de ahora me llamaré Luna.',suggestedActions:[],suggestedQuestions:[],actionProposal:null})}]}};
+    },candidateText:c=>c.content.parts.map(p=>p.text||'').join(''),
+  };
+  const {handler}=loadTS('supabase/functions/boxbin-copilot/index.ts',{'./copilot-server.ts':server});
+  const response=await handler(new Request('https://test.local',{method:'POST',body:JSON.stringify({query:'Quiero llamarte Luna',language:'es'})}));
+  assert.equal(response.status,200);
+  const json=await response.json();
+  assert.equal(json.assistantName,'Luna');
+  assert.equal(savedName,'Luna');
 });
 
 test('Live tools scope searches and validate proposals; cancelled tools cannot produce actions',async()=>{
@@ -591,4 +627,56 @@ test('PostgreSQL: cycle quotas, AI token fallback, renewal-only chat deletion, a
   } finally {
     await db.close();
   }
+});
+
+test('Chat skips Phase 1 when inventory is complete and streams SSE deltas when requested', async () => {
+  let geminiCalls = 0;
+  const inv = { activeBin: null, inventoryMetrics: { totalItems: 2, totalEstimatedValue: 50 }, binsSummary: [], locationsSummary: [], itemsSample: [], matches: { items: 2 }, hasMore: false };
+  const server = {
+    cors: { 'Access-Control-Allow-Origin': '*' },
+    json: (data, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } }),
+    failure: e => new Response(JSON.stringify({ error: e.message }), { status: 503 }),
+    authenticate: async () => ({ actor: A, owner: A, db: {} }),
+    readBody: async req => req.json(),
+    plan: async () => ({ items: 100 }),
+    rpc: async () => null,
+    getAssistantName: async () => ({ name: 'Boxbin', isCustom: false }),
+    inventory: async () => inv,
+    gemini: async body => {
+      geminiCalls++;
+      assert.equal(body.generationConfig?.thinkingConfig?.thinkingBudget, 0);
+      return { content: { parts: [{ text: JSON.stringify({ reply: 'Tienes 2 ítems.', suggestedActions: [], suggestedQuestions: [], actionProposal: null }) }] } };
+    },
+    candidateText: c => c.content.parts.map(p => p.text || '').join(''),
+  };
+  const streamStub = {
+    streamReply: async (_req, onText) => {
+      onText('Tienes ');
+      onText('2 ítems.');
+      return JSON.stringify({ reply: 'Tienes 2 ítems.', suggestedActions: [], suggestedQuestions: [], actionProposal: null });
+    }
+  };
+  const { handler } = loadTS('supabase/functions/boxbin-copilot/index.ts', {
+    './copilot-server.ts': server,
+    '../_shared/copilot-server.ts': server,
+    './copilot-stream.ts': streamStub,
+  });
+
+  // 1. Standard JSON request with hasMore=false skips Phase 1 (only 1 Gemini call)
+  const jsonRes = await handler(new Request('https://test.local', { method: 'POST', body: JSON.stringify({ query: '¿Cuántos ítems tengo?', language: 'es' }) }));
+  assert.equal(jsonRes.status, 200);
+  assert.equal(geminiCalls, 1);
+
+  // 2. SSE request streams delta events before done
+  const sseRes = await handler(new Request('https://test.local', {
+    method: 'POST',
+    headers: { Accept: 'text/event-stream' },
+    body: JSON.stringify({ query: '¿Cuántos ítems tengo?', language: 'es' })
+  }));
+  assert.equal(sseRes.status, 200);
+  assert.match(sseRes.headers.get('content-type') || '', /text\/event-stream/);
+  const text = await sseRes.text();
+  assert.match(text, /event: delta\ndata: \{"delta":"Tienes "\}/);
+  assert.match(text, /event: delta\ndata: \{"delta":"2 ítems\."\}/);
+  assert.match(text, /event: done\ndata: \{.*"reply":"Tienes 2 ítems\."/);
 });

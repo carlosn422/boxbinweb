@@ -17,7 +17,7 @@ function loadTS(filename, replacements = {}, globals = {}, cache = new Map()) {
     }
     return realRequire(name);
   };
-  vm.runInNewContext(`(function(require,module,exports){${code}\n})`,{console,URL,URLSearchParams,Request,Response,Blob,ArrayBuffer,Uint8Array,AbortSignal,TextEncoder,TextDecoder,crypto:require('node:crypto').webcrypto,Deno:{serve(){},env:{get:()=>undefined}},setTimeout,clearTimeout,setInterval,clearInterval,AbortController,atob,btoa,...globals},{filename:absolute})(req,mod,mod.exports);
+  vm.runInNewContext(`(function(require,module,exports){${code}\n})`,{console,URL,URLSearchParams,Request,Response,ReadableStream,Blob,ArrayBuffer,Uint8Array,AbortSignal,TextEncoder,TextDecoder,crypto:require('node:crypto').webcrypto,Deno:{serve(){},env:{get:()=>undefined}},setTimeout,clearTimeout,setInterval,clearInterval,AbortController,atob,btoa,...globals},{filename:absolute})(req,mod,mod.exports);
   return mod.exports;
 }
 const A='11111111-1111-4111-8111-111111111111', B='22222222-2222-4222-8222-222222222222';
