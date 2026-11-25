@@ -387,7 +387,7 @@ export function BoxBinCopilotDrawer() {
       await saveSessionMessages(userId, id, list, undefined, files, focus);
       if (identity.current === userId) {
         setSavingError('');
-        await refreshSessions();
+        void refreshSessions().catch(() => { });
       }
     } catch (e) {
       if (identity.current === userId) setSavingError(errorText(e));
@@ -592,11 +592,12 @@ export function BoxBinCopilotDrawer() {
     setMessages([...previous, user, placeholder]);
     let id = sessionId;
     try {
-      if (!id) {
-        id = await createCopilotSession(userId, text.slice(0, 32) || ct('imageQuery'), binId || undefined, maxChats);
-        if (turn !== epoch.current) return;
-        setSessionId(id);
-      }
+      const sessionPromise = id
+        ? Promise.resolve(id)
+        : createCopilotSession(userId, text.slice(0, 32) || ct('imageQuery'), binId || undefined, maxChats).then(createdId => {
+            if (turn === epoch.current) setSessionId(createdId);
+            return createdId;
+          });
       const history = previous.slice(-8).map(m => ({ sender: m.sender, text: m.text, actionProposal: m.actionProposal }));
       const requestContext = { binId, attachedImageBase64: photo?.base64, attachedImageMime: photo?.type };
       let partial = '';
@@ -605,7 +606,11 @@ export function BoxBinCopilotDrawer() {
         partial += delta;
         setMessages([...previous, user, { ...placeholder, text: partial }]);
       };
-      const response = await streamQueryToBoxBinCopilot(user.text, history, requestContext, onText, user.id);
+      const [response, resolvedId] = await Promise.all([
+        streamQueryToBoxBinCopilot(user.text, history, requestContext, onText, user.id),
+        sessionPromise
+      ]);
+      id = resolvedId;
       if (turn !== epoch.current) return;
       applyBillingUpdate(response.billing);
       if (typeof response.assistantName === 'string' && response.assistantName.trim()) {

@@ -207,6 +207,9 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       const controller = new AbortController();
       const body = new ReadableStream<Uint8Array>({
         start(streamController) {
+          // Immediately flush an SSE comment so reverse proxies / CDNs open the
+          // streaming pipe instead of buffering until the full response completes.
+          try { streamController.enqueue(encoder.encode(': open\n\n')); } catch { controller.abort(); }
           const emit = (event: string, payload: unknown) => {
             try {
               streamController.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`));
@@ -241,7 +244,8 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
         headers: {
           ...cors,
           'Content-Type': 'text/event-stream; charset=utf-8',
-          'Cache-Control': 'no-cache, no-store',
+          'Cache-Control': 'no-cache, no-store, no-transform',
+          'X-Accel-Buffering': 'no',
           Connection: 'keep-alive'
         }
       });
@@ -381,7 +385,13 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     let assistantName = assistantPref.name;
     let assistantIsCustom = assistantPref.isCustom;
     const allowWeb = requestsWebPrices(input.query, input.history);
-    const needsToolPhase = initial.hasMore !== false || allowWeb || requestsAssistantRename(input.query, input.history);
+    const simpleGreetingOrMetrics =
+      !input.image &&
+      /^(?:hola|hi|hello|hey|buenos d[ií]as|buenas tardes|buenas noches|gracias|thanks|ok|okay|qu[eé] tal|c[oó]mo est[aá]s|qui[eé]n eres|c[oó]mo te llamas|who are you|what is your name|cu[aá]ntos [ií]tems|cu[aá]ntas cajas|cu[aá]l es el valor|how many items|how many bins|total value)[\s?!.,]*$/i.test(input.query.trim());
+    const needsToolPhase =
+      allowWeb ||
+      requestsAssistantRename(input.query, input.history) ||
+      (initial.hasMore !== false && !simpleGreetingOrMetrics);
     const privateValues = [ctx.actor, ctx.owner, ...initial.binsSummary.map((b: any) => b.id), ...initial.locationsSummary.flatMap((l: any) => [l.id, l.address || ''])];
     const parts: any[] = [{
       text: JSON.stringify({

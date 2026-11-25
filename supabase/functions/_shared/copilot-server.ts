@@ -336,13 +336,16 @@ export async function plan(ctx: Context): Promise<PlanLimits> {
       void syncEntitlements(ctx, copilot);
       return limits;
     }
-    const price = await stripeGet(`prices/${sub.planId}?expand[]=product`);
+    const hasStripeSub = /^sub_[A-Za-z0-9]+$/.test(sub.stripeSubscriptionId || '');
+    const [price, live] = await Promise.all([
+      stripeGet(`prices/${sub.planId}?expand[]=product`),
+      hasStripeSub ? stripeGet(`subscriptions/${sub.stripeSubscriptionId}?expand[]=customer`) : Promise.resolve(null)
+    ]);
     if (!price) continue;
     if (price.unit_amount === 0 && (price.active === false || price.product?.active === false)) continue;
     let cycle = utcMonthWindow();
     if (price.unit_amount !== 0) {
-      if (!/^sub_[A-Za-z0-9]+$/.test(sub.stripeSubscriptionId || '')) continue;
-      const live = await stripeGet(`subscriptions/${sub.stripeSubscriptionId}?expand[]=customer`);
+      if (!hasStripeSub) continue;
       if (!live || !['active', 'trialing'].includes(live.status) || live.customer?.metadata?.userId !== ctx.owner || !live.items?.data?.some((i: any) => i.price?.id === sub.planId)) continue;
       if (typeof live.current_period_start === 'number' && typeof live.current_period_end === 'number') {
         cycle = {

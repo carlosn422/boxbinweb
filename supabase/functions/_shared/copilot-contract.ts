@@ -240,7 +240,8 @@ export function requestsAssistantRename(query: string, history: {
     return true;
   }
   const lastBot = [...history].reverse().find(m => m.sender !== 'user');
-  if (lastBot && /\b(otro nombre|qu[eé] nombre|llamarme|llames|another name|call me|what name|rename me)\b/i.test(lastBot.text)) {
+  const isStaticWelcome = !!lastBot && (/Puedo buscar tus ítems|I can find your items/i.test(lastBot.text));
+  if (lastBot && !isStaticWelcome && /\b(otro nombre|qu[eé] nombre|llamarme|llames|another name|call me|what name|rename me)\b/i.test(lastBot.text)) {
     return true;
   }
   return false;
