@@ -208,19 +208,25 @@ export function BoxBinCopilotDrawer() {
   }, []);
   const voiceProposalMessage = [...messages].reverse().find(message => message.sender === 'copilot' && message.actionProposal && message.actionProposal.status !== 'executed' && message.actionProposal.status !== 'cancelled');
   const voiceProposal = voiceProposalMessage?.actionProposal;
-  const scrollToBottom = useCallback((smooth = false) => {
+  const lastScrollHeightRef = useRef(0);
+  const scrollToBottom = useCallback((smooth = false, isStreamingUpdate = false) => {
     const el = messagesContainer.current;
-    if (el) {
-      if (smooth) {
-        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
-      } else {
+    if (!el) return;
+    if (isStreamingUpdate) {
+      // During word-by-word streaming, only pin scrollTop (no competing smooth
+      // animations and no scrollIntoView) when content height actually grows.
+      if (el.scrollHeight !== lastScrollHeightRef.current) {
+        lastScrollHeightRef.current = el.scrollHeight;
         el.scrollTop = el.scrollHeight;
       }
+      return;
     }
-    bottom.current?.scrollIntoView({
-      behavior: smooth ? 'smooth' : 'auto',
-      block: 'end'
-    });
+    lastScrollHeightRef.current = el.scrollHeight;
+    if (smooth) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
   }, []);
   const refreshSessions = useCallback(async () => {
     const loaded = await loadCopilotSessions(userId);
@@ -305,7 +311,8 @@ export function BoxBinCopilotDrawer() {
   }, [isOpen, historyOpen, sessionId, scrollToBottom]);
   useEffect(() => {
     if (isOpen && !historyOpen) {
-      scrollToBottom(true);
+      const streaming = messages.some(m => m.isStreaming);
+      scrollToBottom(!streaming, streaming);
     }
   }, [messages, isOpen, historyOpen, scrollToBottom]);
   useEffect(() => {

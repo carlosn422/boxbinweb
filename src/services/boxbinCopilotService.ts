@@ -337,6 +337,98 @@ export async function fetchLiveInventoryContext(_userId: string, activeBinId?: s
     binId: activeBinId || null
   });
 }
+function createWordPacer(onChunk: (text: string) => void) {
+  const queue: string[] = [];
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let drainResolve: (() => void) | null = null;
+  let closing = false;
+
+  const splitWords = (text: string): string[] => {
+    const tokens = text.match(/\S+\s*|\s+/g) || [text];
+    const pieces: string[] = [];
+    let current = '';
+    for (const tok of tokens) {
+      if (current.length + tok.length > 16 && current) {
+        pieces.push(current);
+        current = tok;
+      } else {
+        current += tok;
+      }
+    }
+    if (current) pieces.push(current);
+    return pieces;
+  };
+
+  const step = () => {
+    if (!queue.length) {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (closing && drainResolve) {
+        const res = drainResolve;
+        drainResolve = null;
+        res();
+      }
+      return;
+    }
+    // If closing and many pieces remain, take a slightly bigger bite so completion never lags
+    const count = closing && queue.length > 8 ? Math.ceil(queue.length / 6) : 1;
+    const chunk = queue.splice(0, count).join('');
+    if (chunk) onChunk(chunk);
+    if (!queue.length && closing) {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (drainResolve) {
+        const res = drainResolve;
+        drainResolve = null;
+        res();
+      }
+    }
+  };
+
+  return {
+    push(delta: string) {
+      if (!delta) return;
+      const pieces = splitWords(delta);
+      const wasEmpty = queue.length === 0;
+      queue.push(...pieces);
+      if (wasEmpty) step(); // Emit first word immediately with 0ms delay!
+      if (queue.length > 0 && !timer) {
+        timer = setInterval(step, 18);
+      }
+    },
+    async finish(): Promise<void> {
+      closing = true;
+      if (!queue.length) {
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+        return;
+      }
+      await new Promise<void>(resolve => {
+        drainResolve = resolve;
+        if (!timer) timer = setInterval(step, 16);
+      });
+    },
+    cancel() {
+      queue.length = 0;
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      if (drainResolve) {
+        const res = drainResolve;
+        drainResolve = null;
+        res();
+      }
+    }
+  };
+}
+
 export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
   sender: string;
   text: string;
@@ -362,6 +454,7 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
     return response;
   }
 
+  const startedAt = performance.now();
   const res = await fetch(`${supabaseUrl.replace(/\/$/, '')}/functions/v1/boxbin-copilot`, {
     method: 'POST',
     headers: {
@@ -372,6 +465,7 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
     },
     body: JSON.stringify(payload)
   });
+  const headersMs = Math.round(performance.now() - startedAt);
 
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
@@ -386,6 +480,13 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
   const contentType = res.headers.get('content-type') || '';
   if (!contentType.includes('text/event-stream') || !res.body) {
     const response = (await res.json()) as CopilotResponse;
+    console.info('[Copilot Timing]', {
+      mode: 'json-fallback',
+      contentType,
+      headersMs,
+      totalClientMs: Math.round(performance.now() - startedAt),
+      serverTiming: (response as any)?.debugTiming
+    });
     if (!response || typeof response.reply !== 'string' || !Array.isArray(response.suggestedActions) || !Array.isArray(response.suggestedQuestions)) {
       throw new Error(ct('invalidResponse'));
     }
@@ -395,9 +496,12 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
+  const pacer = createWordPacer(onChunk);
   let buffer = '';
   let finalResponse: CopilotResponse | null = null;
   let streamedAny = false;
+  let firstDeltaMs: number | null = null;
+  let deltaChunks = 0;
 
   const handleFrame = (frame: string) => {
     let eventName = 'message';
@@ -409,11 +513,14 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
     if (!dataLines.length) return;
     const parsed = JSON.parse(dataLines.join('\n'));
     if (eventName === 'delta' && typeof parsed?.delta === 'string' && parsed.delta) {
+      if (firstDeltaMs === null) firstDeltaMs = Math.round(performance.now() - startedAt);
+      deltaChunks++;
       streamedAny = true;
-      onChunk(parsed.delta);
+      pacer.push(parsed.delta);
     } else if (eventName === 'done') {
       finalResponse = parsed as CopilotResponse;
     } else if (eventName === 'error') {
+      pacer.cancel();
       throw new CopilotServiceError(
         copilotError(parsed?.code),
         typeof parsed?.code === 'string' ? parsed.code : undefined,
@@ -437,9 +544,23 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
     }
     buffer += decoder.decode().replace(/\r\n/g, '\n');
     if (buffer.trim()) handleFrame(buffer.trim());
+    await pacer.finish();
+  } catch (err) {
+    pacer.cancel();
+    throw err;
   } finally {
     reader.releaseLock();
   }
+
+  console.info('[Copilot Timing]', {
+    mode: 'sse',
+    contentType,
+    headersMs,
+    firstDeltaMs,
+    deltaChunks,
+    totalClientMs: Math.round(performance.now() - startedAt),
+    serverTiming: (finalResponse as any)?.debugTiming
+  });
 
   if (!finalResponse || typeof (finalResponse as CopilotResponse).reply !== 'string' || !Array.isArray((finalResponse as CopilotResponse).suggestedActions) || !Array.isArray((finalResponse as CopilotResponse).suggestedQuestions)) {
     throw new Error(ct('invalidResponse'));

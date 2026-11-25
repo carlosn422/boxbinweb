@@ -1,10 +1,11 @@
 import { actionTypes, actionData, assistantNameInstruction, DEFAULT_ASSISTANT_NAME, languageInstruction, requestsAssistantRename, responseLanguage, type CopilotLanguage, CopilotError, identifier, prepareInput, inventoryForModel, publicProduct, requestsWebPrices, sourcesFromGrounding, SYSTEM, text, validateAnswer, type Source } from './copilot-contract.ts';
-import { authenticate, candidateText, COPILOT_TOKEN_COSTS, cors, DEFAULT_COPILOT_ENTITLEMENTS, failure, gemini, getAssistantName, inventory, json, plan, readBody, rpc, setAssistantName, type Context } from './copilot-server.ts';
+import { authenticate, candidateText, COPILOT_TOKEN_COSTS, cors, DEFAULT_COPILOT_ENTITLEMENTS, failure, fastThinkingConfig, gemini, getAssistantName, inventory, json, plan, readBody, rpc, setAssistantName, type Context } from './copilot-server.ts';
 import { streamReply } from './copilot-stream.ts';
 export interface ChatStream {
   context: Context;
   signal: AbortSignal;
   onText: (delta: string) => void;
+  authMs?: number;
 }
 export const tools = [{
   functionDeclarations: [{
@@ -202,7 +203,9 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
   });
   if (!stream && req.method === 'POST' && req.headers.get('accept')?.includes('text/event-stream')) {
     try {
+      const authStart = Date.now();
       const context = await authenticate(req);
+      const authMs = Date.now() - authStart;
       const encoder = new TextEncoder();
       const controller = new AbortController();
       const body = new ReadableStream<Uint8Array>({
@@ -220,7 +223,8 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
           void handler(req, {
             context,
             signal: controller.signal,
-            onText: (delta) => emit('delta', { delta })
+            onText: (delta) => emit('delta', { delta }),
+            authMs
           }).then(async (res) => {
             const rawText = await res.text();
             let parsed: unknown = null;
@@ -261,8 +265,13 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       if (ms < 3000) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
       return Math.min(40000, ms);
     };
+    const reqStart = Date.now();
+    const authStart = Date.now();
     const ctx = stream?.context ?? await authenticate(req);
+    const authMs = stream?.authMs ?? (Date.now() - authStart);
+    const bodyStart = Date.now();
     const body = await readBody(req);
+    const bodyMs = Date.now() - bodyStart;
     const op = body.operation || 'chat';
     if (stream && op !== 'chat') throw new CopilotError('COPILOT_INVALID');
     if (op === 'context') {
@@ -349,12 +358,18 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }
     if (op !== 'chat') throw new CopilotError('COPILOT_INVALID');
     const input = prepareInput(body);
+    let planMs = 0, invMs = 0, prefMs = 0;
     const [limits, initial, assistantPref] = await Promise.all([
-      plan(ctx),
-      inventory(ctx, input.binId, '', 0, 50, input.language),
-      typeof getAssistantName === 'function'
-        ? getAssistantName(ctx)
-        : Promise.resolve({ name: DEFAULT_ASSISTANT_NAME, isCustom: false })
+      (async () => { const t = Date.now(); const r = await plan(ctx); planMs = Date.now() - t; return r; })(),
+      (async () => { const t = Date.now(); const r = await inventory(ctx, input.binId, '', 0, 50, input.language); invMs = Date.now() - t; return r; })(),
+      (async () => {
+        const t = Date.now();
+        const r = typeof getAssistantName === 'function'
+          ? await getAssistantName(ctx)
+          : { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
+        prefMs = Date.now() - t;
+        return r;
+      })()
     ]);
     const fallbackEntitlements = DEFAULT_COPILOT_ENTITLEMENTS || {
       tier: 'starter',
@@ -374,6 +389,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     const monthlyLimit = input.image ? copilot.monthlyUploads : copilot.monthlyMessages;
     const tokenCost = input.image ? tokenCosts.upload : tokenCosts.chat;
     const receiptId = identifier(body.requestId) || crypto.randomUUID();
+    const billingStart = Date.now();
     const billing = await rpc(ctx.db, 'copilot_consume_allowance', {
       p_actor: ctx.actor,
       p_kind: kind,
@@ -382,6 +398,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       p_token_cost: tokenCost,
       p_receipt: `copilot:${kind}:${receiptId}`
     });
+    const billingMs = Date.now() - billingStart;
     let assistantName = assistantPref.name;
     let assistantIsCustom = assistantPref.isCustom;
     const allowWeb = requestsWebPrices(input.query, input.history);
@@ -414,11 +431,14 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }];
     const sources: Source[] = [];
     const searchSuggestions: string[] = [];
-    let searches = 0, toolCalls = 0, evidenceSize = 0;
+    let searches = 0, toolCalls = 0, evidenceSize = 0, phase1Rounds = 0;
     const evidence: any[] = [];
+    const phase1Start = Date.now();
+    const thinkingConfig = { thinkingBudget: 0 };
     // Bounded read-only tool loop (plus user assistant-name preference). Skipped completely
     // when initial inventory is already complete and neither web prices nor rename is requested.
     if (needsToolPhase) for (let round = 0; round < 4 && toolCalls < 6 && evidenceSize < 120000; round++) {
+      phase1Rounds++;
       const candidate = await gemini({
         systemInstruction: {
           parts: [{
@@ -430,7 +450,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
         generationConfig: {
           temperature: 0.1,
           maxOutputTokens: 1024,
-          thinkingConfig: { thinkingBudget: 0 }
+          thinkingConfig
         }
       }, false, remaining(), stream?.signal);
       const calls = candidate.content.parts.filter((p: any) => p.functionCall);
@@ -542,14 +562,23 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       generationConfig: {
         temperature: 0.1,
         maxOutputTokens: 4096,
-        thinkingConfig: { thinkingBudget: 0 },
+        thinkingConfig,
         responseMimeType: 'application/json',
         responseSchema
       }
     };
+    const phase1Ms = needsToolPhase ? Date.now() - phase1Start : 0;
+    const phase2Start = Date.now();
+    let ttftMs: number | null = null;
+    let deltaChunks = 0;
     const raw = stream
-      ? await streamReply(finalRequest, stream.onText, stream.signal, remaining())
+      ? await streamReply(finalRequest, (delta) => {
+          if (ttftMs === null) ttftMs = Date.now() - phase2Start;
+          deltaChunks++;
+          stream.onText(delta);
+        }, stream.signal, remaining())
       : candidateText(await gemini(finalRequest, false, remaining()));
+    const phase2Ms = Date.now() - phase2Start;
     const answer = validateAnswer(JSON.parse(raw), sources);
     try {
       answer.actionProposal = await canonicalProposal(ctx, answer.actionProposal, input.binId);
@@ -561,10 +590,29 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       answer.reply += clarification;
       stream?.onText(clarification);
     }
+    const debugTiming = {
+      streaming: !!stream,
+      authMs,
+      bodyMs,
+      planMs,
+      invMs,
+      prefMs,
+      billingMs,
+      needsToolPhase,
+      hasMore: initial.hasMore,
+      phase1Rounds,
+      phase1Ms,
+      ttftMs,
+      deltaChunks,
+      phase2Ms,
+      totalMs: Date.now() - reqStart + (stream?.authMs ?? 0)
+    };
+    console.info('Copilot chat timing', debugTiming);
     return json({
       ...answer,
       assistantName,
       searchSuggestions,
+      debugTiming,
       ...(billing ? { billing } : {})
     });
   } catch (error) {
