@@ -2,7 +2,7 @@
 // VITE_IOS_APP_URL / VITE_ANDROID_APP_URL once the final listings are live.
 export const IOS_APP_URL: string =
   (import.meta.env.VITE_IOS_APP_URL as string | undefined) ||
-  'https://apps.apple.com/app/boxbin-inventory';
+  'https://apps.apple.com/app/boxbin/id6743129667';
 
 export const ANDROID_APP_URL: string =
   (import.meta.env.VITE_ANDROID_APP_URL as string | undefined) ||

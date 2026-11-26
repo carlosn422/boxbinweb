@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../../../../BinventoryQRAPI"
+		},
+		{
+			"path": "../../../../boxbin-web"
 		}
 	],
 	"settings": {}
