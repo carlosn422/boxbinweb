@@ -1,6 +1,5 @@
 import { readTokenBalance } from '@/services/recordService';
 import { createInventoryRecord } from '@/services/inventoryService';
-import { buildSalePayload, type ItemSaleStatus } from '@/lib/itemSales';
 import { buildSalePayload } from '@/lib/itemSales';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {

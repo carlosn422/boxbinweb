@@ -35,6 +35,7 @@ import { toast } from "sonner";
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import { openBinCopilot } from "@/services/boxbinCopilotService";
+import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
 
 const ITEMS_PER_PAGE = 12;
 
@@ -662,6 +663,9 @@ export default function HomeScreen() {
           </div>
 
         </div>
+
+        {/* Invite to the mobile app (dismissible) */}
+        <AppDownloadBanner variant="compact" dismissKey="home" />
 
         {/* Primary inventory action and supporting controls */}
         <div className="inventory-overview">

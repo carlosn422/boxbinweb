@@ -53,6 +53,7 @@ import { stripePromise } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import { useTranslation } from "react-i18next";
 import { resolvePlanCopilotLimits } from "@/lib/copilotPlans";
+import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
 
 
 
@@ -269,6 +270,7 @@ export default function ActiveSubscriptionPage() {
       )}
 
       <div className="container mx-auto px-4 sm:px-6 py-5 max-w-5xl space-y-4">
+        <AppDownloadBanner variant="compact" />
         {/* Top Header Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>

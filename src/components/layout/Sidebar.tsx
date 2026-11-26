@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import LogoFull from "@/assets/logo-full.png";
 import LogoIcon from "@/assets/logo-icon.png";
 import { LanguageSelector } from "./LanguageSelector";
-import { Home, QrCode, MapPin, Users, CreditCard, Sparkles, Download, LogOut, ChevronLeft, ChevronRight, MoreHorizontal, Bot, ShoppingBag } from "lucide-react";
+import { Home, QrCode, MapPin, Users, CreditCard, Sparkles, Download, LogOut, ChevronLeft, ChevronRight, MoreHorizontal, Bot, ShoppingBag, BookOpen } from "lucide-react";
 
 interface SidebarProps { className?: string; }
 
@@ -88,6 +88,12 @@ export function Sidebar({ className }: SidebarProps) {
       title: t("sidebar.exportInventory", { defaultValue: "Export Inventory" }),
       href: "/export-inventory",
       icon: Download,
+      badge: null,
+    },
+    {
+      title: t("sidebar.howItWorks", { defaultValue: "How it works" }),
+      href: "/how-it-works",
+      icon: BookOpen,
       badge: null,
     },
   ];

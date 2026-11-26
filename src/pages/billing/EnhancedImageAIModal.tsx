@@ -1,7 +1,6 @@
 import './photo-analysis.css';
 import { MarketReferences } from '@/components/ai/MarketReferences';
 import { readMarketResearch } from '@/lib/marketResearch';
-import { buildSalePayload, type ItemSaleStatus } from '@/lib/itemSales';
 import { buildSalePayload } from '@/lib/itemSales';
 import { readTokenBalance } from '@/services/recordService';
 import { createInventoryRecord } from '@/services/inventoryService';

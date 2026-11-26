@@ -21,6 +21,7 @@ import { TemplatesView } from "@/pages/smart-labels/components/TemplatesView";
 import LoginByToken from "@/pages/auth/login-by-token";
 import ExportInventory from "@/pages/dashboard/ExportInventory";
 import SalesListScreen from "@/pages/dashboard/SalesList";
+import HowItWorksPage from "@/pages/HowItWorks";
 import NotFoundPage from "./NotFoundPage";
 import TokensPurchasePage from "@/pages/billing/TokensPage";
 
@@ -153,7 +154,30 @@ const RedirectIfAuthenticated = ({
 
 };
 
+// Public guide: shown inside the dashboard layout when signed in, standalone otherwise.
+const HowItWorksRoute = () => {
+  const { currentUser, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  return currentUser ? (
+    <DashboardLayout>
+      <HowItWorksPage embedded />
+    </DashboardLayout>
+  ) : (
+    <HowItWorksPage />
+  );
+};
+
 const router = createBrowserRouter([
+  {
+    path: "/how-it-works",
+    element: <HowItWorksRoute />,
+  },
   {
     path: "/",
     element: <Navigate to="/home" replace />,

@@ -6,6 +6,9 @@ import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { LanguageSelector } from "@/components/layout/LanguageSelector";
+import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
+import { LEGAL_LINKS } from "@/config/appLinks";
+import { Link } from "react-router-dom";
 import {
   QrCode,
   Search,
@@ -15,6 +18,7 @@ import {
   Sparkles,
   Loader2,
   ExternalLink,
+  BookOpen,
 } from "lucide-react";
 
 const LoginPage = () => {
@@ -102,6 +106,13 @@ const LoginPage = () => {
         </a>
 
         <div className="flex items-center space-x-3">
+          <Link
+            to="/how-it-works"
+            className="hidden sm:inline-flex h-9 px-3 items-center gap-1.5 bg-white border border-slate-200/90 shadow-2xs hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700"
+          >
+            <BookOpen className="w-3.5 h-3.5 text-brand-600" />
+            {t("webHowItWorks.menuTitle", { defaultValue: "How it works" })}
+          </Link>
           <LanguageSelector className="h-9 px-3 bg-white border border-slate-200/90 shadow-2xs hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700" />
         </div>
       </header>
@@ -257,10 +268,13 @@ const LoginPage = () => {
                 </div>
               </div>
 
+              {/* Invite to the mobile app */}
+              <AppDownloadBanner variant="hero" className="mt-5" />
+
               {/* Legal & Help Links */}
               <div className="flex items-center justify-center space-x-4 text-xs text-slate-500 mt-6">
                 <a
-                  href="https://boxbin.io/terms-of-service/"
+                  href={LEGAL_LINKS.terms}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-brand-600 transition-colors"
@@ -269,7 +283,7 @@ const LoginPage = () => {
                 </a>
                 <span>•</span>
                 <a
-                  href="https://boxbin.io/privacy-policy/"
+                  href={LEGAL_LINKS.privacy}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-brand-600 transition-colors"
@@ -278,7 +292,7 @@ const LoginPage = () => {
                 </a>
                 <span>•</span>
                 <a
-                  href="https://boxbin.io/support/"
+                  href={LEGAL_LINKS.support}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-brand-600 transition-colors inline-flex items-center gap-1"
