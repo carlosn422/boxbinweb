@@ -1,5 +1,13 @@
 import { MarketReferences } from '@/components/ai/MarketReferences';
 import type { MarketResearch } from '@/lib/marketResearch';
+import {
+  type ItemSaleStatus,
+  buildSalePayload,
+  getSaleStoreLabel,
+  normalizeSaleStatus,
+  normalizeSaleUrl,
+  parseSalePrice,
+} from '@/lib/itemSales';
 import { uploadInventoryImage } from '@/services/storageService';
 import i18n from 'i18next';
 import { createInventoryRecord, updateInventoryRecord, deleteInventoryRecord, inventoryError } from '@/services/inventoryService';
@@ -38,6 +46,11 @@ import {
   Box,
   Calendar,
   MoreVertical,
+  ShoppingBag,
+  CheckCircle2,
+  ExternalLink,
+  Link as LinkIcon,
+  Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -147,6 +160,10 @@ export interface Item {
   value: string;
   quantity?: string | number;
   market_research?: MarketResearch | null;
+  sale_status?: ItemSaleStatus | null;
+  sale_price?: string | null;
+  sale_url?: string | null;
+  sold_at?: string | null;
 }
 
 const BinDetailsScreen: React.FC = () => {
@@ -202,6 +219,7 @@ const BinDetailsScreen: React.FC = () => {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [saleFilter, setSaleFilter] = useState<"all" | "for_sale" | "sold">("all");
   const [sortBy, setSortBy] = useState<"date" | "name" | "value-desc" | "qty-desc">("date");
 
   // Modal dialog states
@@ -232,6 +250,10 @@ const BinDetailsScreen: React.FC = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSavingItem, setIsSavingItem] = useState(false);
+  const [itemForSale, setItemForSale] = useState(false);
+  const [itemSaleStatus, setItemSaleStatus] = useState<ItemSaleStatus>("for_sale");
+  const [itemSalePrice, setItemSalePrice] = useState<string>("");
+  const [itemSaleUrl, setItemSaleUrl] = useState<string>("");
 
   // Bin form states
   const [binName, setBinName] = useState("");
@@ -444,6 +466,17 @@ const BinDetailsScreen: React.FC = () => {
     setItemTags(item.tags || []);
     setSelectedImage(item.imageUrl || null);
     setSelectedFile(null);
+    const st = normalizeSaleStatus(item.sale_status);
+    setItemForSale(st !== "not_for_sale");
+    setItemSaleStatus(st === "sold" ? "sold" : "for_sale");
+    setItemSalePrice(
+      item.sale_price != null && String(item.sale_price).trim() !== ""
+        ? String(item.sale_price)
+        : item.value && item.value !== "0"
+          ? String(item.value)
+          : ""
+    );
+    setItemSaleUrl(item.sale_url || "");
     setIsEditItemOpen(true);
   };
 
@@ -457,6 +490,10 @@ const BinDetailsScreen: React.FC = () => {
     setSelectedImage(null);
     setSelectedFile(null);
     setCurrentItem(null);
+    setItemForSale(false);
+    setItemSaleStatus("for_sale");
+    setItemSalePrice("");
+    setItemSaleUrl("");
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -508,16 +545,30 @@ const BinDetailsScreen: React.FC = () => {
         }
       }
 
+      const salePayload = buildSalePayload({
+        enabled: itemForSale,
+        status: itemSaleStatus,
+        salePrice: itemSalePrice,
+        saleUrl: itemSaleUrl,
+        fallbackValue: itemValue,
+      });
+
+      const effectiveValue =
+        itemValue && String(itemValue).trim() !== ""
+          ? itemValue.toString().trim()
+          : salePayload.sale_price || "0";
+
       const itemData = {
         name: itemName.trim(),
         description: itemDescription.trim(),
         cuantity: itemCuantity.toString(),
         quantity: itemCuantity,
-        value: itemValue ? itemValue.toString().trim() : "0",
+        value: effectiveValue,
         tags: itemTags,
         createdAt: new Date().toISOString(),
         binId: id!,
         userId: effectiveUserId,
+        ...salePayload,
         ...(imageUrl && { imageUrl }),
       };
 
@@ -548,13 +599,28 @@ const BinDetailsScreen: React.FC = () => {
     try {
       setIsSavingItem(true);
 
+      const salePayload = buildSalePayload({
+        enabled: itemForSale,
+        status: itemSaleStatus,
+        salePrice: itemSalePrice,
+        saleUrl: itemSaleUrl,
+        fallbackValue: itemValue,
+        previousSoldAt: currentItem.sold_at,
+      });
+
+      const effectiveValue =
+        itemValue && String(itemValue).trim() !== ""
+          ? itemValue.toString().trim()
+          : salePayload.sale_price || "0";
+
       const updateData: Partial<Item> & { quantity?: string | number } = {
         name: itemName.trim(),
         description: itemDescription.trim(),
         tags: itemTags,
-        value: itemValue ? itemValue.toString().trim() : "0",
+        value: effectiveValue,
         cuantity: itemCuantity.toString(),
         quantity: itemCuantity.toString(),
+        ...salePayload,
       };
 
       if (selectedFile && selectedImage !== currentItem.imageUrl) {
@@ -579,6 +645,32 @@ const BinDetailsScreen: React.FC = () => {
       toast.error(inventoryError(error, t("containers.itemUpdateErrorToast", { defaultValue: "Failed to update item" })));
     } finally {
       setIsSavingItem(false);
+    }
+  };
+
+  // Toggle item sold / for_sale status directly from card
+  const handleToggleItemSold = async (item: Item) => {
+    if (!effectiveUserId) return;
+    const currentSt = normalizeSaleStatus(item.sale_status);
+    const nextSt: ItemSaleStatus = currentSt === "sold" ? "for_sale" : "sold";
+    try {
+      const payload = buildSalePayload({
+        enabled: true,
+        status: nextSt,
+        salePrice: item.sale_price,
+        saleUrl: item.sale_url,
+        fallbackValue: item.value,
+        previousSoldAt: item.sold_at,
+      });
+      const saved = await updateInventoryRecord("items", effectiveUserId, item.id, payload);
+      setItems((prev) => prev.map((it) => (it.id === saved.id ? (saved as Item) : it)));
+      toast.success(
+        nextSt === "sold"
+          ? t("sales.markedSoldToast", { name: item.name, defaultValue: `"${item.name}" marked as sold` })
+          : t("sales.markedForSaleToast", { name: item.name, defaultValue: `"${item.name}" marked as for sale` })
+      );
+    } catch (error) {
+      toast.error(inventoryError(error, t("sales.updateError", { defaultValue: "Failed to update sale status" })));
     }
   };
 
@@ -701,8 +793,11 @@ const BinDetailsScreen: React.FC = () => {
           it.tags?.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
 
         const matchesTag = !selectedTag || it.tags?.includes(selectedTag);
+        const st = normalizeSaleStatus(it.sale_status);
+        const matchesSale =
+          saleFilter === "all" || st === saleFilter;
 
-        return matchesQuery && matchesTag;
+        return matchesQuery && matchesTag && matchesSale;
       })
       .sort((a, b) => {
         if (sortBy === "name") {
@@ -718,7 +813,7 @@ const BinDetailsScreen: React.FC = () => {
         }
         return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
       });
-  }, [items, searchQuery, selectedTag, sortBy]);
+  }, [items, searchQuery, selectedTag, saleFilter, sortBy]);
 
   if (loading || authLoading) {
     return (
@@ -990,6 +1085,108 @@ const BinDetailsScreen: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Sales List Section */}
+      <div className="rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3.5 space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-slate-900">
+                {t("sales.listForSaleToggle", { defaultValue: "Add to Sales List" })}
+              </p>
+              <p className="text-[10px] text-slate-500">
+                {t("sales.listForSaleHint", {
+                  defaultValue: "Track sale price, eBay/store link, and sold status",
+                })}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            role="switch"
+            aria-checked={itemForSale}
+            onClick={() => {
+              const next = !itemForSale;
+              setItemForSale(next);
+              if (next && !itemSalePrice && itemValue) {
+                setItemSalePrice(String(itemValue));
+              }
+            }}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${itemForSale ? "bg-amber-500" : "bg-slate-200"
+              }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition ${itemForSale ? "translate-x-5" : "translate-x-0"
+                }`}
+            />
+          </button>
+        </div>
+
+        {itemForSale && (
+          <div className="space-y-3 pt-2 border-t border-slate-200/70">
+            <div className="grid grid-cols-2 gap-2.5">
+              <div>
+                <Label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  {t("sales.priceLabel", { defaultValue: "Sale Price ($ USD)" })}
+                </Label>
+                <div className="relative">
+                  <DollarSign className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <Input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={itemSalePrice}
+                    onChange={(e) => setItemSalePrice(e.target.value)}
+                    placeholder={itemValue ? String(itemValue) : "0.00"}
+                    className="h-8 pl-7 text-xs rounded-xl border-slate-200 bg-white font-mono font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-[11px] font-bold text-slate-700 block mb-1">
+                  {t("sales.statusLabel", { defaultValue: "Sale Status" })}
+                </Label>
+                <select
+                  value={itemSaleStatus}
+                  onChange={(e) =>
+                    setItemSaleStatus(e.target.value === "sold" ? "sold" : "for_sale")
+                  }
+                  className="h-8 w-full rounded-xl border border-slate-200 bg-white px-2 text-xs font-bold text-slate-800"
+                >
+                  <option value="for_sale">
+                    {t("sales.statusForSale", { defaultValue: "For Sale" })}
+                  </option>
+                  <option value="sold">
+                    {t("sales.statusSold", { defaultValue: "Sold" })}
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-[11px] font-bold text-slate-700 block mb-1">
+                {t("sales.urlLabel", {
+                  defaultValue: "Listing URL (eBay, Amazon, Marketplace...)",
+                })}
+              </Label>
+              <Input
+                type="url"
+                value={itemSaleUrl}
+                onChange={(e) => setItemSaleUrl(e.target.value)}
+                placeholder={t("sales.urlPlaceholder", {
+                  defaultValue: "https://www.ebay.com/itm/...",
+                })}
+                className="h-8 text-xs rounded-xl border-slate-200 bg-white"
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -1054,21 +1251,21 @@ const BinDetailsScreen: React.FC = () => {
               </div>
 
               <ResponsiveDisclosure label={t("workspaceDesign.details")} className="bin-detail-metadata">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-1.5 text-xs text-slate-500">
-                {bin.description && (
-                  <span className="text-slate-600 truncate max-w-md">{bin.description}</span>
-                )}
-                {bin.address && (
-                  <span className="flex items-center gap-1.5 text-slate-500 truncate max-w-sm">
-                    <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    <span>{bin.address}</span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mt-1.5 text-xs text-slate-500">
+                  {bin.description && (
+                    <span className="text-slate-600 truncate max-w-md">{bin.description}</span>
+                  )}
+                  {bin.address && (
+                    <span className="flex items-center gap-1.5 text-slate-500 truncate max-w-sm">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{bin.address}</span>
+                    </span>
+                  )}
+                  <span className="flex items-center gap-1.5 text-slate-400 shrink-0">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span>{new Date(bin.createdAt).toLocaleDateString()}</span>
                   </span>
-                )}
-                <span className="flex items-center gap-1.5 text-slate-400 shrink-0">
-                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{new Date(bin.createdAt).toLocaleDateString()}</span>
-                </span>
-              </div>
+                </div>
               </ResponsiveDisclosure>
             </div>
           </div>
@@ -1076,6 +1273,17 @@ const BinDetailsScreen: React.FC = () => {
           {/* Right: Actions Suite */}
           <div className="bin-detail-actions">
             {/* Copilot IA */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate("/sales")}
+              className="h-9 px-3 bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-900 rounded-xl text-xs font-bold shadow-2xs flex items-center gap-1.5"
+              title={t("sales.title", { defaultValue: "Sales List" })}
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-amber-600" />
+              <span>{t("sales.title", { defaultValue: "Sales List" })}</span>
+            </Button>
+
             <Button
               variant="outline"
               size="sm"
@@ -1088,135 +1296,135 @@ const BinDetailsScreen: React.FC = () => {
             </Button>
 
             <ResponsiveDisclosure label={t("workspaceDesign.tools")} className="bin-detail-tools">
-            {/* AI Recognition Tools Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
-                >
-                  <ScanLine className="w-3.5 h-3.5 text-brand-600" />
-                  <span>{t("containers.aiTools", { defaultValue: "AI Tools" })}</span>
-                  <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 text-xs rounded-2xl shadow-xl border-slate-200 p-1.5 bg-white">
-                <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2.5 py-1.5">
-                  {t("containers.aiRecognition", { defaultValue: "AI Recognition" })}
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => setIsImagesUploadOpen(true)}
-                  className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
-                    <ImageIcon className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-900">{t("containers.scanPhotos", { defaultValue: "Scan from Photos" })}</div>
-                    <div className="text-[10px] text-slate-400">{t("containers.scanPhotosDesc", { defaultValue: "Detect items automatically" })}</div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setIsVideoUploadOpen(true)}
-                  className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50 transition-colors"
-                >
-                  <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
-                    <Video className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="font-bold text-slate-900">{t("containers.scanVideo", { defaultValue: "Scan from Video" })}</div>
-                    <div className="text-[10px] text-slate-400">{t("containers.scanVideoDesc", { defaultValue: "Process video walkthrough" })}</div>
-                  </div>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+              {/* AI Recognition Tools Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
+                  >
+                    <ScanLine className="w-3.5 h-3.5 text-brand-600" />
+                    <span>{t("containers.aiTools", { defaultValue: "AI Tools" })}</span>
+                    <ChevronDown className="w-3 h-3 text-slate-400 ml-0.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 text-xs rounded-2xl shadow-xl border-slate-200 p-1.5 bg-white">
+                  <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2.5 py-1.5">
+                    {t("containers.aiRecognition", { defaultValue: "AI Recognition" })}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => setIsImagesUploadOpen(true)}
+                    className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                      <ImageIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">{t("containers.scanPhotos", { defaultValue: "Scan from Photos" })}</div>
+                      <div className="text-[10px] text-slate-400">{t("containers.scanPhotosDesc", { defaultValue: "Detect items automatically" })}</div>
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setIsVideoUploadOpen(true)}
+                    className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2.5 hover:bg-slate-50 transition-colors"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+                      <Video className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="font-bold text-slate-900">{t("containers.scanVideo", { defaultValue: "Scan from Video" })}</div>
+                      <div className="text-[10px] text-slate-400">{t("containers.scanVideoDesc", { defaultValue: "Process video walkthrough" })}</div>
+                    </div>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            {/* Bulk Upload Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsBulkUploadOpen(true)}
-              className="h-9 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
-            >
-              <UploadCloud className="w-3.5 h-3.5 text-brand-600" />
-              <span>{t("containers.bulkUpload", { defaultValue: "Bulk Upload" })}</span>
-            </Button>
+              {/* Bulk Upload Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsBulkUploadOpen(true)}
+                className="h-9 px-3 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl text-xs font-semibold shadow-2xs flex items-center gap-1.5"
+              >
+                <UploadCloud className="w-3.5 h-3.5 text-brand-600" />
+                <span>{t("containers.bulkUpload", { defaultValue: "Bulk Upload" })}</span>
+              </Button>
 
-            {/* Refresh container */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="h-9 w-9 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl shadow-2xs"
-              title={t("containers.refreshTooltip", { defaultValue: "Refresh container" })}
-            >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-brand-600" : "text-slate-500"}`}
-              />
-            </Button>
+              {/* Refresh container */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="h-9 w-9 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-700 rounded-xl shadow-2xs"
+                title={t("containers.refreshTooltip", { defaultValue: "Refresh container" })}
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-brand-600" : "text-slate-500"}`}
+                />
+              </Button>
 
-            {/* Container Options Dropdown: Edit & Delete */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 w-9 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 rounded-xl shadow-2xs"
-                  title={t("containers.manageContainer", { defaultValue: "Manage container" })}
-                >
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 text-xs rounded-2xl shadow-xl border-slate-200 p-1.5 bg-white">
-                <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                  {t("containers.manageContainer", { defaultValue: "Manage container" })}
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={handleEditBin}
-                  className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2 hover:bg-slate-50 text-slate-700 font-semibold"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>{t("actions.edit", { defaultValue: "Edit" })}</span>
-                </DropdownMenuItem>
+              {/* Container Options Dropdown: Edit & Delete */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-9 p-0 bg-white hover:bg-slate-50 border-slate-200 text-slate-600 rounded-xl shadow-2xs"
+                    title={t("containers.manageContainer", { defaultValue: "Manage container" })}
+                  >
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 text-xs rounded-2xl shadow-xl border-slate-200 p-1.5 bg-white">
+                  <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                    {t("containers.manageContainer", { defaultValue: "Manage container" })}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={handleEditBin}
+                    className="cursor-pointer rounded-xl px-2.5 py-2 flex items-center gap-2 hover:bg-slate-50 text-slate-700 font-semibold"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>{t("actions.edit", { defaultValue: "Edit" })}</span>
+                  </DropdownMenuItem>
 
-                <DropdownMenuSeparator className="my-1 bg-slate-100" />
+                  <DropdownMenuSeparator className="my-1 bg-slate-100" />
 
-                <DropdownMenuItem onSelect={() => setIsDeleteBinOpen(true)} className="text-red-600 focus:text-red-600">
-                  <Trash2 className="w-3.5 h-3.5 mr-2" />
-                  {t("actions.delete", { defaultValue: "Delete" })}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem onSelect={() => setIsDeleteBinOpen(true)} className="text-red-600 focus:text-red-600">
+                    <Trash2 className="w-3.5 h-3.5 mr-2" />
+                    {t("actions.delete", { defaultValue: "Delete" })}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            <AlertDialog open={isDeleteBinOpen} onOpenChange={setIsDeleteBinOpen}>
-                  <AlertDialogContent className="workspace-safe-dialog rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-md p-6">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle className="text-base font-black text-slate-900">
-                        {t("containers.deleteConfirmTitle", { name: bin.name, defaultValue: `Delete "${bin.name}"?` })}
-                      </AlertDialogTitle>
-                      <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed mt-1">
-                        {t("containers.deleteConfirmDesc", {
-                          count: items.length,
-                          defaultValue: `This will permanently delete this container and all ${items.length} items stored inside it.`,
-                        })}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter className="pt-4">
-                      <AlertDialogCancel className="rounded-xl border-slate-200 text-xs h-9 font-semibold">
-                        {t("actions.cancel", { defaultValue: "Cancel" })}
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleDeleteBin}
-                        disabled={isDeletingBin}
-                        className="rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs h-9 font-bold shadow-sm"
-                      >
-                        {isDeletingBin ? t("containers.deleting", { defaultValue: "Deleting..." }) : t("containers.deleteConfirmBtn", { defaultValue: "Delete Container" })}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-            </AlertDialog>
+              <AlertDialog open={isDeleteBinOpen} onOpenChange={setIsDeleteBinOpen}>
+                <AlertDialogContent className="workspace-safe-dialog rounded-3xl border border-slate-200 shadow-2xl bg-white max-w-md p-6">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-base font-black text-slate-900">
+                      {t("containers.deleteConfirmTitle", { name: bin.name, defaultValue: `Delete "${bin.name}"?` })}
+                    </AlertDialogTitle>
+                    <AlertDialogDescription className="text-xs text-slate-500 leading-relaxed mt-1">
+                      {t("containers.deleteConfirmDesc", {
+                        count: items.length,
+                        defaultValue: `This will permanently delete this container and all ${items.length} items stored inside it.`,
+                      })}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="pt-4">
+                    <AlertDialogCancel className="rounded-xl border-slate-200 text-xs h-9 font-semibold">
+                      {t("actions.cancel", { defaultValue: "Cancel" })}
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteBin}
+                      disabled={isDeletingBin}
+                      className="rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs h-9 font-bold shadow-sm"
+                    >
+                      {isDeletingBin ? t("containers.deleting", { defaultValue: "Deleting..." }) : t("containers.deleteConfirmBtn", { defaultValue: "Delete Container" })}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
             </ResponsiveDisclosure>
 
@@ -1320,94 +1528,131 @@ const BinDetailsScreen: React.FC = () => {
           </div>
 
           <ResponsiveDisclosure label={t("workspaceDesign.sortAndView")} className="bin-detail-filter-options">
-          {/* Filter, Sort, & View Mode Switcher */}
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
-            {/* Sort Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 px-3 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold shadow-2xs"
-                >
-                  <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
-                  <span>
-                    {sortBy === "name"
-                      ? t("containers.sortName", { defaultValue: "Name (A - Z)" })
-                      : sortBy === "value-desc"
-                        ? t("containers.sortValueDesc", { defaultValue: "Value (Highest)" })
-                        : sortBy === "qty-desc"
-                          ? t("containers.sortQtyDesc", { defaultValue: "Quantity (Highest)" })
-                          : t("containers.sortDate", { defaultValue: "Recently Added" })}
-                  </span>
-                  <ChevronDown className="w-3 h-3 ml-1 text-slate-400" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 text-xs rounded-2xl shadow-xl border-slate-200 p-1 bg-white">
-                <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                  {t("containers.sortOrder", { defaultValue: "Sort order" })}
-                </DropdownMenuLabel>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("date")}
-                  className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "date" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
-                >
-                  {t("containers.sortDate", { defaultValue: "Recently Added" })}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("name")}
-                  className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "name" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
-                >
-                  {t("containers.sortName", { defaultValue: "Name (A - Z)" })}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("value-desc")}
-                  className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "value-desc" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
-                >
-                  {t("containers.sortValueDesc", { defaultValue: "Value (Highest)" })}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSortBy("qty-desc")}
-                  className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "qty-desc" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
-                >
-                  {t("containers.sortQtyDesc", { defaultValue: "Quantity (Highest)" })}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Filter, Sort, & View Mode Switcher */}
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-end">
+              {/* Sort Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 px-3 bg-white border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl text-xs font-semibold shadow-2xs"
+                  >
+                    <ArrowUpDown className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                    <span>
+                      {sortBy === "name"
+                        ? t("containers.sortName", { defaultValue: "Name (A - Z)" })
+                        : sortBy === "value-desc"
+                          ? t("containers.sortValueDesc", { defaultValue: "Value (Highest)" })
+                          : sortBy === "qty-desc"
+                            ? t("containers.sortQtyDesc", { defaultValue: "Quantity (Highest)" })
+                            : t("containers.sortDate", { defaultValue: "Recently Added" })}
+                    </span>
+                    <ChevronDown className="w-3 h-3 ml-1 text-slate-400" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 text-xs rounded-2xl shadow-xl border-slate-200 p-1 bg-white">
+                  <DropdownMenuLabel className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                    {t("containers.sortOrder", { defaultValue: "Sort order" })}
+                  </DropdownMenuLabel>
+                  <DropdownMenuItem
+                    onClick={() => setSortBy("date")}
+                    className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "date" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
+                  >
+                    {t("containers.sortDate", { defaultValue: "Recently Added" })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSortBy("name")}
+                    className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "name" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
+                  >
+                    {t("containers.sortName", { defaultValue: "Name (A - Z)" })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSortBy("value-desc")}
+                    className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "value-desc" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
+                  >
+                    {t("containers.sortValueDesc", { defaultValue: "Value (Highest)" })}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setSortBy("qty-desc")}
+                    className={`cursor-pointer rounded-xl px-2.5 py-1.5 text-xs font-medium ${sortBy === "qty-desc" ? "bg-slate-100 text-slate-900 font-bold" : "text-slate-600"}`}
+                  >
+                    {t("containers.sortQtyDesc", { defaultValue: "Quantity (Highest)" })}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
-            {/* View Mode Toggle (Grid vs List) */}
-            <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode("grid")}
-                className={`h-7 w-7 p-0 rounded-lg transition-all ${
-                  viewMode === "grid"
-                    ? "bg-white text-slate-900 shadow-2xs font-bold"
-                    : "text-slate-400 hover:text-slate-700"
-                }`}
-                aria-pressed={viewMode === "grid"}
-                title={t("containers.gridView", { defaultValue: "Grid view" })}
-              >
-                <Grid className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewMode("list")}
-                className={`h-7 w-7 p-0 rounded-lg transition-all ${
-                  viewMode === "list"
-                    ? "bg-white text-slate-900 shadow-2xs font-bold"
-                    : "text-slate-400 hover:text-slate-700"
-                }`}
-                aria-pressed={viewMode === "list"}
-                title={t("containers.listView", { defaultValue: "List view" })}
-              >
-                <List className="w-3.5 h-3.5" />
-              </Button>
+              {/* View Mode Toggle (Grid vs List) */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/80 shadow-2xs">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewMode("grid")}
+                  className={`h-7 w-7 p-0 rounded-lg transition-all ${viewMode === "grid"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-400 hover:text-slate-700"
+                    }`}
+                  aria-pressed={viewMode === "grid"}
+                  title={t("containers.gridView", { defaultValue: "Grid view" })}
+                >
+                  <Grid className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setViewMode("list")}
+                  className={`h-7 w-7 p-0 rounded-lg transition-all ${viewMode === "list"
+                      ? "bg-white text-slate-900 shadow-2xs font-bold"
+                      : "text-slate-400 hover:text-slate-700"
+                    }`}
+                  aria-pressed={viewMode === "list"}
+                  title={t("containers.listView", { defaultValue: "List view" })}
+                >
+                  <List className="w-3.5 h-3.5" />
+                </Button>
+              </div>
             </div>
-          </div>
           </ResponsiveDisclosure>
         </div>
+
+        {/* Sales Filter Pills */}
+        {items.some((it) => normalizeSaleStatus(it.sale_status) !== "not_for_sale") && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+            {(["all", "for_sale", "sold"] as const).map((st) => {
+              const active = saleFilter === st;
+              const count =
+                st === "all"
+                  ? items.length
+                  : items.filter((it) => normalizeSaleStatus(it.sale_status) === st).length;
+              const label =
+                st === "all"
+                  ? t("sales.filterAllItems", { defaultValue: "All Items" })
+                  : st === "for_sale"
+                    ? t("sales.statusForSale", { defaultValue: "For Sale" })
+                    : t("sales.statusSold", { defaultValue: "Sold" });
+              return (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setSaleFilter(st)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shadow-2xs ${active
+                      ? st === "sold"
+                        ? "bg-emerald-600 text-white"
+                        : st === "for_sale"
+                          ? "bg-amber-500 text-slate-950"
+                          : "bg-slate-900 text-white"
+                      : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                >
+                  <Tag className="w-3 h-3" />
+                  <span>
+                    {label} ({count})
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Interactive Tags Ribbon Strip */}
         {allTags.length > 0 && (
@@ -1415,11 +1660,10 @@ const BinDetailsScreen: React.FC = () => {
             <button
               aria-pressed={!selectedTag}
               onClick={() => setSelectedTag(null)}
-              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-2xs ${
-                !selectedTag
+              className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-2xs ${!selectedTag
                   ? "bg-slate-900 text-white shadow-sm"
                   : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              }`}
+                }`}
             >
               {t("containers.allTags", { defaultValue: "All Tags" })} ({items.length})
             </button>
@@ -1431,17 +1675,15 @@ const BinDetailsScreen: React.FC = () => {
                   key={tag}
                   aria-pressed={isSelected}
                   onClick={() => setSelectedTag(isSelected ? null : tag)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shadow-2xs ${
-                    isSelected
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 shadow-2xs ${isSelected
                       ? "bg-brand-600 text-white shadow-sm font-bold"
                       : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
-                  }`}
+                    }`}
                 >
                   <span>#{tag}</span>
                   <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${
-                      isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                    }`}
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                      }`}
                   >
                     {count}
                   </span>
@@ -1607,6 +1849,83 @@ const BinDetailsScreen: React.FC = () => {
 
                     <MarketReferences research={item.market_research} />
 
+                    {/* Sales Status & Actions on Item Card */}
+                    {normalizeSaleStatus(item.sale_status) !== "not_for_sale" && (() => {
+                      const st = normalizeSaleStatus(item.sale_status);
+                      const isSold = st === "sold";
+                      const sPrice = parseSalePrice(item.sale_price, item.value);
+                      const sUrl = normalizeSaleUrl(item.sale_url);
+                      const storeName = getSaleStoreLabel(sUrl);
+                      return (
+                        <div className="mt-2.5 p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/80 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isSold
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                  : "bg-amber-100 text-amber-900 border border-amber-200"
+                                }`}
+                            >
+                              <Tag className="w-3 h-3" />
+                              <span>
+                                {isSold
+                                  ? t("sales.statusSold", { defaultValue: "Sold" })
+                                  : t("sales.statusForSale", { defaultValue: "For Sale" })}
+                              </span>
+                            </span>
+                            {sPrice > 0 && (
+                              <span className="text-xs font-mono font-bold text-slate-900">
+                                ${sPrice.toFixed(2)} USD
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center justify-between gap-1.5">
+                            {sUrl ? (
+                              <a
+                                href={sUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline truncate"
+                              >
+                                <LinkIcon className="w-3 h-3 shrink-0" />
+                                <span className="truncate">
+                                  {t("sales.viewOnStore", {
+                                    store: storeName,
+                                    defaultValue: `View on ${storeName}`,
+                                  })}
+                                </span>
+                                <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                              </a>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">
+                                {t("sales.noListingUrl", { defaultValue: "No listing URL" })}
+                              </span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleToggleItemSold(item);
+                              }}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 shrink-0 transition-colors ${isSold
+                                  ? "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                                  : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                }`}
+                            >
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span>
+                                {isSold
+                                  ? t("sales.markForSaleBtn", { defaultValue: "Mark For Sale" })
+                                  : t("sales.markSoldBtn", { defaultValue: "Mark as Sold" })}
+                              </span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {/* Card Footer Divider & Actions */}
                     <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
                       <span className="text-[11px] text-slate-400 font-medium">
@@ -1732,6 +2051,83 @@ const BinDetailsScreen: React.FC = () => {
                         </div>
                       )}
                       <MarketReferences research={item.market_research} />
+
+                      {/* Sales Status & Actions on Item Card */}
+                      {normalizeSaleStatus(item.sale_status) !== "not_for_sale" && (() => {
+                        const st = normalizeSaleStatus(item.sale_status);
+                        const isSold = st === "sold";
+                        const sPrice = parseSalePrice(item.sale_price, item.value);
+                        const sUrl = normalizeSaleUrl(item.sale_url);
+                        const storeName = getSaleStoreLabel(sUrl);
+                        return (
+                          <div className="mt-2.5 p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/80 space-y-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isSold
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    : "bg-amber-100 text-amber-900 border border-amber-200"
+                                  }`}
+                              >
+                                <Tag className="w-3 h-3" />
+                                <span>
+                                  {isSold
+                                    ? t("sales.statusSold", { defaultValue: "Sold" })
+                                    : t("sales.statusForSale", { defaultValue: "For Sale" })}
+                                </span>
+                              </span>
+                              {sPrice > 0 && (
+                                <span className="text-xs font-mono font-bold text-slate-900">
+                                  ${sPrice.toFixed(2)} USD
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between gap-1.5">
+                              {sUrl ? (
+                                <a
+                                  href={sUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:underline truncate"
+                                >
+                                  <LinkIcon className="w-3 h-3 shrink-0" />
+                                  <span className="truncate">
+                                    {t("sales.viewOnStore", {
+                                      store: storeName,
+                                      defaultValue: `View on ${storeName}`,
+                                    })}
+                                  </span>
+                                  <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-slate-400">
+                                  {t("sales.noListingUrl", { defaultValue: "No listing URL" })}
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  void handleToggleItemSold(item);
+                                }}
+                                className={`px-2 py-1 rounded-lg text-[10px] font-bold inline-flex items-center gap-1 shrink-0 transition-colors ${isSold
+                                    ? "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                                    : "bg-emerald-600 text-white hover:bg-emerald-700"
+                                  }`}
+                              >
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span>
+                                  {isSold
+                                    ? t("sales.markForSaleBtn", { defaultValue: "Mark For Sale" })
+                                    : t("sales.markSoldBtn", { defaultValue: "Mark as Sold" })}
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

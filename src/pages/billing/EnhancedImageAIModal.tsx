@@ -1,6 +1,8 @@
 import './photo-analysis.css';
 import { MarketReferences } from '@/components/ai/MarketReferences';
 import { readMarketResearch } from '@/lib/marketResearch';
+import { buildSalePayload, type ItemSaleStatus } from '@/lib/itemSales';
+import { buildSalePayload } from '@/lib/itemSales';
 import { readTokenBalance } from '@/services/recordService';
 import { createInventoryRecord } from '@/services/inventoryService';
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -275,13 +277,26 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
       if (moveError || !moveResult?.newUrl) throw new Error(t('records.imageSaveFailed'));
       const finalUrl = moveResult.newUrl;
 
+      const offerPrice =
+        item.selectedOffer != null
+          ? readMarketResearch(item.market_research)?.offers[item.selectedOffer]?.price?.toString()
+          : undefined;
+      const salePayload = buildSalePayload({
+        enabled: Boolean(item.forSale),
+        status: item.saleStatus === "sold" ? "sold" : "for_sale",
+        salePrice: item.salePrice ?? offerPrice,
+        saleUrl: item.saleUrl,
+        fallbackValue: offerPrice,
+      });
+
       const newItemData = {
         name: item.label,
         description: item.description || "",
         quantity: 1,
         cuantity: "1",
-        value: readMarketResearch(item.market_research)?.offers[item.selectedOffer]?.price?.toString() ?? "",
+        value: offerPrice ?? salePayload.sale_price ?? "",
         market_research: readMarketResearch(item.market_research),
+        ...salePayload,
         tags: item.tags || [],
         confidence: item.confidence,
         createdAt: new Date().toISOString(),
@@ -709,14 +724,85 @@ const EnhancedImagesAIModal: React.FC<EnhancedImagesAIModalProps> = ({
                     {!!readMarketResearch(item.market_research)?.offers.length && <label className="mt-2 block text-xs text-slate-600">
                       {t('market.inventoryValue')}
                       <select className="mt-1 w-full min-w-0 rounded border border-slate-200 bg-white p-1.5" value={item.selectedOffer ?? ''}
-                        onChange={event => setDetectedItems(previous => previous.map(detected => detected.id === item.id
-                          ? { ...detected, selectedOffer: event.target.value === '' ? undefined : Number(event.target.value) } : detected))}>
+                        onChange={event => {
+                          const nextOfferIdx = event.target.value === '' ? undefined : Number(event.target.value);
+                          const pickedOffer = nextOfferIdx != null ? readMarketResearch(item.market_research)?.offers[nextOfferIdx] : undefined;
+                          setDetectedItems(previous => previous.map(detected => detected.id === item.id
+                            ? {
+                                ...detected,
+                                selectedOffer: nextOfferIdx,
+                                ...(pickedOffer && !detected.salePrice ? { salePrice: pickedOffer.price.toFixed(2) } : {}),
+                              } : detected));
+                        }}>
                         <option value="">{t('market.unassigned')}</option>
                         {readMarketResearch(item.market_research)?.offers.map((offer, index) => <option key={`${offer.url}:${offer.price}:${index}`} value={index}>
                           {offer.marketplace === 'amazon' ? 'Amazon' : 'eBay'} · ${offer.price.toFixed(2)} USD · {t(`market.condition.${offer.condition}`)}
                         </option>)}
                       </select>
                     </label>}
+
+                    <div className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 space-y-2">
+                      <label className="flex items-center justify-between gap-2 text-xs font-bold text-slate-800 cursor-pointer">
+                        <span>{t("sales.listForSaleToggle", { defaultValue: "Add to Sales List" })}</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(item.forSale)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            const offer =
+                              item.selectedOffer != null
+                                ? readMarketResearch(item.market_research)?.offers[item.selectedOffer]
+                                : readMarketResearch(item.market_research)?.offers[0];
+                            setDetectedItems((prev) =>
+                              prev.map((d) =>
+                                d.id === item.id
+                                  ? {
+                                      ...d,
+                                      forSale: checked,
+                                      salePrice:
+                                        d.salePrice || (offer ? offer.price.toFixed(2) : ""),
+                                      saleUrl: d.saleUrl || (offer ? offer.url : ""),
+                                    }
+                                  : d
+                              )
+                            );
+                          }}
+                          className="h-4 w-4 rounded border-slate-300 text-amber-600"
+                        />
+                      </label>
+                      {item.forSale && (
+                        <div className="space-y-1.5 pt-1 border-t border-slate-200/70">
+                          <input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            value={item.salePrice ?? ""}
+                            onChange={(e) =>
+                              setDetectedItems((prev) =>
+                                prev.map((d) =>
+                                  d.id === item.id ? { ...d, salePrice: e.target.value } : d
+                                )
+                              )
+                            }
+                            placeholder={t("sales.priceLabel", { defaultValue: "Sale Price ($ USD)" })}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-mono"
+                          />
+                          <input
+                            type="url"
+                            value={item.saleUrl ?? ""}
+                            onChange={(e) =>
+                              setDetectedItems((prev) =>
+                                prev.map((d) =>
+                                  d.id === item.id ? { ...d, saleUrl: e.target.value } : d
+                                )
+                              )
+                            }
+                            placeholder={t("sales.urlPlaceholder", { defaultValue: "https://www.ebay.com/itm/..." })}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
 
                     {item.tags && item.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">

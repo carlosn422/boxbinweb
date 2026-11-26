@@ -1,5 +1,7 @@
 import { readTokenBalance } from '@/services/recordService';
 import { createInventoryRecord } from '@/services/inventoryService';
+import { buildSalePayload, type ItemSaleStatus } from '@/lib/itemSales';
+import { buildSalePayload } from '@/lib/itemSales';
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dialog,
@@ -282,12 +284,22 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
       if (moveError || !moveResult?.newUrl) throw new Error(t('records.imageSaveFailed'));
       const finalUrl = moveResult.newUrl;
 
+      const estVal = item.estimated_value_usd ? Number(item.estimated_value_usd) : 0;
+      const salePayload = buildSalePayload({
+        enabled: Boolean(item.forSale),
+        status: item.saleStatus === "sold" ? "sold" : "for_sale",
+        salePrice: item.salePrice ?? (estVal > 0 ? String(estVal) : ""),
+        saleUrl: item.saleUrl,
+        fallbackValue: estVal > 0 ? String(estVal) : "0",
+      });
+
       const newItemData = {
         name: item.label,
         description: item.description || "",
         quantity: 1,
         cuantity: "1",
-        value: item.estimated_value_usd ? Number(item.estimated_value_usd) : 0,
+        value: salePayload.sale_price ? Number(salePayload.sale_price) : estVal,
+        ...salePayload,
         tags: item.tags || [],
         confidence: item.confidence,
         timestamp: item.timestamp_seconds,
@@ -721,6 +733,86 @@ const EnhancedVideoAIModal: React.FC<EnhancedVideoAIModalProps> = ({
                         ))}
                       </div>
                     )}
+
+                    {/* Add to Sales List option on detected video item */}
+                    <div className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-2.5 space-y-2 text-xs">
+                      <label className="flex items-center justify-between gap-2 cursor-pointer font-semibold text-slate-800">
+                        <span>{t("sales.listForSaleToggle", { defaultValue: "Add to Sales List" })}</span>
+                        <input
+                          type="checkbox"
+                          checked={Boolean(item.forSale)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setDetectedItems((prev) =>
+                              prev.map((d) =>
+                                d.id === item.id
+                                  ? {
+                                      ...d,
+                                      forSale: checked,
+                                      salePrice:
+                                        d.salePrice ??
+                                        (d.estimated_value_usd ? String(d.estimated_value_usd) : ""),
+                                      saleStatus: d.saleStatus || "for_sale",
+                                    }
+                                  : d
+                              )
+                            );
+                          }}
+                          className="w-3.5 h-3.5 rounded accent-slate-900"
+                        />
+                      </label>
+
+                      {item.forSale && (
+                        <div className="space-y-1.5 pt-1.5 border-t border-slate-200/70">
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={item.salePrice ?? ""}
+                              onChange={(e) =>
+                                setDetectedItems((prev) =>
+                                  prev.map((d) =>
+                                    d.id === item.id ? { ...d, salePrice: e.target.value } : d
+                                  )
+                                )
+                              }
+                              placeholder={t("sales.priceLabel", { defaultValue: "Sale Price ($)" })}
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-mono"
+                            />
+                            <select
+                              value={item.saleStatus || "for_sale"}
+                              onChange={(e) =>
+                                setDetectedItems((prev) =>
+                                  prev.map((d) =>
+                                    d.id === item.id ? { ...d, saleStatus: e.target.value } : d
+                                  )
+                                )
+                              }
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold"
+                            >
+                              <option value="for_sale">{t("sales.statusForSale", { defaultValue: "For Sale" })}</option>
+                              <option value="sold">{t("sales.statusSold", { defaultValue: "Sold" })}</option>
+                            </select>
+                          </div>
+                          <input
+                            type="url"
+                            value={item.saleUrl ?? ""}
+                            onChange={(e) =>
+                              setDetectedItems((prev) =>
+                                prev.map((d) =>
+                                  d.id === item.id ? { ...d, saleUrl: e.target.value } : d
+                                )
+                              )
+                            }
+                            placeholder={t("sales.urlPlaceholder", {
+                              defaultValue: "https://www.ebay.com/itm/...",
+                            })}
+                            className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t border-slate-100">

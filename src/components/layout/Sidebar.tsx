@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import LogoFull from "@/assets/logo-full.png";
 import LogoIcon from "@/assets/logo-icon.png";
 import { LanguageSelector } from "./LanguageSelector";
-import { Home, QrCode, MapPin, Users, CreditCard, Sparkles, Download, LogOut, ChevronLeft, ChevronRight, MoreHorizontal, Bot } from "lucide-react";
+import { Home, QrCode, MapPin, Users, CreditCard, Sparkles, Download, LogOut, ChevronLeft, ChevronRight, MoreHorizontal, Bot, ShoppingBag } from "lucide-react";
 
 interface SidebarProps { className?: string; }
 
@@ -58,6 +58,12 @@ export function Sidebar({ className }: SidebarProps) {
       title: t("sidebar.locations", { defaultValue: "Locations" }),
       href: "/locations",
       icon: MapPin,
+      badge: null,
+    },
+    {
+      title: t("sidebar.salesList", { defaultValue: "Sales List" }),
+      href: "/sales",
+      icon: ShoppingBag,
       badge: null,
     },
     {

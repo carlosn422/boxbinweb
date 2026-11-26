@@ -20,6 +20,7 @@ import ActiveSubscriptionPage from "@/pages/billing/ActiveSubscriptionPage";
 import { TemplatesView } from "@/pages/smart-labels/components/TemplatesView";
 import LoginByToken from "@/pages/auth/login-by-token";
 import ExportInventory from "@/pages/dashboard/ExportInventory";
+import SalesListScreen from "@/pages/dashboard/SalesList";
 import NotFoundPage from "./NotFoundPage";
 import TokensPurchasePage from "@/pages/billing/TokensPage";
 
@@ -211,6 +212,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <LocationsManager />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "/sales",
+    element: (
+      <ProtectedRoute>
+        <SalesListScreen />
       </ProtectedRoute>
     ),
   },
