@@ -71,6 +71,8 @@ export class CopilotServiceError extends Error {
   }
 }
 export interface CopilotResponse {
+  responseTimeMs?: number;
+  responseTimeKind?: 'chat' | 'voice';
   reply: string;
   suggestedActions: CopilotAction[];
   suggestedQuestions: string[];
@@ -85,6 +87,8 @@ export interface CopilotResponse {
   assistantName?: string;
 }
 export interface ChatMessage {
+  responseTimeMs?: number;
+  responseTimeKind?: 'chat' | 'voice';
   id: string;
   sender: "user" | "copilot";
   text: string;
@@ -337,7 +341,13 @@ export async function fetchLiveInventoryContext(_userId: string, activeBinId?: s
     binId: activeBinId || null
   });
 }
-export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
+export async function streamQueryToBoxBinCopilot(...args: Parameters<typeof queryWithStream>): Promise<CopilotResponse> {
+  const started = performance.now();
+  const response = await queryWithStream(...args);
+  return { ...response, responseTimeMs: Math.max(0, Math.round(performance.now() - started)), responseTimeKind: 'chat' };
+}
+
+async function queryWithStream(query: string, chatHistory: {
   sender: string;
   text: string;
   actionProposal?: ActionProposal;

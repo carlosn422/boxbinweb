@@ -54,16 +54,18 @@ async function setup(page:Page, language: 'en' | 'es' | null = 'es'){
   await page.goto('/home');
   return {chats,writes,requests,imageCount:()=>images};
 }
-const open=async(page:Page)=>{await page.getByRole('button',{name:/^(Copiloto IA|Consultar al Copiloto IA de BoxBin|AI Copilot|Ask BoxBin AI Copilot)$/}).first().click();await expect(page.getByRole('dialog',{name:'BoxBin Copilot',exact:true})).toBeVisible();await expect(page.getByRole('textbox',{name:/^(Consulta al copiloto|Ask Copilot)$/})).toBeEnabled();};
+const open=async(page:Page)=>{await page.getByRole('button',{name:/^(Copiloto IA|Consultar al Copiloto IA de BoxBin|AI Copilot|Ask BoxBin AI Copilot)$/}).first().click();await expect(page.getByRole('dialog',{name:'Boxbin',exact:true})).toBeVisible();await expect(page.getByRole('textbox',{name:/^(Consulta al copiloto|Ask Copilot)$/})).toBeEnabled();};
 const send=async(page:Page,text:string)=>{await page.getByRole('textbox',{name:/^(Consulta al copiloto|Ask Copilot)$/}).fill(text);await page.getByRole('button',{name:/^(Enviar consulta|Send query)$/}).click();await expect(page.getByRole('textbox',{name:/^(Consulta al copiloto|Ask Copilot)$/})).toBeEnabled();};
 
 test('Global entry point, safe text, confirmed action and server history after reload',async({page})=>{
   const state=await setup(page);await open(page);await send(page,'crea un taladro');
   await expect(page.getByText('Registrar ítem',{exact:true})).toBeVisible();
+  await expect(page.locator('.copilot-response-time')).toHaveText(/\d+\.\d s/);
   expect(await page.evaluate(()=> (window as any).__copilotXss)).toBeUndefined();
   await page.getByRole('button',{name:'Confirmar acción'}).click();await expect(page.getByText('Cambio guardado correctamente.',{exact:true})).toBeVisible();expect(state.writes.length).toBe(1);
   await page.evaluate(()=>{for(const k of Object.keys(localStorage))if(k.startsWith('boxbin_copilot_sessions_'))localStorage.removeItem(k);});
   await page.reload();await page.getByRole('button',{name:'Abrir BoxBin Copilot'}).click();await expect(page.getByText('Cambio guardado correctamente.',{exact:true})).toBeVisible();
+  await expect(page.locator('.copilot-response-time')).toHaveText(/\d+\.\d s/);
   await page.screenshot({path:'/tmp/boxbin-copilot-desktop.png',fullPage:true});
 });
 test('PDF preview/download uses real pdfmake and generated image is recovered, not regenerated',async({page})=>{

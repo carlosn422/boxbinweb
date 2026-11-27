@@ -745,6 +745,9 @@
     }
   },
   "copilot": {
+    "responseTiming": "Response completed in {{seconds}} seconds",
+    "voiceResponseTiming": "Approximate time from last received transcription to first server audio: {{seconds}} seconds",
+    "voiceTimingLabel": "Audio",
     "callAction": "Voice chat",
     "registerItem": "Register item",
     "createBin": "Create bin",

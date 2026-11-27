@@ -64,6 +64,8 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       input: '',
       output: '',
       audio: 0,
+      lastInputAt: null as number | null,
+      responseTimeMs: undefined as number | undefined,
       tools: new LiveTurnTools(ctx, scope, initial, (savedName) => {
         assistantName = savedName;
         assistantIsCustom = savedName.toLowerCase() !== DEFAULT_ASSISTANT_NAME.toLowerCase();
@@ -142,6 +144,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       turns++;
       send({ type: 'turn_complete', id: previous.id, input: previous.input, interrupted, answer: {
         reply: previous.output || (interrupted ? localized('Response interrupted.', 'Respuesta interrumpida.') : localized('Voice response transcript unavailable.', 'Respuesta de voz sin transcripción disponible.')),
+        ...(previous.responseTimeMs === undefined ? {} : { responseTimeMs: previous.responseTimeMs, responseTimeKind: 'voice' }),
         suggestedActions: [], suggestedQuestions: [], actionProposal: interrupted ? null : previous.tools.proposal,
         sources: previous.tools.sources, searchSuggestions: previous.tools.searchSuggestions, isValuation: !!previous.tools.sources.length,
         assistantName: previous.tools.updatedAssistantName || assistantName
@@ -185,6 +188,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
         if (!ready || !turn) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
         const message = text(data.text, 6000, true);
         language = detectLanguage(message, language);
+        turn.lastInputAt = Date.now();
         turn.input += (turn.input ? ' ' : '') + message;
         lastInput = Date.now();
         send({ type: 'transcript', id: turn.id, input: turn.input, output: turn.output });
@@ -266,6 +270,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       checkpoint = null; // A checkpoint is reusable only while idle.
     }
     if (content?.inputTranscription?.text) {
+      if (turn.responseTimeMs === undefined) turn.lastInputAt = Date.now();
       turn.input += content.inputTranscription.text;
       language = detectLanguage(turn.input, language);
       lastInput = Date.now();
@@ -281,6 +286,9 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
     if (content?.inputTranscription?.text || content?.outputTranscription?.text) send({ type: 'transcript', id: turn.id, input: turn.input, output: turn.output });
     if (!content?.interrupted) for (const part of content?.modelTurn?.parts || []) {
       if (!part.inlineData?.mimeType?.startsWith('audio/pcm') || !part.inlineData?.data) continue;
+      if (turn.responseTimeMs === undefined && turn.lastInputAt !== null) {
+        turn.responseTimeMs = Math.max(0, Date.now() - turn.lastInputAt);
+      }
       const raw = atob(part.inlineData.data);
       turn.audio += raw.length;
       if (raw.length > 1000000 || turn.audio > 3000000 || socket.bufferedAmount > 1000000) throw new CopilotError('COPILOT_UNAVAILABLE', 503);

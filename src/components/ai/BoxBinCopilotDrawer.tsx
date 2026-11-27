@@ -85,7 +85,7 @@ export function BoxBinCopilotDrawer() {
   const [liveState, setLiveState] = useState<LiveState>('ended');
   const [voiceMode, setVoiceMode] = useState<'voice' | 'text'>('voice');
   const [showCaptions, setShowCaptions] = useState(true);
-  const [liveCaption, setLiveCaption] = useState({ input: '', output: '' });
+  const [liveCaption, setLiveCaption] = useState<{ input: string; output: string; responseTimeMs?: number }>({ input: '', output: '' });
   const [micMuted, setMicMuted] = useState(false);
   const [voiceWarning, setVoiceWarning] = useState('');
   const [callElapsedSeconds, setCallElapsedSeconds] = useState(0);
@@ -417,6 +417,7 @@ export function BoxBinCopilotDrawer() {
       { id: `voice-user-${data.id}`, sender: 'user', text: data.input || ct('voiceNoTranscript'), timestamp: new Date() },
       {
         id: `voice-bot-${data.id}`, sender: 'copilot', text: data.answer.reply + (data.interrupted ? `\n\n[${ct('interrupted')}]` : ''), timestamp: new Date(), isStreaming: false,
+        responseTimeMs: data.answer.responseTimeMs, responseTimeKind: data.answer.responseTimeKind,
         actions: data.answer.suggestedActions, suggestedQuestions: data.answer.suggestedQuestions,
         actionProposal: data.interrupted ? undefined : data.answer.actionProposal || undefined,
         sources: data.answer.sources, searchSuggestions: data.answer.searchSuggestions, isValuation: data.answer.isValuation
@@ -425,6 +426,7 @@ export function BoxBinCopilotDrawer() {
       if (typeof data.answer.assistantName === 'string' && data.answer.assistantName.trim()) {
         setAssistantName(data.answer.assistantName.trim());
       }
+      setLiveCaption({ input: data.input, output: data.answer.reply, responseTimeMs: data.answer.responseTimeMs });
       livePartial.current = null;
       liveMessages.current = list;
       setMessages(list); save(list);
@@ -625,6 +627,8 @@ export function BoxBinCopilotDrawer() {
       }
       const completed: ChatMessage = {
         ...placeholder,
+        responseTimeMs: response.responseTimeMs,
+        responseTimeKind: response.responseTimeKind,
         text: response.reply,
         isStreaming: false,
         actions: response.suggestedActions,
@@ -969,6 +973,7 @@ export function BoxBinCopilotDrawer() {
                   <span>{ct('standbyTalkNow')}</span>
                 </Button>
               )}
+              {typeof liveCaption.responseTimeMs === 'number' && Number.isFinite(liveCaption.responseTimeMs) && liveCaption.responseTimeMs >= 0 && <span className="copilot-response-time" title={ct('voiceResponseTiming', { seconds: (liveCaption.responseTimeMs / 1000).toFixed(1) })}>{ct('voiceTimingLabel')} ≈ {(liveCaption.responseTimeMs / 1000).toFixed(1)} s</span>}
               <Button type="button" variant="ghost" className="copilot-caption-toggle" aria-pressed={showCaptions} aria-label={ct(showCaptions ? 'hideCaptions' : 'showCaptions')} onClick={() => setShowCaptions(value => !value)}><Captions className="size-4" />{ct(showCaptions ? 'hideCaptions' : 'showCaptions')}</Button>
               {showCaptions && (liveCaption.input || liveCaption.output) && <div aria-live="polite" className="copilot-live-captions"><p>{liveCaption.input ? ct('you') : assistantName}</p>{liveCaption.input && <p>{liveCaption.input}</p>}{liveCaption.output && <p>{liveCaption.output}</p>}</div>}
             {voiceProposal && (
@@ -1032,7 +1037,7 @@ export function BoxBinCopilotDrawer() {
                 </ResponsiveDisclosure>
               </>}
             </article> : <article key={msg.id} className={`copilot-turn ${msg.sender === 'user' ? 'copilot-turn-user' : 'copilot-turn-assistant'} ${msg.actionProposal ? 'copilot-turn-proposal' : ''}`}>
-              <div className="copilot-message-meta">{msg.sender === 'copilot' && <span className="copilot-message-avatar"><Sparkles aria-hidden="true" /></span>}<span>{msg.sender === 'user' ? ct('you') : assistantName}</span></div>
+              <div className="copilot-message-meta">{msg.sender === 'copilot' && <span className="copilot-message-avatar"><Sparkles aria-hidden="true" /></span>}<span>{msg.sender === 'user' ? ct('you') : assistantName}</span>{msg.sender === 'copilot' && !msg.isStreaming && typeof msg.responseTimeMs === 'number' && Number.isFinite(msg.responseTimeMs) && msg.responseTimeMs >= 0 && <span className="copilot-response-time" title={ct(msg.responseTimeKind === 'voice' ? 'voiceResponseTiming' : 'responseTiming', { seconds: (msg.responseTimeMs / 1000).toFixed(1) })} aria-label={ct(msg.responseTimeKind === 'voice' ? 'voiceResponseTiming' : 'responseTiming', { seconds: (msg.responseTimeMs / 1000).toFixed(1) })}>{msg.responseTimeKind === 'voice' ? `${ct('voiceTimingLabel')} ≈ ` : ''}{(msg.responseTimeMs / 1000).toFixed(1)} s</span>}</div>
               <div className={msg.sender === 'user' ? 'copilot-message-user' : 'copilot-message-assistant'}>
                 {msg.attachedFile && <div className="mb-2 break-words text-xs">{msg.attachedFile.previewUrl && <img src={msg.attachedFile.previewUrl} alt={ct('attachedPhoto')} className="mb-1 max-h-32 rounded-xl" />}{msg.attachedFile.name}{!msg.attachedFile.previewUrl && ct('photoNotStored')}</div>}
                 {msg.isStreaming && !msg.text ? <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-500"><Loader2 className="size-4 shrink-0 animate-spin" />{ct('thinking')}</div> : <SafeMarkdown text={msg.text} />}
