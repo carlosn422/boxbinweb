@@ -13,8 +13,8 @@ import i18n from 'i18next';
 import { createInventoryRecord, updateInventoryRecord, deleteInventoryRecord, inventoryError } from '@/services/inventoryService';
 import "./bin-detail.css";
 import { ResponsiveDisclosure } from "@/components/layout/ResponsiveDisclosure";
-import React, { useState, useEffect, useMemo } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Edit3,
@@ -166,10 +166,28 @@ export interface Item {
   sold_at?: string | null;
 }
 
+const normalizeSearchText = (value: unknown) =>
+  String(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const matchesItemQuery = (it: Item, rawQuery: string) => {
+  const tokens = normalizeSearchText(rawQuery).trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const haystack = normalizeSearchText(
+    [it.name, it.description, Array.isArray(it.tags) ? it.tags.join(" ") : ""].join(" ")
+  );
+  return tokens.every((tok) => haystack.includes(tok));
+};
+
 const BinDetailsScreen: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialQueryParam = (searchParams.get("q") || "").trim();
+  const appliedInitialQueryRef = useRef<string | null>(null);
   const { currentUser, loading: authLoading } = useAuth();
 
   const [userImpersonated, setUserImpersonated] = useState<any>(() =>
@@ -353,7 +371,17 @@ const BinDetailsScreen: React.FC = () => {
 
       if (itemsErr) throw itemsErr;
 
-      setItems((itemsData || []) as Item[]);
+      const loadedItems = (itemsData || []) as Item[];
+      setItems(loadedItems);
+
+      const queryKey = `${id}::${initialQueryParam}`;
+      if (initialQueryParam && appliedInitialQueryRef.current !== queryKey) {
+        appliedInitialQueryRef.current = queryKey;
+        const hasMatchingItem = loadedItems.some((it) => matchesItemQuery(it, initialQueryParam));
+        if (hasMatchingItem) {
+          setSearchQuery(initialQueryParam);
+        }
+      }
     } catch (err) {
       console.error("Error fetching bin data:", err);
       toast.error(t("containers.loadErrorToast", { defaultValue: "Failed to load container data" }));
@@ -786,11 +814,7 @@ const BinDetailsScreen: React.FC = () => {
   const filteredItems = useMemo(() => {
     return items
       .filter((it) => {
-        const matchesQuery =
-          searchQuery.trim() === "" ||
-          it.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          it.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          it.tags?.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase()));
+        const matchesQuery = matchesItemQuery(it, searchQuery);
 
         const matchesTag = !selectedTag || it.tags?.includes(selectedTag);
         const st = normalizeSaleStatus(it.sale_status);

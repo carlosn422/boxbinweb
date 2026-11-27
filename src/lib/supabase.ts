@@ -82,22 +82,6 @@ export const loginWithApple = async () => {
   }
 };
 
-export const loginWithYahoo = async () => {
-  try {
-    // Supabase supports custom OIDC/OAuth or Google/Apple primarily
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/home`,
-      },
-    });
-    if (error) throw error;
-    return { data, error: null };
-  } catch (error: any) {
-    return { data: null, error: error.message };
-  }
-};
-
 export const logoutUser = async () => {
   try {
     const { error } = await supabase.auth.signOut();

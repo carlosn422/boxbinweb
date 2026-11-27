@@ -186,15 +186,7 @@ export default function HomeScreen() {
     recentActivity: 0,
   });
 
-  const normalizeText = (text: any) =>
-    (text || "")
-      .toString()
-      .trim()
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[̀-\u036f]/g, "");
-
-  // --- FETCH FUNCTIONS using effectiveUserId ---
+  // --- FETCH FUNCTIONS using effectiveUserId (server-side SQL aggregation & search) ---
   const fetchBins = async (
     page: number = 1,
     searchTerm: string = "",
@@ -206,64 +198,31 @@ export default function HomeScreen() {
 
     try {
       const from = (page - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
-
-      const { data: rawBins, error } = await supabase
-        .from("bins")
-        .select("*")
-        .eq("userId", effectiveUserId)
-        .order("createdAt", { ascending: false })
-        .range(from, to);
-
-      if (error) throw error;
-
-      const binsData = (rawBins || []) as Bin[];
-
-      const qrGuids = binsData.map((b) => b.qrGuid).filter(Boolean) as string[];
-      let qrMap = new Map<string, string>();
-      if (qrGuids.length > 0) {
-        const { data: qrs } = await supabase
-          .from("qrcodes")
-          .select("guid, qrcodeId")
-          .in("guid", qrGuids);
-        if (qrs) {
-          qrMap = new Map(qrs.map((q: any) => [q.guid, q.qrcodeId]));
-        }
-      }
-
-      const binsWithQRCodes = binsData.map((bin) => {
-        if (!bin.qrGuid || !qrMap.has(bin.qrGuid)) return bin;
-        return { ...bin, qrcodeId: qrMap.get(bin.qrGuid) };
-      });
-
-      const normalizedSearch = normalizeText(searchTerm);
-
       const currentLocFilter =
         selectedLocation !== undefined ? selectedLocation : filterLocation;
 
-      const filtered = binsWithQRCodes.filter((bin) => {
-        const matchesSearch = searchTerm
-          ? [bin.name, bin.description, bin.qrcodeId].some((field) =>
-            normalizeText(field).includes(normalizedSearch)
-          )
-          : true;
-
-        const matchesLocation = currentLocFilter
-          ? bin.location?.id === currentLocFilter.id
-          : true;
-
-        return matchesSearch && matchesLocation;
+      const { data, error } = await supabase.rpc("app_dashboard_bins", {
+        p_owner_id: effectiveUserId,
+        p_search: searchTerm.trim(),
+        p_location_id: currentLocFilter?.id ?? null,
+        p_offset: from,
+        p_limit: ITEMS_PER_PAGE,
       });
 
-      setFilteredBins(filtered);
+      if (error) throw error;
 
+      const rows = Array.isArray(data?.rows) ? (data.rows as Bin[]) : [];
+      const totalCount = Number(data?.totalCount ?? rows.length);
+      const hasMore = Boolean(data?.hasMore);
+
+      setFilteredBins(rows);
       setBinsPagination({
         currentPage: page,
-        hasNextPage: binsData.length === ITEMS_PER_PAGE,
+        hasNextPage: hasMore,
         hasPreviousPage: page > 1,
         lastVisible: null,
         firstVisible: null,
-        totalCount: filtered.length,
+        totalCount,
       });
     } catch (error) {
       console.error("Error fetching bins:", error);
@@ -282,33 +241,28 @@ export default function HomeScreen() {
 
     try {
       const from = (page - 1) * ITEMS_PER_PAGE;
-      const to = from + ITEMS_PER_PAGE - 1;
 
-      const { data: rawLocs, error } = await supabase
-        .from("locations")
-        .select("*")
-        .eq("userId", effectiveUserId)
-        .order("createdAt", { ascending: false })
-        .range(from, to);
+      const { data, error } = await supabase.rpc("app_dashboard_locations", {
+        p_owner_id: effectiveUserId,
+        p_search: searchTerm.trim(),
+        p_offset: from,
+        p_limit: ITEMS_PER_PAGE,
+      });
 
       if (error) throw error;
 
-      const locData = (rawLocs || []) as Location[];
+      const rows = Array.isArray(data?.rows) ? (data.rows as Location[]) : [];
+      const totalCount = Number(data?.totalCount ?? rows.length);
+      const hasMore = Boolean(data?.hasMore);
 
-      const filtered = searchTerm
-        ? locData.filter((loc) =>
-          normalizeText(loc.name).includes(normalizeText(searchTerm))
-        )
-        : locData;
-      setFilteredLocations(filtered);
-
+      setFilteredLocations(rows);
       setLocationsPagination({
         currentPage: page,
-        hasNextPage: locData.length === ITEMS_PER_PAGE,
+        hasNextPage: hasMore,
         hasPreviousPage: page > 1,
         lastVisible: null,
         firstVisible: null,
-        totalCount: filtered.length,
+        totalCount,
       });
     } catch (error) {
       console.error("Error fetching locations:", error);
@@ -431,6 +385,12 @@ export default function HomeScreen() {
     }
   };
 
+  const openBinDetails = (binId: string) => {
+    const trimmed = searchTextBins.trim();
+    const query = trimmed ? `?q=${encodeURIComponent(trimmed)}` : "";
+    navigate(`/bin-details/${binId}${query}`);
+  };
+
   // Existing inventory content, with the reference palette and surfaces.
   const renderBinCard = (bin: Bin) => (
     <div
@@ -439,7 +399,7 @@ export default function HomeScreen() {
       role="button"
       tabIndex={0}
       onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click(); } }}
-      onClick={() => navigate(`/bin-details/${bin.id}`)}
+      onClick={() => openBinDetails(bin.id)}
     >
       {/* Top Header Row */}
       <div className="inventory-card-top">
@@ -561,7 +521,7 @@ export default function HomeScreen() {
             className="group flex items-center justify-between px-4 py-2.5 hover:bg-slate-50/80 transition-colors cursor-pointer"
             onClick={() =>
               type === "bin"
-                ? navigate(`/bin-details/${item.id}`)
+                ? openBinDetails(item.id)
                 : handleLocationFilter(item)
             }
           >

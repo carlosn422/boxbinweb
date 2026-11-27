@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { loginWithGoogle, loginWithApple, loginWithYahoo } from "@/lib/supabase";
-import YahooIcon from "@/assets/yahoo.svg";
+import { loginWithGoogle, loginWithApple } from "@/lib/supabase";
 import LogoIcon from "@/assets/logo.png";
 import { useTranslation } from "react-i18next";
 import { useSearchParams } from "react-router-dom";
@@ -25,11 +24,9 @@ const LoginPage = () => {
   const [isLoading, setIsLoading] = useState<{
     google: boolean;
     apple: boolean;
-    yahoo: boolean;
   }>({
     google: false,
     apple: false,
-    yahoo: false,
   });
   const { t } = useTranslation();
   const [searchParams] = useSearchParams();
@@ -46,14 +43,13 @@ const LoginPage = () => {
     ? "An error occurred during authentication. Please try again."
     : null;
 
-  const handleOAuthLogin = async (provider: "google" | "apple" | "yahoo") => {
+  const handleOAuthLogin = async (provider: "google" | "apple") => {
     setIsLoading((prev) => ({ ...prev, [provider]: true }));
 
     try {
       let response;
       if (provider === "google") response = await loginWithGoogle();
       if (provider === "apple") response = await loginWithApple();
-      if (provider === "yahoo") response = await loginWithYahoo();
 
       if (response?.error) {
         console.error(`Login error with ${provider}:`, response.error);
@@ -245,20 +241,6 @@ const LoginPage = () => {
                     <span>{t("auth.continueWithApple") || "Continue with Apple"}</span>
                   </button>
 
-                  {/* Yahoo */}
-                  <button
-                    type="button"
-                    onClick={() => handleOAuthLogin("yahoo")}
-                    disabled={anyLoading}
-                    className="w-full h-11 px-4 bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-slate-300 text-slate-700 hover:text-slate-900 font-medium text-sm rounded-xl shadow-2xs transition-all flex items-center justify-center gap-3 disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.99] cursor-pointer"
-                  >
-                    {isLoading.yahoo ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
-                    ) : (
-                      <img src={YahooIcon} alt="Yahoo" className="w-4 h-4 shrink-0 object-contain" />
-                    )}
-                    <span>{t("auth.continueWithYahoo") || "Continue with Yahoo"}</span>
-                  </button>
                 </div>
 
                 {/* Security Footer */}
