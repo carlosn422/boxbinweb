@@ -489,7 +489,7 @@ export async function setAssistantName(ctx: Context, rawName: unknown): Promise<
   return typeof saved === 'string' && saved.trim() ? saved.trim() : clean;
 }
 export async function inventory(ctx: Context, binId: string | null, search = '', offset = 0, limit = 50, lang = 'en') {
-  return await rpc(ctx.db, 'copilot_inventory', {
+  const result = await rpc(ctx.db, 'copilot_inventory', {
     p_actor: ctx.actor,
     p_bin_id: binId,
     p_search: search,
@@ -497,6 +497,18 @@ export async function inventory(ctx: Context, binId: string | null, search = '',
     p_limit: limit,
     p_lang: lang
   });
+  const metrics = result?.inventoryMetrics;
+  const counts = ['totalItems', 'totalBins', 'totalLocations', 'unvaluedItems'];
+  if (!result || !metrics || !counts.every(key => Number.isSafeInteger(metrics[key]) && metrics[key] >= 0)
+    || !['totalUnits', 'totalEstimatedValue'].every(key => typeof metrics[key] === 'number' && Number.isFinite(metrics[key]) && metrics[key] >= 0)
+    || !['itemsSample', 'binsSummary', 'locationsSummary', 'latestItems'].every(key => Array.isArray(result[key]))
+    || typeof result.hasMore !== 'boolean'
+    || !Number.isSafeInteger(result.itemsWithoutCreationDate) || result.itemsWithoutCreationDate < 0
+    || (binId && result.activeBin?.id !== binId)
+    || (binId && result.itemsSample.some((item: any) => item.binId !== binId))) {
+    throw new CopilotError('COPILOT_UNAVAILABLE', 503);
+  }
+  return { ...result, fetchedAt: new Date().toISOString() };
 }
 export function fastThinkingConfig(): Record<string, unknown> {
   return { thinkingBudget: 0 };

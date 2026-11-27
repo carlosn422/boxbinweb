@@ -860,3 +860,85 @@ test('Simultaneous plan requests share the lookup without sharing across owners'
   await Promise.allSettled([server.plan({db,actor:A,owner:A}),server.plan({db,actor:B,owner:B})]);
   assert.equal(reads,3,'failures are cleared and different owners remain isolated');
 });
+
+test('Inventory exposes stored creation dates and scope-wide latest records beyond the first page', async () => {
+  const db=await fixture();
+  try {
+    await db.query('update items set "createdAt"=$1 where "userId"=$2',['2020-01-01T00:00:00Z',A]);
+    await db.query('update items set "createdAt"=$1 where id=$2',['2026-11-27T14:12:13Z','item-99']);
+    await db.query('update items set "createdAt"=$1 where id=$2',['2030-01-01T00:00:00Z','secret']);
+    const result=(await db.query('select copilot_inventory($1,null,$2,0,1,$3) result',[A,'','es'])).rows[0].result;
+    assert.equal(result.itemsSample.length,1);
+    assert.ok(result.itemsSample[0].createdAt);
+    assert.equal(result.latestItems[0].id,'item-99');
+    assert.equal(result.itemsWithoutCreationDate,0);
+    const model=contract.inventoryForModel(result);
+    assert.equal(model.itemsSample[0].createdAt,result.itemsSample[0].createdAt);
+    assert.equal(model.latestItems[0].id,'item-99');
+    assert.ok(model.latestItems[0].createdAtNormalized);
+    const empty=(await db.query('select copilot_inventory($1,$2) result',[A,'a-dest'])).rows[0].result;
+    assert.equal(empty.latestItems.length,0);
+    await db.query('update items set "createdAt"=null where id=$1',['item-1']);
+    const missing=(await db.query('select copilot_inventory($1) result',[A])).rows[0].result;
+    assert.equal(missing.itemsWithoutCreationDate,1);
+    for(const value of ['2026-11-27T14:12:13Z',{seconds:1795788733,nanoseconds:0},JSON.stringify({_seconds:1795788733}), '2026-11-27 14:12:13+00']) {
+      const parsed=(await db.query('select copilot_created_at_timestamp($1::jsonb) result',[JSON.stringify(value)])).rows[0].result;
+      assert.ok(parsed);
+    }
+    for(const value of ['invalid',null,'2026-11-27']) {
+      assert.equal((await db.query('select copilot_created_at_timestamp($1::jsonb) result',[JSON.stringify(value)])).rows[0].result,null);
+    }
+  } finally {await db.close();}
+});
+
+test('Exact item values, quantities, dates and nulls survive SQL to model evidence', async () => {
+  const db=await fixture();
+  try {
+    await db.query('update items set cuantity=$1,value=$2,"createdAt"=$3 where id=$4',['3','0.1','2026-11-27T10:00:00Z','item-1']);
+    await db.query('update items set cuantity=$1,value=$2 where id=$3',['0','0','item-2']);
+    await db.query('update items set value=null where id=$1',['item-3']);
+    const snapshot=(await db.query('select copilot_inventory($1,null,$2,0,200) result',[A,''])).rows[0].result;
+    const payload=contract.inventoryForModel(snapshot);
+    const first=payload.itemsSample.find(i=>i.id==='item-1');
+    assert.equal(first.quantityNumber,'3');assert.equal(first.unitValue,'0.1');assert.equal(first.recordedTotal,'0.3');assert.ok(first.createdAt);
+    assert.equal(payload.itemsSample.find(i=>i.id==='item-2').recordedTotal,'0');
+    assert.equal(payload.itemsSample.find(i=>i.id==='item-3').recordedTotal,null);
+    assert.equal(payload.evidenceRules.metricsCoverage,'entire_assigned_scope_not_search_matches');
+    assert.equal(payload.evidenceRules.currency,'USD');
+    assert.equal(snapshot.inventoryMetrics.unvaluedItems,1);
+  } finally {await db.close();}
+});
+
+test('Incomplete inventory RPC data fails closed instead of becoming invented empty inventory', async () => {
+  const server=loadTS('supabase/functions/_shared/copilot-server.ts',{'https://esm.sh/@supabase/supabase-js@2.109.0':{createClient(){}}});
+  for (const data of [null,{}, {inventoryMetrics:{totalItems:0},itemsSample:[]}]) {
+    await assert.rejects(()=>server.inventory({actor:A,owner:A,db:{rpc:async()=>({data,error:null})}},null),/COPILOT_UNAVAILABLE/);
+  }
+});
+
+test('Combined latest item and value use a single authoritative snapshot with no Gemini inference', async () => {
+  const facts=loadTS('supabase/functions/_shared/copilot-facts.ts');
+  const query='cual fue mi ultimo item y cual es el valor de mi inventario';
+  assert.deepEqual(Array.from(facts.directFacts(query)),['latest','value']);
+  assert.equal(facts.directFacts(query+' explica a detalle').length,0);
+  let inventories=0;
+  const initial={hasMore:true,inventoryMetrics:{totalItems:500,totalEstimatedValue:250,unvaluedItems:0},itemsWithoutCreationDate:0,latestItems:[{id:'real',name:'plant leaf',createdAtNormalized:'2026-11-27T10:00:00Z'}]};
+  const server={cors:{},authenticate:async()=>({actor:A,owner:A,db:{}}),readBody:r=>r.json(),plan:async()=>({items:1000}),inventory:async()=>{inventories++;return initial;},rpc:async()=>({}),json:v=>new Response(JSON.stringify(v)),failure:e=>{throw e;},gemini:async()=>{throw Error('Must not infer recorded facts');}};
+  const {handler}=loadTS('supabase/functions/_shared/copilot-chat.ts',{'./copilot-server.ts':server});
+  const response=await handler(new Request('https://test.local',{method:'POST',body:JSON.stringify({query,language:'es',chatHistory:[{sender:'copilot',text:'Tu inventario vale 999 dólares y no tiene fechas.'}]})}));
+  const answer=await response.json();assert.match(answer.reply,/plant leaf/);assert.match(answer.reply,/250\.00/);assert.doesNotMatch(answer.reply,/999|no tiene fechas/);assert.equal(inventories,1);
+  assert.match(facts.latestSnapshotReply({...initial,itemsWithoutCreationDate:1},'es'),/No puedo confirmar/);
+});
+
+test('Chat and voice tools actually pass current dates and exact monetary evidence to the model', async () => {
+  const snapshot={hasMore:false,itemsWithoutCreationDate:0,activeBin:null,inventoryMetrics:{totalItems:1,totalEstimatedValue:0.3,unvaluedItems:0},binsSummary:[],locationsSummary:[],itemsSample:[{id:'one',name:'real',cuantity:'3',value:'0.1',quantityNumber:'3',unitValue:'0.1',recordedTotal:'0.3',createdAt:'2026-11-27T12:00:00Z'}],latestItems:[{id:'one',name:'real',createdAt:'2026-11-27T12:00:00Z',createdAtNormalized:'2026-11-27T12:00:00Z'}]};
+  let received;
+  const server={cors:{},authenticate:async()=>({actor:A,owner:A,db:{}}),readBody:r=>r.json(),plan:async()=>({}),inventory:async()=>snapshot,rpc:async()=>({}),json:v=>new Response(JSON.stringify(v)),failure:e=>{throw e;},gemini:async body=>{received=JSON.parse(body.contents[0].parts[0].text).inventory;return {content:{parts:[{text:JSON.stringify({reply:'Verified',suggestedActions:[],suggestedQuestions:[]})}]}};},candidateText:c=>c.content.parts[0].text};
+  const {handler}=loadTS('supabase/functions/_shared/copilot-chat.ts',{'./copilot-server.ts':server});
+  await handler(new Request('https://test.local',{method:'POST',body:JSON.stringify({query:'Explica detalladamente el valor y el artículo más reciente',chatHistory:[{sender:'copilot',text:'No hay fechas y el total es 999.'}]})}));
+  assert.equal(received.itemsSample[0].recordedTotal,'0.3');assert.equal(received.latestItems[0].createdAtNormalized,snapshot.latestItems[0].createdAtNormalized);
+  const {LiveTurnTools}=loadTS('supabase/functions/_shared/copilot-live.ts',{'./copilot-server.ts':server});
+  const tools=new LiveTurnTools({actor:A,owner:A,db:{}},null,snapshot);
+  const evidence=await tools.run('search_inventory',{search:''},'¿Cuál es el valor?',new AbortController().signal);
+  assert.equal(evidence.itemsSample[0].unitValue,'0.1');assert.equal(evidence.itemsSample[0].recordedTotal,'0.3');assert.equal(evidence.latestItems[0].createdAtNormalized,snapshot.latestItems[0].createdAtNormalized);
+});

@@ -94,7 +94,7 @@ async function liveFixture(page:Page, language: 'en' | 'es' | null = 'es') {
     const create=AudioContext.prototype.createBufferSource;
     AudioContext.prototype.createBufferSource=function(){const source=create.call(this);const start=source.start.bind(source),stop=source.stop.bind(source);source.start=(...args)=>{(window as any).__audioStarts++;start(...args);};source.stop=(...args)=>{(window as any).__audioStops++;stop(...args);};return source;};
   });
-  await page.routeWebSocket('**/functions/v1/boxbin-copilot-voice',socket=>{
+  await page.routeWebSocket(/\/functions\/v1\/boxbin-copilot-voice(?:\?|$)/,socket=>{
     connection=socket;socket.onMessage(message=>{
       if(typeof message!=='string'){packets++;return;}
       const data=JSON.parse(message);controls.push(data);
@@ -153,7 +153,7 @@ test('Live renewal retains transcript context; closing the drawer ends every mic
 test('Microphone permission denial leaves text chat usable and creates no Live provider connection',async({page})=>{
   let connections=0;
   await page.addInitScript(()=>{navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('Denied','NotAllowedError');};});
-  await page.routeWebSocket('**/functions/v1/boxbin-copilot-voice',()=>{connections++;});
+  await page.routeWebSocket(/\/functions\/v1\/boxbin-copilot-voice(?:\?|$)/,()=>{connections++;});
   await setup(page);await open(page);await page.getByRole('button',{name:'Iniciar llamada con Gemini',exact:true}).click();
   await expect(page.getByText('Permite el acceso al micrófono para hablar. El chat de texto sigue disponible.',{exact:true})).toBeVisible();expect(connections).toBe(0);
   await expect(page.getByRole('textbox',{name:/^(Consulta al copiloto|Ask Copilot)$/})).toBeEnabled();
@@ -206,4 +206,22 @@ test('English Live sends and retains locale on renewal; switching locale ends ca
   await expect(page.getByText('Te escucho',{exact:true})).toBeVisible();
   const latest=live.controls.filter(c=>c.type==='start').at(-1);expect(latest.language).toBe('es');expect(latest.resumeToken).toBeUndefined();
   await page.getByRole('button',{name:'Finalizar llamada'}).click();
+});
+
+
+test('Voice ending after an empty assistant transcript clears loading and persists the closed turn', async ({page}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'SpeechRecognition', {value: undefined, configurable:true});
+    Object.defineProperty(window, 'webkitSpeechRecognition', {value: undefined, configurable:true});
+  });
+  const live=await liveFixture(page);
+  await page.getByRole('button',{name:'Iniciar llamada con Gemini',exact:true}).click();
+  await expect.poll(()=>live.controls.some(c=>c.type==='start')).toBe(true);
+  live.send({type:'transcript',id:'closing-turn',input:'Ya cierra la llamada.',output:''});
+  await expect(page.getByText('Ya cierra la llamada.',{exact:true})).toBeVisible();
+  live.send({type:'ended',message:'Llamada cancelada.'});
+  await expect(page.locator('.copilot-turn-assistant .animate-spin')).toHaveCount(0);
+  await expect(page.getByText('Llamada finalizada.',{exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Consulta al copiloto'})).toBeEnabled();
+  await expect.poll(()=>live.state.chats.some(c=>c.messages?.some((m:any)=>m.id==='voice-bot-closing-turn' && !m.isStreaming && m.text==='Llamada finalizada.'))).toBe(true);
 });

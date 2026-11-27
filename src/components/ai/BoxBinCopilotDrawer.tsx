@@ -98,7 +98,12 @@ export function BoxBinCopilotDrawer() {
   const liveSave = useRef<Promise<void>>(Promise.resolve());
   const callActive = liveState !== 'ended';
   const callDurationLabel = formatCallDuration(callElapsedSeconds);
+  const finishVoiceTurnRef = useRef<(() => void) | null>(null);
   const cancelVoice = () => {
+    const finish = finishVoiceTurnRef.current;
+    finishVoiceTurnRef.current = null;
+    finish?.();
+    livePartial.current = null;
     callEpoch.current++;
     standbyContextRef.current = null;
     pendingWakePromptRef.current = '';
@@ -435,13 +440,19 @@ export function BoxBinCopilotDrawer() {
         setVoiceWarning(ct('messageLimit'));
       }
     };
+    finishVoiceTurnRef.current = () => {
+      if (!isCurrentCall()) return;
+      const partial = livePartial.current;
+      if (partial && (partial.input || partial.output)) {
+        complete({ ...partial, interrupted: Boolean(partial.output), answer: { reply: partial.output || ct('callEnded'), suggestedActions: [], suggestedQuestions: [] } });
+      }
+    };
     const call = new CopilotVoiceStream({
       history: () => liveMessages.current.slice(-8).map(m => ({ sender: m.sender, text: m.text, actionProposal: m.actionProposal })),
       onState: state => {
+        if (!isCurrentCall()) return;
         if (state === 'ended') {
           voiceStream.current = null;
-          const partial = livePartial.current;
-          if (partial && (partial.input || partial.output)) complete({ ...partial, interrupted: true, answer: { reply: partial.output || ct('callEnded'), suggestedActions: [], suggestedQuestions: [] } });
           cancelVoice();
           return;
         }
@@ -472,7 +483,7 @@ export function BoxBinCopilotDrawer() {
         if (identity.current === userId) applyBillingUpdate(usage);
       },
       onWarning: (message, detail) => {
-        if (identity.current === userId) {
+        if (isCurrentCall()) {
           setVoiceWarning(message);
           if (detail?.code === 'COPILOT_INSUFFICIENT_TOKENS' || detail?.code === 'COPILOT_SUBSCRIPTION') {
             setBillingCta({ code: detail.code, requiredTokens: detail.requiredTokens });

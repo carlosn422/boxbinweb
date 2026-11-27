@@ -10,6 +10,28 @@ export function directFact(query: string): 'value' | 'latest' | 'list' | null {
   return null;
 }
 
+export function directFacts(query: string): NonNullable<ReturnType<typeof directFact>>[] {
+  const single = directFact(query);
+  if (single) return [single];
+  const parts = query.trim().replace(/^(?:y|and)\s+/i, '').split(/\s+(?:y|and)\s+/i);
+  if (parts.length !== 2) return [];
+  const facts = parts.map(directFact);
+  return facts.every(Boolean) ? [...new Set(facts)] as NonNullable<ReturnType<typeof directFact>>[] : [];
+}
+
+// Uses the same authorized SQL snapshot as totals and model evidence.
+export function latestSnapshotReply(snapshot: Record<string, any>, language: CopilotLanguage): string {
+  const es = language === 'es';
+  if (snapshot.inventoryMetrics.totalItems === 0) return es ? 'No hay ítems registrados en este alcance.' : 'There are no items in this scope.';
+  if (snapshot.itemsWithoutCreationDate > 0) return es ? 'No puedo confirmar cuál fue el último ítem: algunos registros no tienen una fecha de creación válida.' : 'I cannot confirm the latest item: some records have no valid creation date.';
+  const [first, second] = snapshot.latestItems;
+  const firstTime = creationTime(first?.createdAtNormalized);
+  if (!first || firstTime === null) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
+  if (second && creationTime(second.createdAtNormalized) === firstTime) return es ? 'Varios ítems comparten la fecha más reciente; no puedo distinguir un único último ítem.' : 'Several items share the latest timestamp; I cannot identify a single latest item.';
+  const name = String(first.name ?? '').replace(/[\\`*_{}\[\]<>]/g, '').slice(0, 200);
+  return es ? `Claro, el último ítem que registraste${snapshot.activeBin ? ' en esta caja' : ''} es **${name}**.` : `Sure, the latest item you added${snapshot.activeBin ? ' in this bin' : ''} is **${name}**.`;
+}
+
 export function creationTime(value: unknown): number | null {
   if (typeof value === 'string') {
     // Only ISO dates with an explicit timezone; never let the host guess a locale.
