@@ -339,7 +339,18 @@ function persistEntitlements(ctx: Context, copilot: CopilotEntitlements, cache: 
   runtime?.waitUntil?.(pending);
 }
 
+const pendingPlans = new Map<string, Promise<PlanLimits>>();
 export async function plan(ctx: Context): Promise<PlanLimits> {
+  const key = JSON.stringify([ctx.actor, ctx.owner]);
+  const existing = pendingPlans.get(key);
+  if (existing) return existing;
+  const pending = resolvePlan(ctx);
+  pendingPlans.set(key, pending);
+  try { return await pending; }
+  finally { if (pendingPlans.get(key) === pending) pendingPlans.delete(key); }
+}
+
+async function resolvePlan(ctx: Context): Promise<PlanLimits> {
   const [subRes, entRes] = await Promise.all([
     ctx.db.from('subscriptions').select('*').eq('userId', ctx.owner).limit(20),
     ctx.db?.from

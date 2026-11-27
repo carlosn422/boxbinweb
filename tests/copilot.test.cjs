@@ -389,7 +389,7 @@ test('Chat and inventory document handlers propagate English and Spanish to fina
   for(const language of ['en','es']){
     instructions.length=0;
     const request=body=>new Request('https://test.local',{method:'POST',body:JSON.stringify({...body,language})});
-    assert.equal((await handler(request({query:'Inventory'}))).status,200);
+    assert.equal((await handler(request({query:language==='es'?'Inventario':'Inventory'}))).status,200);
     assert.equal(instructions.length,2);
     for(const prompt of instructions)assert.ok(prompt.includes('Selected response language: '+(language==='es'?'Spanish':'English')));
     const document=await (await handler(request({operation:'document'}))).json();
@@ -789,4 +789,74 @@ test('Plan persistence survives response completion and reports returned databas
     assert.equal(writes,failedStage==='sync'?0:1);
     assert.equal(errors.length,failedStage?1:0);
   }
+});
+
+test('Direct facts recognize only unambiguous queries and preserve incomplete value warning', () => {
+  const facts=loadTS('supabase/functions/_shared/copilot-facts.ts');
+  assert.equal(facts.directFact('y cual es el valor de mi inventario?'),'value');
+  assert.equal(facts.directFact('cual fue mi ultimo item'),'latest');
+  for(const q of ['valor de mi inventario en pesos','cual fue mi ultimo item y elimínalo','valor de mi inventario de herramientas','cual es el valor de mi inventario explicamelo a detalle','desglosa el valor de mi inventario']) assert.equal(facts.directFact(q),null);
+  assert.match(facts.inventoryValueReply({totalEstimatedValue:250,unvaluedItems:0},'es'),/250\.00 USD/);
+  assert.match(facts.inventoryValueReply({totalEstimatedValue:0,unvaluedItems:2},'es'),/incompleto/);
+  assert.equal(facts.creationTime('yesterday'),null);
+  assert.equal(facts.creationTime({seconds:1,nanoseconds:500000000}),1500);
+});
+
+test('Latest item uses actual dates across pages, enforces owner/bin and refuses incomplete chronology', async () => {
+  const {latestItemReply}=loadTS('supabase/functions/_shared/copilot-facts.ts');
+  const run=async(rows)=>{
+    const filters=[];
+    const builder={select:()=>builder,eq:(...args)=>{filters.push(args);return builder;},order:()=>builder,range:async(a,b)=>({data:rows.slice(a,b+1),error:null})};
+    const reply=await latestItemReply({db:{from:()=>builder},owner:A,actor:A},'a-box','es');
+    assert.ok(filters.some(([k,v])=>k==='userId'&&v===A));assert.ok(filters.some(([k,v])=>k==='binId'&&v==='a-box'));
+    return reply;
+  };
+  const rows=Array.from({length:500},(_,i)=>({id:'uuid-'+i,name:'Old',createdAt:'2020-01-01T00:00:00Z'}));
+  rows.push({id:'legacy-id',name:'Newest',createdAt:{seconds:1800000000}});
+  assert.match(await run(rows),/Newest/);
+  assert.match(await run([...rows,{name:'Unknown',createdAt:null}]),/No puedo confirmar/);
+  assert.match(await run([{name:'One',createdAt:'2026-01-01T00:00:00Z'},{name:'Two',createdAt:'2026-01-01T00:00:00Z'}]),/comparten/);
+});
+
+test('Recorded inventory value replies without any Gemini request and still bills after validation', async () => {
+  let calls=0, charges=0;
+  const server={cors:{},authenticate:async()=>({actor:A,owner:A,db:{}}),readBody:r=>r.json(),plan:async()=>({items:100}),inventory:async()=>({inventoryMetrics:{totalEstimatedValue:250,unvaluedItems:0},hasMore:true}),rpc:async()=>{charges++;return {};},json:v=>new Response(JSON.stringify(v)),failure:e=>{throw e;},gemini:async()=>{calls++;throw Error('Unexpected provider call');}};
+  const {handler}=loadTS('supabase/functions/_shared/copilot-chat.ts',{'./copilot-server.ts':server});
+  const response=await handler(new Request('https://test.local',{method:'POST',body:JSON.stringify({query:'y cual es el valor de mi inventario?',language:'es'})}));
+  const answer=await response.json();assert.match(answer.reply,/250\.00 USD/);assert.equal(calls,0);assert.equal(charges,1);assert.equal(answer.debugTiming.directFact,'value');
+});
+
+test('Latest item answers Spanish without accents despite an English UI, with no technical suffix', async () => {
+  assert.equal(contract.prepareInput({query:'cual fue mi ultimo item',language:'en'}).language,'es');
+  assert.equal(contract.prepareInput({query:'¿Cuál fue mi último ítem?',language:'en'}).language,'es');
+  assert.equal(contract.prepareInput({query:'what was my latest item',language:'es'}).language,'en');
+  assert.equal(contract.detectLanguage('plant leaf','es'),'es');
+  const builder={select:()=>builder,eq:()=>builder,order:()=>builder,range:async()=>({data:[{id:'one',name:'plant leaf',createdAt:'2026-11-27T12:00:00Z'}],error:null})};
+  const server={cors:{},authenticate:async()=>({actor:A,owner:A,db:{from:()=>builder}}),readBody:r=>r.json(),plan:async()=>({items:100}),inventory:async()=>({inventoryMetrics:{totalItems:1},hasMore:false}),rpc:async()=>({}),json:v=>new Response(JSON.stringify(v)),failure:e=>{throw e;},gemini:async()=>{throw Error('Unexpected Gemini call');}};
+  const {handler}=loadTS('supabase/functions/_shared/copilot-chat.ts',{'./copilot-server.ts':server});
+  const result=await handler(new Request('https://test.local',{method:'POST',body:JSON.stringify({query:'cual fue mi ultimo item',language:'en'})}));
+  assert.equal((await result.json()).reply,'Claro, el último ítem que registraste es **plant leaf**.');
+});
+
+test('Inventory list renders duplicate names in separate bins and never mislabels a partial page as complete', () => {
+  const facts=loadTS('supabase/functions/_shared/copilot-facts.ts');
+  for (const query of ['dime todos los items','muestrame mis artículos','list all my items']) assert.equal(facts.directFact(query),'list');
+  assert.equal(facts.directFact('dime todos los items que valen más de 100'),null);
+  const snapshot={hasMore:false,itemsSample:[{name:'suitcase',binId:'a',binName:'Same',locationName:'North',cuantity:'5'},{name:'suitcase',binId:'b',binName:'Same',locationName:'South',cuantity:'0'},{name:'other',binId:'b',binName:'Same',cuantity:null}]};
+  const reply=facts.inventoryListReply(snapshot,'es');
+  assert.match(reply,/3 ítems/);assert.match(reply,/North/);assert.match(reply,/South/);assert.match(reply,/5 uds/);assert.match(reply,/0 uds/);assert.match(reply,/cantidad no registrada/);
+  assert.equal(facts.inventoryListReply({...snapshot,hasMore:true},'es'),null);
+});
+
+test('Simultaneous plan requests share the lookup without sharing across owners', async () => {
+  const server=loadTS('supabase/functions/_shared/copilot-server.ts',{'https://esm.sh/@supabase/supabase-js@2.109.0':{createClient(){}}});
+  let reads=0;
+  const db={from:table=>{
+    if(table==='subscriptions')return {select:()=>({eq:()=>({limit:async()=>{reads++;return {data:[],error:null};}})})};
+    return {select:()=>({eq:()=>({maybeSingle:async()=>({data:null})})})};
+  }};
+  const results=await Promise.allSettled([server.plan({db,actor:A,owner:A}),server.plan({db,actor:A,owner:A})]);
+  assert.equal(reads,1);assert.equal(results[0].status,'rejected');
+  await Promise.allSettled([server.plan({db,actor:A,owner:A}),server.plan({db,actor:B,owner:B})]);
+  assert.equal(reads,3,'failures are cleared and different owners remain isolated');
 });

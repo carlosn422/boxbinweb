@@ -1,3 +1,4 @@
+import { directFact, inventoryListReply, inventoryValueReply, latestItemReply } from './copilot-facts.ts';
 import { actionTypes, actionData, assistantNameInstruction, DEFAULT_ASSISTANT_NAME, languageInstruction, requestsAssistantRename, responseLanguage, type CopilotLanguage, CopilotError, identifier, prepareInput, inventoryForModel, publicProduct, requestsWebPrices, sourcesFromGrounding, SYSTEM, text, validateAnswer, type Source } from './copilot-contract.ts';
 import { authenticate, candidateText, COPILOT_TOKEN_COSTS, cors, DEFAULT_COPILOT_ENTITLEMENTS, failure, fastThinkingConfig, gemini, getAssistantName, inventory, json, plan, readBody, rpc, setAssistantName, type Context } from './copilot-server.ts';
 import { streamReply } from './copilot-stream.ts';
@@ -358,6 +359,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }
     if (op !== 'chat') throw new CopilotError('COPILOT_INVALID');
     const input = prepareInput(body);
+    const fact = input.image ? null : directFact(input.query);
     const fallbackEntitlements = DEFAULT_COPILOT_ENTITLEMENTS || {
       tier: 'starter',
       planName: 'Starter',
@@ -379,7 +381,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     let planMs = 0, billingMs = 0, invMs = 0, prefMs = 0;
     const [limits, initial, assistantPref] = await Promise.all([
       (async () => { const t = Date.now(); const r = await plan(ctx); planMs = Date.now() - t; return r; })(),
-      (async () => { const t = Date.now(); const r = await inventory(ctx, input.binId, '', 0, 200, input.language); invMs = Date.now() - t; return r; })(),
+      (async () => { const t = Date.now(); const r = await inventory(ctx, input.binId, '', 0, fact === 'list' ? 1500 : fact ? 1 : 200, input.language); invMs = Date.now() - t; return r; })(),
       (async () => {
         const t = Date.now();
         const r = typeof getAssistantName === 'function'
@@ -389,6 +391,10 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
         return r;
       })()
     ]);
+    const directReply = fact === 'latest'
+      ? await latestItemReply(ctx, input.binId, input.language)
+      : fact === 'value' ? inventoryValueReply(initial.inventoryMetrics, input.language)
+      : fact === 'list' ? inventoryListReply(initial, input.language) : null;
     stream?.signal.throwIfAborted();
     const copilot = limits?.copilot || fallbackEntitlements;
     const billingStart = Date.now();
@@ -398,6 +404,21 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       p_token_cost: tokenCost, p_receipt: `copilot:${kind}:${receiptId}`
     });
     billingMs = Date.now() - billingStart;
+    if (directReply !== null) {
+      stream?.onText(directReply);
+      return json({ reply: directReply, suggestedActions: [], suggestedQuestions: [], actionProposal: null,
+        assistantName: assistantPref.name, billing,
+        debugTiming: { directFact: fact, authMs, planMs, invMs, prefMs, billingMs, phase1Rounds: 0, phase1Ms: 0, phase2Ms: 0, totalMs: Date.now() - reqStart + (stream?.authMs ?? 0) }
+      });
+    }
+    // If a large list needs the model, retain the usual context bound instead
+    // of forwarding the entire direct-list page into every provider request.
+    if (fact === 'list' && initial.limit > 200) {
+      for (const key of ['itemsSample', 'binsSummary', 'locationsSummary']) {
+        if (initial[key]?.length > 200) { initial[key] = initial[key].slice(0, 200); initial.hasMore = true; }
+      }
+      initial.limit = 200;
+    }
     let assistantName = assistantPref.name;
     let assistantIsCustom = assistantPref.isCustom;
     const allowWeb = requestsWebPrices(input.query, input.history);
