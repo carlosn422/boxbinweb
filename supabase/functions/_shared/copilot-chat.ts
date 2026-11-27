@@ -1,4 +1,4 @@
-import { directFacts, inventoryListReply, inventoryValueReply, latestItemReply, latestSnapshotReply } from './copilot-facts.ts';
+import { directFacts, latestBinSnapshotReply, inventoryListReply, inventoryValueReply, latestItemReply, latestSnapshotReply } from './copilot-facts.ts';
 import { actionTypes, actionData, assistantNameInstruction, DEFAULT_ASSISTANT_NAME, languageInstruction, requestsAssistantRename, responseLanguage, type CopilotLanguage, CopilotError, identifier, prepareInput, inventoryForModel, publicProduct, requestsWebPrices, sourcesFromGrounding, SYSTEM, text, validateAnswer, type Source } from './copilot-contract.ts';
 import { authenticate, candidateText, COPILOT_TOKEN_COSTS, cors, DEFAULT_COPILOT_ENTITLEMENTS, failure, fastThinkingConfig, gemini, getAssistantName, inventory, json, plan, readBody, rpc, setAssistantName, type Context } from './copilot-server.ts';
 import { streamReply } from './copilot-stream.ts';
@@ -396,6 +396,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       if (request === 'latest') return Array.isArray(initial.latestItems)
         ? latestSnapshotReply(initial, input.language)
         : await latestItemReply(ctx, input.binId, input.language);
+      if (request === 'latest_bin') return latestBinSnapshotReply(initial, input.language);
       if (request === 'value') return inventoryValueReply(initial.inventoryMetrics, input.language);
       return inventoryListReply(initial, input.language);
     }));

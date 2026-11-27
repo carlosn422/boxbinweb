@@ -942,3 +942,45 @@ test('Chat and voice tools actually pass current dates and exact monetary eviden
   const evidence=await tools.run('search_inventory',{search:''},'¿Cuál es el valor?',new AbortController().signal);
   assert.equal(evidence.itemsSample[0].unitValue,'0.1');assert.equal(evidence.itemsSample[0].recordedTotal,'0.3');assert.equal(evidence.latestItems[0].createdAtNormalized,snapshot.latestItems[0].createdAtNormalized);
 });
+
+test('Latest bin and item share one snapshot, skip Gemini and preserve detail requests', async () => {
+  const facts=loadTS('supabase/functions/_shared/copilot-facts.ts');
+  for (const query of ['cual fue mi ultimo bin y mi ultimo item','¿Y cuál fue mi última caja y mi último ítem?','what was my latest bin and my latest item']) {
+    assert.deepEqual(Array.from(facts.directFacts(query)),['latest_bin','latest']);
+  }
+  assert.equal(facts.directFacts('cual fue mi ultimo bin y mi ultimo item explica a detalle').length,0);
+  assert.equal(facts.directFacts('mi ultimo bin de ayer').length,0);
+  let reads=0;
+  const initial={inventoryMetrics:{totalBins:2,totalItems:1},binsWithoutCreationDate:0,itemsWithoutCreationDate:0,latestBins:[{name:'Nueva',createdAtNormalized:'2026-11-27T10:00:00Z'}],latestItems:[{name:'Planta',createdAtNormalized:'2026-11-27T11:00:00Z'}]};
+  const server={cors:{},authenticate:async()=>({actor:A,owner:A,db:{}}),readBody:r=>r.json(),plan:async()=>({items:1000}),inventory:async()=>{reads++;return initial;},rpc:async()=>({}),json:v=>new Response(JSON.stringify(v)),failure:e=>{throw e;},gemini:async()=>{throw Error('Must not call Gemini');}};
+  const {handler}=loadTS('supabase/functions/_shared/copilot-chat.ts',{'./copilot-server.ts':server});
+  const response=await handler(new Request('https://test.local',{method:'POST',body:JSON.stringify({query:'cual fue mi ultimo bin y mi ultimo item',language:'es'})}));
+  const answer=await response.json();
+  assert.match(answer.reply,/Nueva/);assert.match(answer.reply,/Planta/);assert.equal(reads,1);
+  assert.match(facts.latestBinSnapshotReply({...initial,binsWithoutCreationDate:1},'es'),/No puedo confirmar/);
+  assert.match(facts.latestBinSnapshotReply({...initial,latestBins:[...initial.latestBins,...initial.latestBins]},'es'),/comparten/);
+  assert.match(facts.latestBinSnapshotReply({...initial,activeBin:{id:'a-box'}},'es'),/inventario general/);
+  assert.throws(()=>facts.latestBinSnapshotReply({...initial,latestBins:undefined},'es'),/COPILOT_UNAVAILABLE/);
+});
+
+test('SQL bin dates survive pagination, search and model sanitization without crossing ownership', async () => {
+  const db=await fixture();
+  try {
+    await db.query('update bins set "createdAt"=$1 where id=$2',['2026-11-25T10:00:00Z','a-box']);
+    await db.query('update bins set "createdAt"=$1 where id=$2',['2026-11-27T10:00:00Z','a-dest']);
+    await db.query('update bins set "createdAt"=$1 where id=$2',['2027-01-01T10:00:00Z','b-box']);
+    const snapshot=(await db.query('select copilot_inventory($1,null,$2,0,1) result',[A,'missing search'])).rows[0].result;
+    assert.equal(snapshot.binsSummary.length,0);
+    assert.equal(snapshot.latestBins[0].id,'a-dest');
+    assert.equal(snapshot.binsWithoutCreationDate,0);
+    const payload=contract.inventoryForModel(snapshot);
+    assert.equal(Date.parse(payload.latestBins[0].createdAt),Date.parse('2026-11-27T10:00:00Z'));
+    assert.ok(payload.latestBins[0].createdAtNormalized);
+    const scoped=(await db.query('select copilot_inventory($1,$2) result',[A,'a-box'])).rows[0].result;
+    assert.equal(scoped.latestBins.length,1);assert.equal(scoped.latestBins[0].id,'a-box');
+    assert.equal(Date.parse(contract.inventoryForModel(scoped).activeBin.createdAt),Date.parse('2026-11-25T10:00:00Z'));
+    await db.query('update bins set "createdAt"=null where id=$1',['a-dest']);
+    const missing=(await db.query('select copilot_inventory($1) result',[A])).rows[0].result;
+    assert.equal(missing.binsWithoutCreationDate,1);
+  } finally {await db.close();}
+});

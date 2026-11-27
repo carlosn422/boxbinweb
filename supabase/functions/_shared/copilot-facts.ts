@@ -1,19 +1,20 @@
 import { CopilotError, type CopilotLanguage } from './copilot-contract.ts';
 import type { Context } from './copilot-server.ts';
 
-// Deliberately narrow: compound questions, conversions and filtered totals still use the model.
-export function directFact(query: string): 'value' | 'latest' | 'list' | null {
+// Only supported factual clauses bypass the model; filters and detail requests do not.
+export function directFact(query: string): 'value' | 'latest' | 'latest_bin' | 'list' | null {
   const q = query.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[¿?¡!.,]/g, '').trim().replace(/^y\s+/, '').replace(/\s+/g, ' ');
   if (/^(?:(?:dime|lista|muestrame|dame|ensename|ver) )?(?:todos (?:los |mis )?|mis |los )?(?:items|articulos|productos)(?: (?:de mi inventario|registrados))?$/.test(q) || /^(?:list|show|show me) (?:all |my |all my )?items$/.test(q)) return 'list';
   if (/^(?:(?:cual es|cuanto es|dime) )?(?:el )?valor(?: total)? de (?:mi|el) inventario$/.test(q) || /^(?:what is |what's )?(?:the )?(?:total )?value of my inventory$/.test(q)) return 'value';
   if (/^(?:(?:cual (?:es|fue)|dime|muestrame) )?(?:mi|el) ultimo (?:item|articulo|producto)(?: (?:registrado|agregado|creado))?$/.test(q) || /^(?:what (?:is|was) |what's )?my (?:last|latest|most recent) item$/.test(q)) return 'latest';
+  if (/^(?:(?:cual (?:es|fue)|dime|muestrame) )?(?:mi|el|la) (?:ultimo|ultima|mas reciente) (?:bin|caja|contenedor)(?: (?:registrado|registrada|agregado|agregada|creado|creada))?$/.test(q) || /^(?:what (?:is|was) |what's )?my (?:last|latest|most recent) (?:bin|box|container)$/.test(q)) return 'latest_bin';
   return null;
 }
 
 export function directFacts(query: string): NonNullable<ReturnType<typeof directFact>>[] {
   const single = directFact(query);
   if (single) return [single];
-  const parts = query.trim().replace(/^(?:y|and)\s+/i, '').split(/\s+(?:y|and)\s+/i);
+  const parts = query.trim().replace(/^[¿¡]/, '').replace(/^(?:y|and)\s+/i, '').split(/\s+(?:y|and)\s+/i);
   if (parts.length !== 2) return [];
   const facts = parts.map(directFact);
   return facts.every(Boolean) ? [...new Set(facts)] as NonNullable<ReturnType<typeof directFact>>[] : [];
@@ -30,6 +31,20 @@ export function latestSnapshotReply(snapshot: Record<string, any>, language: Cop
   if (second && creationTime(second.createdAtNormalized) === firstTime) return es ? 'Varios ítems comparten la fecha más reciente; no puedo distinguir un único último ítem.' : 'Several items share the latest timestamp; I cannot identify a single latest item.';
   const name = String(first.name ?? '').replace(/[\\`*_{}\[\]<>]/g, '').slice(0, 200);
   return es ? `Claro, el último ítem que registraste${snapshot.activeBin ? ' en esta caja' : ''} es **${name}**.` : `Sure, the latest item you added${snapshot.activeBin ? ' in this bin' : ''} is **${name}**.`;
+}
+
+export function latestBinSnapshotReply(snapshot: Record<string, any>, language: CopilotLanguage): string {
+  const es = language === 'es';
+  if (snapshot.activeBin) return es ? 'Para consultar tu última caja, cambia al inventario general; esta conversación está limitada a la caja actual.' : 'Switch to the full inventory to find your latest bin; this conversation is limited to the current bin.';
+  if (snapshot.inventoryMetrics.totalBins === 0) return es ? 'Aún no tienes cajas registradas.' : 'You have no bins yet.';
+  if (!Number.isSafeInteger(snapshot.binsWithoutCreationDate) || !Array.isArray(snapshot.latestBins)) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
+  if (snapshot.binsWithoutCreationDate > 0) return es ? 'No puedo confirmar cuál fue tu última caja: algunas no tienen una fecha de creación válida.' : 'I cannot confirm your latest bin: some bins have no valid creation date.';
+  const [first, second] = snapshot.latestBins;
+  const date = creationTime(first?.createdAtNormalized);
+  if (!first || date === null) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
+  if (second && creationTime(second.createdAtNormalized) === date) return es ? 'Varias cajas comparten la fecha más reciente; no puedo distinguir una única última caja.' : 'Several bins share the latest timestamp; I cannot identify a single latest bin.';
+  const name = String(first.name ?? '').replace(/[\\`*_{}\[\]<>]/g, '').slice(0, 200);
+  return es ? `Tu última caja registrada es **${name}**.` : `Your latest bin is **${name}**.`;
 }
 
 export function creationTime(value: unknown): number | null {

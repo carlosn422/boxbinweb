@@ -503,12 +503,17 @@ export function BoxBinCopilotDrawer() {
     });
     voiceStream.current = call;
     const prepared = call.prepare();
+    const connected = call.connect(binId);
     try {
-      const created = id ? Promise.resolve(id) : createCopilotSession(userId, ct('voiceConversation'), binId || undefined, maxChats);
-      const [chatId] = await Promise.all([created, prepared]);
+      const created = id
+        ? Promise.resolve(id)
+        : createCopilotSession(userId, ct('voiceConversation'), binId || undefined, maxChats).then(chatId => {
+            id = chatId;
+            if (isCurrentCall()) setSessionId(chatId);
+            return chatId;
+          });
+      await Promise.all([created, prepared, connected]);
       if (!isCurrentCall() || voiceStream.current !== call) { call.stop(); return; }
-      id = chatId; setSessionId(chatId);
-      await call.connect(binId);
     } catch (error) {
       call.stop();
       if (isCurrentCall()) { setVoiceWarning(errorText(error)); cancelVoice(); }

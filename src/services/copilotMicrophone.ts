@@ -1,19 +1,55 @@
 import { copilotText as ct } from '@/lib/copilotI18n';
 export class CopilotMicrophone {
   private context: AudioContext | null = null;
+  private ownsContext = false;
   private stream: MediaStream | null = null;
   private source: MediaStreamAudioSourceNode | null = null;
   private worklet: AudioWorkletNode | null = null;
   private gain: GainNode | null = null;
   private stopped = false;
   private muted = false;
-  async start(onPacket: (pcm: ArrayBuffer) => void, onLost: () => void) {
-    if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) throw new Error(ct('micBrowser'));
-    // Construct/resume in the initiating click. Permission and module loading run together.
-    const context = this.context = new AudioContext();
-    const resume = context.resume();
+
+  private async acquireStream(): Promise<MediaStream> {
     try {
-      const streamPromise = navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }).then(stream => {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false
+      });
+    } catch (error) {
+      if (error instanceof DOMException && ['NotAllowedError', 'PermissionDeniedError'].includes(error.name)) {
+        throw error;
+      }
+      // Fallback for iOS Safari / Bluetooth / AirPods routes that reject advanced audio constraints.
+      return await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    }
+  }
+
+  ensureRunning() {
+    const ctx = this.context;
+    if (ctx && (ctx.state === 'suspended' || (ctx.state as string) === 'interrupted')) {
+      void ctx.resume().catch(() => {});
+    }
+  }
+
+  async start(onPacket: (pcm: ArrayBuffer) => void, onLost: () => void, sharedContext?: AudioContext | null) {
+    if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorkletNode) throw new Error(ct('micBrowser'));
+    this.stopped = false;
+    this.muted = false;
+    // Reuse the player's AudioContext when provided so iOS Safari never suspends mic capture
+    // due to two competing AudioContexts.
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) throw new Error(ct('micBrowser'));
+    const context = sharedContext && sharedContext.state !== 'closed' ? sharedContext : new AudioCtx();
+    this.context = context;
+    this.ownsContext = context !== sharedContext;
+    context.onstatechange = () => {
+      if (!this.stopped && (context.state === 'suspended' || (context.state as string) === 'interrupted')) {
+        void context.resume().catch(() => {});
+      }
+    };
+    const resume = context.state === 'running' ? Promise.resolve() : context.resume();
+    try {
+      const streamPromise = this.acquireStream().then(stream => {
         if (this.stopped) { stream.getTracks().forEach(t => t.stop()); throw new Error(ct('callCancelled')); }
         this.stream = stream;
         return stream;
@@ -45,6 +81,10 @@ export class CopilotMicrophone {
     this.source?.disconnect(); this.gain?.disconnect();
     this.worklet = null; this.source = null; this.gain = null;
     const context = this.context; this.context = null;
-    if (context && context.state !== 'closed') void context.close().catch(() => {});
+    if (context) {
+      context.onstatechange = null;
+      if (this.ownsContext && context.state !== 'closed') void context.close().catch(() => {});
+    }
+    this.ownsContext = false;
   }
 }

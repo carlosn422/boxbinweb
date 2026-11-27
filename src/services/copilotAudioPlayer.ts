@@ -17,10 +17,16 @@ export class CopilotAudioPlayer {
     await this.context.resume();
     if (!this.context || this.context.state !== 'running') throw new Error(ct('enableAudio'));
   }
+  getContext(): AudioContext | null {
+    return this.context;
+  }
   push(buffer: ArrayBuffer) {
     const context = this.context;
     if (!context || this.ended) return;
-    if (context.state !== 'running') throw new Error(ct('audioPaused'));
+    if (context.state === 'closed') throw new Error(ct('audioPaused'));
+    if (context.state !== 'running') {
+      void context.resume().catch(() => {});
+    }
     const incoming = new Uint8Array(buffer);
     const bytes = new Uint8Array(incoming.length + (this.pendingByte === null ? 0 : 1));
     if (this.pendingByte !== null) bytes[0] = this.pendingByte;

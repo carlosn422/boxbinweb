@@ -24,6 +24,8 @@ export class CopilotVoiceStream {
   private socket: WebSocket | null = null;
   private stopped = false;
   private ready = false;
+  private micReady = false;
+  private serverReady = false;
   private muted = false;
   private silenced = false;
   private inputTurnId = '';
@@ -39,19 +41,32 @@ export class CopilotVoiceStream {
     this.callbacks = callbacks;
     this.player = new CopilotAudioPlayer(playing => { if (!this.stopped && this.ready) callbacks.onState(playing ? 'responding' : 'listening'); });
   }
+  private maybeMarkListening() {
+    if (this.stopped || this.ready || !this.micReady || !this.serverReady) return;
+    this.ready = true;
+    this.microphone.ensureRunning();
+    this.microphone.mute(this.muted);
+    if (this.muted && this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ type: 'mute' }));
+    }
+    this.callbacks.onState('listening');
+  }
+
   // Must be invoked directly in the click, before awaiting chat persistence.
   async prepare() {
     this.callbacks.onState('connecting');
     try {
-      await Promise.all([
-        this.player.unlock(),
-        this.microphone.start(pcm => {
-          if (!this.ready || this.stopped || this.muted || this.socket?.readyState !== WebSocket.OPEN) return;
-          // Never queue microphone recordings for replay after a reconnect.
-          if (this.socket.bufferedAmount > 32000) { this.fail(ct('slowConnection')); return; }
-          this.socket.send(pcm);
-        }, () => this.fail(ct('micDisconnected')))
-      ]);
+      await this.player.unlock();
+      if (this.stopped) return;
+      await this.microphone.start(pcm => {
+        if (!this.ready || this.stopped || this.muted || this.socket?.readyState !== WebSocket.OPEN) return;
+        // Never queue microphone recordings for replay after a reconnect.
+        if (this.socket.bufferedAmount > 32000) { this.fail(ct('slowConnection')); return; }
+        this.socket.send(pcm);
+      }, () => this.fail(ct('micDisconnected')), this.player.getContext());
+      if (this.stopped) return;
+      this.micReady = true;
+      this.maybeMarkListening();
     } catch (error) { this.stop(); throw error; }
   }
 
@@ -88,13 +103,12 @@ export class CopilotVoiceStream {
         }
         const data = JSON.parse(event.data);
         if (data.type === 'ready') {
-          clearTimeout(this.timer); this.ready = true;
-          this.microphone.mute(this.muted);
-          if (this.muted) socket.send(JSON.stringify({ type: 'mute' }));
+          clearTimeout(this.timer);
+          this.serverReady = true;
           if (typeof data.assistantName === 'string' && data.assistantName.trim()) {
             this.callbacks.onAssistantName?.(data.assistantName.trim());
           }
-          this.callbacks.onState('listening');
+          this.maybeMarkListening();
         } else if (data.type === 'assistant_name') {
           if (typeof data.assistantName === 'string' && data.assistantName.trim()) {
             this.callbacks.onAssistantName?.(data.assistantName.trim());
@@ -122,7 +136,7 @@ export class CopilotVoiceStream {
             });
           }
         } else if (data.type === 'reconnect') {
-          this.ready = false; this.player.clear(); this.microphone.mute(true);
+          this.ready = false; this.serverReady = false; this.player.clear(); this.microphone.mute(true);
           this.callbacks.onState('reconnecting');
           this.socket = null; socket.close();
           if (++this.reconnects > 8) { this.fail(ct('callLimit')); return; }
@@ -165,7 +179,7 @@ export class CopilotVoiceStream {
 
   stop() {
     if (this.stopped) return;
-    this.stopped = true; this.ready = false; this.generation++;
+    this.stopped = true; this.ready = false; this.micReady = false; this.serverReady = false; this.generation++;
     clearTimeout(this.timer);
     this.microphone.stop(); this.player.stop();
     if (this.socket?.readyState === WebSocket.OPEN) this.socket.send(JSON.stringify({ type: 'stop' }));
