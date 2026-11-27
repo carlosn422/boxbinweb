@@ -337,98 +337,6 @@ export async function fetchLiveInventoryContext(_userId: string, activeBinId?: s
     binId: activeBinId || null
   });
 }
-function createWordPacer(onChunk: (text: string) => void) {
-  const queue: string[] = [];
-  let timer: ReturnType<typeof setInterval> | null = null;
-  let drainResolve: (() => void) | null = null;
-  let closing = false;
-
-  const splitWords = (text: string): string[] => {
-    const tokens = text.match(/\S+\s*|\s+/g) || [text];
-    const pieces: string[] = [];
-    let current = '';
-    for (const tok of tokens) {
-      if (current.length + tok.length > 16 && current) {
-        pieces.push(current);
-        current = tok;
-      } else {
-        current += tok;
-      }
-    }
-    if (current) pieces.push(current);
-    return pieces;
-  };
-
-  const step = () => {
-    if (!queue.length) {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-      if (closing && drainResolve) {
-        const res = drainResolve;
-        drainResolve = null;
-        res();
-      }
-      return;
-    }
-    // If closing and many pieces remain, take a slightly bigger bite so completion never lags
-    const count = closing && queue.length > 8 ? Math.ceil(queue.length / 6) : 1;
-    const chunk = queue.splice(0, count).join('');
-    if (chunk) onChunk(chunk);
-    if (!queue.length && closing) {
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-      if (drainResolve) {
-        const res = drainResolve;
-        drainResolve = null;
-        res();
-      }
-    }
-  };
-
-  return {
-    push(delta: string) {
-      if (!delta) return;
-      const pieces = splitWords(delta);
-      const wasEmpty = queue.length === 0;
-      queue.push(...pieces);
-      if (wasEmpty) step(); // Emit first word immediately with 0ms delay!
-      if (queue.length > 0 && !timer) {
-        timer = setInterval(step, 18);
-      }
-    },
-    async finish(): Promise<void> {
-      closing = true;
-      if (!queue.length) {
-        if (timer) {
-          clearInterval(timer);
-          timer = null;
-        }
-        return;
-      }
-      await new Promise<void>(resolve => {
-        drainResolve = resolve;
-        if (!timer) timer = setInterval(step, 16);
-      });
-    },
-    cancel() {
-      queue.length = 0;
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-      if (drainResolve) {
-        const res = drainResolve;
-        drainResolve = null;
-        res();
-      }
-    }
-  };
-}
-
 export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
   sender: string;
   text: string;
@@ -496,7 +404,6 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  const pacer = createWordPacer(onChunk);
   let buffer = '';
   let finalResponse: CopilotResponse | null = null;
   let streamedAny = false;
@@ -516,11 +423,10 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
       if (firstDeltaMs === null) firstDeltaMs = Math.round(performance.now() - startedAt);
       deltaChunks++;
       streamedAny = true;
-      pacer.push(parsed.delta);
+      onChunk(parsed.delta);
     } else if (eventName === 'done') {
       finalResponse = parsed as CopilotResponse;
     } else if (eventName === 'error') {
-      pacer.cancel();
       throw new CopilotServiceError(
         copilotError(parsed?.code),
         typeof parsed?.code === 'string' ? parsed.code : undefined,
@@ -544,10 +450,6 @@ export async function streamQueryToBoxBinCopilot(query: string, chatHistory: {
     }
     buffer += decoder.decode().replace(/\r\n/g, '\n');
     if (buffer.trim()) handleFrame(buffer.trim());
-    await pacer.finish();
-  } catch (err) {
-    pacer.cancel();
-    throw err;
   } finally {
     reader.releaseLock();
   }

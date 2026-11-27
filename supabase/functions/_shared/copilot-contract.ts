@@ -236,7 +236,7 @@ export function requestsAssistantRename(query: string, history: {
   sender: string;
   text: string;
 }[] = []) {
-  if (/\b(llamar(?:te|me|ás|as)?|ll[aá]mate|nombre|renombra(?:r|te)?|bautiz|apodo|call you|your name|rename|name you|new name)\b/i.test(query)) {
+  if (/\b(llamar(?:te|me|ás|as)?|ll[aá]mate|renombra(?:r|te)?|bautiz\w*|apodo|tu nombre|otro nombre|nuevo nombre|cambiar(?:te)?\s+(?:el|de|tu)\s+nombre|pon(?:er|le|te)?\s+(?:un\s+)?nombre|call you|your name|rename|name you|new name)\b/i.test(query)) {
     return true;
   }
   const lastBot = [...history].reverse().find(m => m.sender !== 'user');

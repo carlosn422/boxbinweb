@@ -37,6 +37,8 @@ export async function handler(req: Request): Promise<Response> {
 }
 
 export function attachSession(socket: WebSocket, ctx: Context, key: string, duration = 130000, entitlements: CopilotEntitlements = DEFAULT_COPILOT_ENTITLEMENTS) {
+  const sessionStartedAt = Date.now();
+  let providerStartedAt = 0;
   let language: CopilotLanguage = 'en';
   const localized = (en: string, es: string) => language === 'es' ? es : en;
   let provider: WebSocket | undefined;
@@ -193,16 +195,16 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       started = true; clearTimeout(idle);
       const input = prepareInput({ query: 'Voice conversation', language: data.language, binId: data.binId, chatHistory: data.chatHistory });
       scope = input.binId; language = input.language;
-      const [inv, pref] = await Promise.all([
-        inventory(ctx, scope), // Verify scope before any provider connection.
+      const [inv, pref, resumed] = await Promise.all([
+        inventory(ctx, scope, '', 0, 200, language), // Verify scope and load up to 200 items before connecting.
         typeof getAssistantName === 'function'
           ? getAssistantName(ctx)
-          : Promise.resolve({ name: DEFAULT_ASSISTANT_NAME, isCustom: false })
+          : Promise.resolve({ name: DEFAULT_ASSISTANT_NAME, isCustom: false }),
+        data.resumeToken ? openResumePayload(data.resumeToken, ctx, scope, language) : Promise.resolve(undefined)
       ]);
       initial = inv;
       assistantName = pref.name;
       assistantIsCustom = pref.isCustom;
-      const resumed = data.resumeToken ? await openResumePayload(data.resumeToken, ctx, scope, language) : undefined;
       const handle = resumed?.handle;
       if (resumed?.callId) callId = resumed.callId;
       if (typeof resumed?.elapsedSeconds === 'number') elapsedSeconds = resumed.elapsedSeconds;
@@ -214,6 +216,7 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
       if (closed) return;
       const setup = liveSetup(initial, input.history, handle, language, assistantName, assistantIsCustom);
       turn = newTurn();
+      providerStartedAt = Date.now();
       provider = new WebSocket('wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key=' + encodeURIComponent(key));
       provider.binaryType = 'arraybuffer';
       setupTimer = setTimeout(() => void fail(new CopilotError('COPILOT_UNAVAILABLE', 503)), 15000);
@@ -249,7 +252,9 @@ export function attachSession(socket: WebSocket, ctx: Context, key: string, dura
         if (closed) return;
       }
       ready = true;
-      send({ type: 'ready', assistantName });
+      const timing = { readyMs: Date.now() - sessionStartedAt, providerSetupAndBillingMs: Date.now() - providerStartedAt };
+      console.info('Copilot voice timing', timing);
+      send({ type: 'ready', assistantName, debugTiming: timing });
       if (latestUsage) send({ type: 'usage', usage: latestUsage, elapsedSeconds, maxCallSeconds: entitlements.maxCallSeconds });
       startBillingTicker();
     }

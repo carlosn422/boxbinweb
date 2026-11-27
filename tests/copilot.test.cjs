@@ -680,3 +680,111 @@ test('Chat skips Phase 1 when inventory is complete and streams SSE deltas when 
   assert.match(text, /event: delta\ndata: \{"delta":"2 ítems\."\}/);
   assert.match(text, /event: done\ndata: \{.*"reply":"Tienes 2 ítems\."/);
 });
+
+test('Performance optimizations: order-independent search, rename regex precision, and persistent DB plan cache', async () => {
+  // 1. Rename regex avoids false positives on inventory questions mentioning "nombre"
+  assert.equal(contract.requestsAssistantRename('¿Cuál es el nombre de esta caja?'), false);
+  assert.equal(contract.requestsAssistantRename('Cambia el nombre del taladro'), false);
+  assert.equal(contract.requestsAssistantRename('Quiero llamarte Luna'), true);
+  assert.equal(contract.requestsAssistantRename('¿Cuál es tu nombre?'), true);
+  assert.equal(contract.requestsAssistantRename('Cambia tu nombre a Jarvis'), true);
+
+  // 2. Multi-word order-independent SQL search in copilot_inventory
+  const db = await fixture();
+  try {
+    const rev = (await db.query('select copilot_inventory($1,$2,$3,$4,50) result', [A, null, '151 taladro', 0])).rows[0].result;
+    assert.equal(rev.matches.items, 1);
+    assert.equal(rev.itemsSample[0].name, 'Taladro 151');
+  } finally {
+    await db.close();
+  }
+
+  // 3. plan() reuses persistent copilot_entitlements cache without calling Stripe
+  let stripeCalls = 0;
+  const server = loadTS('supabase/functions/_shared/copilot-server.ts', {
+    'https://esm.sh/@supabase/supabase-js@2.109.0': { createClient() {} }
+  }, {
+    Deno: { env: { get: () => 'sk_test_unused' } },
+    fetch: async () => { stripeCalls++; throw new Error('Should not call Stripe on DB cache hit'); }
+  });
+  const subKey = JSON.stringify([A, A, 'price_pro123', 'sub_pro123', 'active']);
+  const cachedLimits = {
+    items: 1000, bins: 200, locations: 50,
+    copilot: server.resolveCopilotEntitlements('Pro', 1400, {})
+  };
+  const fakeDb = {
+    from: (table) => table === 'subscriptions'
+      ? { select: () => ({ eq: () => ({ limit: async () => ({ data: [{ planId: 'price_pro123', stripeSubscriptionId: 'sub_pro123', status: 'active' }], error: null }) }) }) }
+      : { select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { cached_sub_key: subKey, cached_limits: cachedLimits, cached_expires_at: new Date(Date.now() + 600000).toISOString() }, error: null }) }) }) }
+  };
+  const limits = await server.plan({ db: fakeDb, actor: A, owner: A });
+  assert.equal(stripeCalls, 0);
+  assert.equal(limits.copilot.tier, 'pro');
+  assert.equal(limits.items, 1000);
+});
+
+test('Chat never consumes allowance if scope or preferences fail validation', async () => {
+  for (const failing of ['inventory', 'preference']) {
+    let charges = 0;
+    const server = {
+      cors: {}, authenticate: async () => ({ actor: A, owner: A, db: {} }),
+      readBody: req => req.json(), plan: async () => ({ items: 100 }),
+      failure: e => new Response(e.message, { status: 404 }),
+      inventory: async () => { if (failing === 'inventory') throw Error('COPILOT_NOT_FOUND'); return {}; },
+      getAssistantName: async () => { if (failing === 'preference') throw Error('COPILOT_UNAVAILABLE'); return {name:'Boxbin'}; },
+      rpc: async () => { charges++; return {}; }
+    };
+    const {handler} = loadTS('supabase/functions/_shared/copilot-chat.ts', {'./copilot-server.ts': server});
+    const result = await handler(new Request('https://test.local', {method:'POST',body:JSON.stringify({query:'hola',binId:'missing-box'})}));
+    assert.equal(result.status, 404);
+    assert.equal(charges, 0);
+  }
+});
+
+test('Global totals bypass tool planning for large inventories but filtered totals still search', async () => {
+  for (const [query, expected] of [['¿Cuántos ítems tengo?',false], ['How many bins do I have?',false], ['¿Cuántos productos tengo en total?',false], ['¿Cuántos taladros tengo?',true]]) {
+    let planning = 0;
+    const server = {
+      cors:{}, authenticate:async()=>({actor:A,owner:A,db:{}}), readBody:r=>r.json(),
+      plan:async()=>({items:1000}), rpc:async()=>null,
+      json:data=>new Response(JSON.stringify(data)), failure:e=>{throw e;},
+      inventory:async()=>({hasMore:true,inventoryMetrics:{totalItems:501},binsSummary:[],locationsSummary:[],itemsSample:[]}),
+      gemini:async body=>{
+        if(body.tools) { planning++; return {content:{parts:[{text:'READY'}]}}; }
+        return {content:{parts:[{text:JSON.stringify({reply:'501',suggestedActions:[],suggestedQuestions:[]})}]}};
+      }, candidateText:c=>c.content.parts[0].text
+    };
+    const {handler}=loadTS('supabase/functions/_shared/copilot-chat.ts',{'./copilot-server.ts':server});
+    const response=await handler(new Request('https://test.local',{method:'POST',body:JSON.stringify({query})}));
+    assert.equal(response.status,200);
+    assert.equal(planning,expected?1:0,query);
+  }
+});
+
+test('Plan persistence survives response completion and reports returned database errors', async () => {
+  for (const failedStage of [null, 'sync', 'cache']) {
+    const pending = [], errors = [];
+    let writes = 0;
+    const server = loadTS('supabase/functions/_shared/copilot-server.ts', {
+      'https://esm.sh/@supabase/supabase-js@2.109.0': {createClient(){}}
+    }, {
+      EdgeRuntime: {waitUntil: task => pending.push(task)},
+      console: {...console, error: (...args) => errors.push(args)}
+    });
+    const db = {
+      rpc: async () => ({error: failedStage === 'sync' ? {message:'sync failed'} : null}),
+      from: table => table === 'subscriptions'
+        ? {select:()=>({eq:()=>({limit:async()=>({data:[{planId:'price_free123',status:'active'}]})})})}
+        : {
+          select:()=>({eq:()=>({maybeSingle:async()=>({data:null})})}),
+          update:()=>({eq:async()=>{writes++;return {error:failedStage === 'cache'?{message:'cache failed'}:null};}})
+        }
+    };
+    const limits = await server.plan({db,actor:A,owner:A});
+    assert.equal(limits.copilot.tier,'free');
+    assert.equal(pending.length,1);
+    await Promise.all(pending);
+    assert.equal(writes,failedStage==='sync'?0:1);
+    assert.equal(errors.length,failedStage?1:0);
+  }
+});

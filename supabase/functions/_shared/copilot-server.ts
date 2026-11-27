@@ -194,6 +194,8 @@ export async function readBody(req: Request) {
     throw new CopilotError('COPILOT_INVALID');
   }
 }
+const ownerCache = new Map<string, { owner: string; expires: number }>();
+
 export async function authenticate(req: Request) {
   const token = req.headers.get('Authorization')?.match(/^Bearer\s+(\S+)$/i)?.[1];
   if (!token) throw new CopilotError('COPILOT_UNAUTHORIZED', 401);
@@ -212,13 +214,19 @@ export async function authenticate(req: Request) {
   } = await db.auth.getUser(token);
   if (error || !data.user) throw new CopilotError('COPILOT_UNAUTHORIZED', 401);
   const actor = data.user.id;
-  const owner = await rpc(db, 'copilot_owner', {
-    p_actor: actor
-  });
+  const cachedOwner = ownerCache.get(actor);
+  let owner: string;
+  if (cachedOwner && cachedOwner.expires > Date.now()) {
+    owner = cachedOwner.owner;
+  } else {
+    owner = String(await rpc(db, 'copilot_owner', { p_actor: actor }));
+    if (ownerCache.size > 500) ownerCache.clear();
+    ownerCache.set(actor, { owner, expires: Date.now() + 300000 });
+  }
   return {
     db,
     actor,
-    owner: String(owner)
+    owner
   };
 }
 export type Context = Awaited<ReturnType<typeof authenticate>>;
@@ -275,10 +283,30 @@ function utcMonthWindow(now = new Date()) {
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
   return { periodStart: start.toISOString(), periodEnd: end.toISOString() };
 }
-async function syncEntitlements(ctx: Context, copilot: CopilotEntitlements) {
+const PLAN_MEMORY_TTL_MS = 300000; // 5 minutes in warm isolate
+const PLAN_DB_TTL_MS = 900000; // 15 minutes persisted across cold starts (invalidated immediately if subscriptions row changes)
+
+function isValidCachedLimits(v: unknown): v is PlanLimits {
+  const r = record(v);
+  const c = record(r.copilot);
+  return (
+    typeof r.items === 'number' &&
+    typeof r.bins === 'number' &&
+    typeof r.locations === 'number' &&
+    typeof c.tier === 'string' &&
+    typeof c.monthlyMessages === 'number' &&
+    typeof c.monthlyVoiceSeconds === 'number'
+  );
+}
+
+async function syncEntitlements(
+  ctx: Context,
+  copilot: CopilotEntitlements,
+  cache?: { subKey: string; limits: PlanLimits }
+) {
   if (!ctx.db?.rpc) return;
   try {
-    await ctx.db.rpc('copilot_sync_entitlements', {
+    const synced = await ctx.db.rpc('copilot_sync_entitlements', {
       p_actor: ctx.actor,
       p_tier: copilot.tier,
       p_plan_name: copilot.planName,
@@ -287,20 +315,58 @@ async function syncEntitlements(ctx: Context, copilot: CopilotEntitlements) {
       p_period_start: copilot.periodStart || null,
       p_period_end: copilot.periodEnd || null
     });
+    if (synced?.error) throw synced.error;
+    if (cache && ctx.db?.from) {
+      const saved = await ctx.db
+        .from('copilot_entitlements')
+        .update({
+          cached_sub_key: cache.subKey,
+          cached_limits: cache.limits,
+          cached_expires_at: new Date(Date.now() + PLAN_DB_TTL_MS).toISOString()
+        })
+        .eq('actor', ctx.actor);
+      if (saved?.error) throw saved.error;
+    }
   } catch (e) {
     console.error('Failed to sync copilot entitlements', e);
   }
 }
+
+function persistEntitlements(ctx: Context, copilot: CopilotEntitlements, cache: { subKey: string; limits: PlanLimits }) {
+  const pending = syncEntitlements(ctx, copilot, cache);
+  // Register background persistence so the worker can finish it after responding.
+  const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (task: Promise<unknown>) => void } }).EdgeRuntime;
+  runtime?.waitUntil?.(pending);
+}
+
 export async function plan(ctx: Context): Promise<PlanLimits> {
-  const {
-    data,
-    error
-  } = await ctx.db.from('subscriptions').select('*').eq('userId', ctx.owner).limit(20);
+  const [subRes, entRes] = await Promise.all([
+    ctx.db.from('subscriptions').select('*').eq('userId', ctx.owner).limit(20),
+    ctx.db?.from
+      ? ctx.db
+          .from('copilot_entitlements')
+          .select('cached_sub_key, cached_limits, cached_expires_at')
+          .eq('actor', ctx.actor)
+          .maybeSingle()
+          .then((r: any) => r?.data || null, () => null)
+      : Promise.resolve(null)
+  ]);
+  const { data, error } = subRes;
   if (error) throw new CopilotError('COPILOT_UNAVAILABLE', 503);
+  const now = Date.now();
+  const dbCachedKey = typeof entRes?.cached_sub_key === 'string' ? entRes.cached_sub_key : null;
+  const dbCachedExp = entRes?.cached_expires_at ? Date.parse(entRes.cached_expires_at) : 0;
+  const dbCachedLimits = isValidCachedLimits(entRes?.cached_limits) ? entRes.cached_limits : null;
+
   for (const sub of (data || []).filter((s: any) => !s.status || ['active', 'trialing'].includes(s.status)).slice(0, 3)) {
     const cacheKey = JSON.stringify([ctx.actor, ctx.owner, sub.planId, sub.stripeSubscriptionId, sub.status]);
     const cached = planCache.get(cacheKey);
-    if (cached && cached.expires > Date.now()) return cached.limits;
+    if (cached && cached.expires > now) return cached.limits;
+    if (dbCachedLimits && dbCachedKey === cacheKey && dbCachedExp > now) {
+      if (planCache.size > 200) planCache.clear();
+      planCache.set(cacheKey, { expires: Math.min(now + PLAN_MEMORY_TTL_MS, dbCachedExp), limits: dbCachedLimits });
+      return dbCachedLimits;
+    }
     if (!sub.planId || !/^price_[A-Za-z0-9]+$/.test(sub.planId)) continue;
     // Free plans activated via activate_free and legacy migrated rows do not
     // have a Stripe subscription id. Read the Stripe price when available so
@@ -332,8 +398,8 @@ export async function plan(ctx: Context): Promise<PlanLimits> {
         copilot
       };
       if (planCache.size > 200) planCache.clear();
-      planCache.set(cacheKey, { expires: Date.now() + 120000, limits });
-      void syncEntitlements(ctx, copilot);
+      planCache.set(cacheKey, { expires: Date.now() + PLAN_MEMORY_TTL_MS, limits });
+      persistEntitlements(ctx, copilot, { subKey: cacheKey, limits });
       return limits;
     }
     const hasStripeSub = /^sub_[A-Za-z0-9]+$/.test(sub.stripeSubscriptionId || '');
@@ -374,10 +440,10 @@ export async function plan(ctx: Context): Promise<PlanLimits> {
     };
     if (planCache.size > 200) planCache.clear();
     planCache.set(cacheKey, {
-      expires: Date.now() + 120000,
+      expires: Date.now() + PLAN_MEMORY_TTL_MS,
       limits
     });
-    void syncEntitlements(ctx, copilot);
+    persistEntitlements(ctx, copilot, { subKey: cacheKey, limits });
     return limits;
   }
   throw new CopilotError('COPILOT_SUBSCRIPTION', 403);

@@ -358,19 +358,6 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }
     if (op !== 'chat') throw new CopilotError('COPILOT_INVALID');
     const input = prepareInput(body);
-    let planMs = 0, invMs = 0, prefMs = 0;
-    const [limits, initial, assistantPref] = await Promise.all([
-      (async () => { const t = Date.now(); const r = await plan(ctx); planMs = Date.now() - t; return r; })(),
-      (async () => { const t = Date.now(); const r = await inventory(ctx, input.binId, '', 0, 50, input.language); invMs = Date.now() - t; return r; })(),
-      (async () => {
-        const t = Date.now();
-        const r = typeof getAssistantName === 'function'
-          ? await getAssistantName(ctx)
-          : { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
-        prefMs = Date.now() - t;
-        return r;
-      })()
-    ]);
     const fallbackEntitlements = DEFAULT_COPILOT_ENTITLEMENTS || {
       tier: 'starter',
       planName: 'Starter',
@@ -384,27 +371,39 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       maxCallSeconds: 120
     };
     const tokenCosts = COPILOT_TOKEN_COSTS || { chat: 50, upload: 100, image: 500, voiceBlock30s: 200, voicePerMin: 400, video30s: 500 };
-    const copilot = limits?.copilot || fallbackEntitlements;
     const kind = input.image ? 'upload' : 'chat';
-    const monthlyLimit = input.image ? copilot.monthlyUploads : copilot.monthlyMessages;
     const tokenCost = input.image ? tokenCosts.upload : tokenCosts.chat;
     const receiptId = identifier(body.requestId) || crypto.randomUUID();
+
+    // Keep read-only preparation parallel; charge only after all validation succeeds.
+    let planMs = 0, billingMs = 0, invMs = 0, prefMs = 0;
+    const [limits, initial, assistantPref] = await Promise.all([
+      (async () => { const t = Date.now(); const r = await plan(ctx); planMs = Date.now() - t; return r; })(),
+      (async () => { const t = Date.now(); const r = await inventory(ctx, input.binId, '', 0, 200, input.language); invMs = Date.now() - t; return r; })(),
+      (async () => {
+        const t = Date.now();
+        const r = typeof getAssistantName === 'function'
+          ? await getAssistantName(ctx)
+          : { name: DEFAULT_ASSISTANT_NAME, isCustom: false };
+        prefMs = Date.now() - t;
+        return r;
+      })()
+    ]);
+    stream?.signal.throwIfAborted();
+    const copilot = limits?.copilot || fallbackEntitlements;
     const billingStart = Date.now();
     const billing = await rpc(ctx.db, 'copilot_consume_allowance', {
-      p_actor: ctx.actor,
-      p_kind: kind,
-      p_amount: 1,
-      p_monthly_limit: monthlyLimit,
-      p_token_cost: tokenCost,
-      p_receipt: `copilot:${kind}:${receiptId}`
+      p_actor: ctx.actor, p_kind: kind, p_amount: 1,
+      p_monthly_limit: input.image ? copilot.monthlyUploads : copilot.monthlyMessages,
+      p_token_cost: tokenCost, p_receipt: `copilot:${kind}:${receiptId}`
     });
-    const billingMs = Date.now() - billingStart;
+    billingMs = Date.now() - billingStart;
     let assistantName = assistantPref.name;
     let assistantIsCustom = assistantPref.isCustom;
     const allowWeb = requestsWebPrices(input.query, input.history);
     const simpleGreetingOrMetrics =
       !input.image &&
-      /^(?:hola|hi|hello|hey|buenos d[ií]as|buenas tardes|buenas noches|gracias|thanks|ok|okay|qu[eé] tal|c[oó]mo est[aá]s|qui[eé]n eres|c[oó]mo te llamas|who are you|what is your name|cu[aá]ntos [ií]tems|cu[aá]ntas cajas|cu[aá]l es el valor|how many items|how many bins|total value)[\s?!.,]*$/i.test(input.query.trim());
+      /^(?:hola|hi|hello|hey|buenos d[ií]as|buenas tardes|buenas noches|gracias|thanks|ok|okay|qu[eé] tal|c[oó]mo est[aá]s|qui[eé]n eres|c[oó]mo te llamas|who are you|what is your name|cu[aá]ntos [ií]tems|cu[aá]ntas cajas|cu[aá]l es el valor|how many items|how many bins|total value)[\s?!.,]*$/i.test(input.query.trim().replace(/^[¿¡]+/, '')) || (!input.image && /^(?:cu[aá]ntos (?:[ií]tems|art[ií]culos|productos) tengo(?: en total)?|cu[aá]ntas (?:cajas|ubicaciones) tengo(?: en total)?|how many (?:items|bins|locations) do i have(?: in total)?)[?!.\s]*$/i.test(input.query.trim().replace(/^[¿¡]+/, '')));
     const needsToolPhase =
       allowWeb ||
       requestsAssistantRename(input.query, input.history) ||
@@ -456,19 +455,21 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       const calls = candidate.content.parts.filter((p: any) => p.functionCall);
       if (!calls.length) break;
       contents.push(candidate.content); // preserve provider thought signatures on tool calls
-      const responses: any[] = [];
-      for (const part of calls.slice(0, 4)) {
-        const {
-          name,
-          args = {}
-        } = part.functionCall;
+      const batch: { name: string; args: Record<string, any>; callIndex: number; webSearchSlot: number }[] = calls.slice(0, 4).map((part: any) => {
+        const callIndex = ++toolCalls;
+        const { name, args = {} } = part.functionCall;
+        const webSearchSlot = name === 'search_prices' && allowWeb ? ++searches : 0;
+        return { name, args, callIndex, webSearchSlot };
+      });
+      const batchResults = await Promise.all(batch.map(async ({ name, args, callIndex, webSearchSlot }) => {
         let result: any;
-        if (++toolCalls > 6) result = { error: input.language === 'es' ? 'Límite de consultas por turno. Indica el alcance pendiente.' : 'Turn query limit exceeded. State the pending scope.' };
-        else if (name === 'search_inventory') {
+        if (callIndex > 6) {
+          result = { error: input.language === 'es' ? 'Límite de consultas por turno. Indica el alcance pendiente.' : 'Turn query limit exceeded. State the pending scope.' };
+        } else if (name === 'search_inventory') {
           const offset = Number(args.offset || 0);
           if (!Number.isSafeInteger(offset) || offset < 0 || offset > 1000000) throw new CopilotError('COPILOT_INVALID');
           result = inventoryForModel(await inventory(ctx, input.binId, text(args.search, 200), offset, 50, input.language));
-        } else if (name === 'search_prices' && allowWeb && searches++ < 2) {
+        } else if (name === 'search_prices' && allowWeb && webSearchSlot > 0 && webSearchSlot <= 2) {
           const product = publicProduct(args.product, privateValues);
           try {
             const web = await gemini({
@@ -485,7 +486,8 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
               }],
               generationConfig: {
                 temperature: 0.1,
-                maxOutputTokens: 4000
+                maxOutputTokens: 1200,
+                thinkingConfig
               }
             }, false, remaining(), stream?.signal);
             const found = sourcesFromGrounding(web.groundingMetadata);
@@ -521,9 +523,16 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
                 : 'Invalid name. Ask for a short name between 1 and 40 characters.'
             };
           }
-        } else result = {
-          error: input.language === 'es' ? 'Herramienta no disponible o límite de consultas alcanzado.' : 'Tool unavailable or query limit reached.'
-        };
+        } else {
+          result = {
+            error: input.language === 'es' ? 'Herramienta no disponible o límite de consultas alcanzado.' : 'Tool unavailable or query limit reached.'
+          };
+        }
+        return { name, result };
+      }));
+      const responses: any[] = [];
+      for (const { name, result: rawResult } of batchResults) {
+        let result = rawResult;
         const size = JSON.stringify(result).length;
         if (evidenceSize + size > 120000) result = { error: input.language === 'es' ? 'Límite de contexto alcanzado. Explica que la búsqueda está incompleta.' : 'Context limit reached. State that the search is incomplete.' };
         else evidenceSize += size;
@@ -605,6 +614,7 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       ttftMs,
       deltaChunks,
       phase2Ms,
+      firstTextMs: ttftMs === null ? null : phase2Start - reqStart + ttftMs + (stream?.authMs ?? 0),
       totalMs: Date.now() - reqStart + (stream?.authMs ?? 0)
     };
     console.info('Copilot chat timing', debugTiming);
