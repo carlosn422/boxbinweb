@@ -23,7 +23,6 @@ import {
   RefreshCw,
   QrCode,
   Layers,
-  Sparkles,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
@@ -35,6 +34,7 @@ import { toast } from "sonner";
 import { getStripePlanById } from "@/lib/stripe";
 import { ModalMessage, type ModalType } from "@/components/layout/ModalMessage";
 import { openBinCopilot } from "@/services/boxbinCopilotService";
+import { BoxBinAiIcon } from "@/components/ai/BoxBinAiIcon";
 import { AppDownloadBanner } from "@/components/layout/AppDownloadBanner";
 
 const ITEMS_PER_PAGE = 12;
@@ -694,7 +694,7 @@ export default function HomeScreen() {
               title={ct('askCopilot')}
             >
               <div className="inventory-action-icon-wrap bg-amber-50 text-brand-600 border border-amber-200/70">
-                <Sparkles className="w-3.5 h-3.5" />
+                <BoxBinAiIcon size={20} withBadge showSparkle={false} />
               </div>
               <div className="inventory-action-text">
                 <span className="inventory-action-title">{ct('aiCopilot')}</span>

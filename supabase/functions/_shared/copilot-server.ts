@@ -513,9 +513,9 @@ export async function inventory(ctx: Context, binId: string | null, search = '',
 export function fastThinkingConfig(): Record<string, unknown> {
   return { thinkingBudget: 0 };
 }
-export async function gemini(body: Record<string, unknown>, image = false, timeoutMs = image ? 110000 : 45000, signal?: AbortSignal) {
+export async function gemini(body: Record<string, unknown>, image = false, timeoutMs = image ? 110000 : 45000, signal?: AbortSignal, modelOverride?: string) {
   const key = Deno.env.get('GEMINI_API_KEY');
-  const model = Deno.env.get(image ? 'COPILOT_IMAGE_MODEL' : 'COPILOT_CHAT_MODEL') || (image ? 'gemini-2.5-flash-image' : 'gemini-3.8-flash');
+  const model = (!image && modelOverride) || Deno.env.get(image ? 'COPILOT_IMAGE_MODEL' : 'COPILOT_CHAT_MODEL') || (image ? 'gemini-2.5-flash-image' : 'gemini-3.8-flash');
   if (!key || !/^[a-zA-Z0-9_.-]+$/.test(model)) throw new CopilotError('COPILOT_CONFIGURATION', 503);
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',

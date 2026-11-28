@@ -22,9 +22,9 @@ export function partialReply(json: string): string {
   return result;
 }
 
-export async function streamReply(body: Record<string, unknown>, onText: (delta: string) => void, signal: AbortSignal, timeoutMs: number) {
+export async function streamReply(body: Record<string, unknown>, onText: (delta: string) => void, signal: AbortSignal, timeoutMs: number, modelOverride?: string) {
   const key = Deno.env.get('GEMINI_API_KEY');
-  const model = Deno.env.get('COPILOT_CHAT_MODEL') || 'gemini-3.8-flash';
+  const model = modelOverride || Deno.env.get('COPILOT_CHAT_MODEL') || 'gemini-3.8-flash';
   if (!key || !/^[a-zA-Z0-9_.-]+$/.test(model)) throw new CopilotError('COPILOT_CONFIGURATION', 503);
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },

@@ -29,7 +29,6 @@ import {
   Search,
   Grid,
   List,
-  Sparkles,
   UploadCloud,
   DollarSign,
   TrendingUp,
@@ -90,6 +89,7 @@ import EnhancedVideoAIModal from "../billing/EnhancedVideoAIModal";
 import EnhancedImagesAIModal from "../billing/EnhancedImageAIModal";
 import { useTranslation } from "react-i18next";
 import { openBinCopilot } from "@/services/boxbinCopilotService";
+import { BoxBinAiIcon } from "@/components/ai/BoxBinAiIcon";
 
 export interface TokenEstimate {
   success: boolean;
@@ -1315,7 +1315,7 @@ const BinDetailsScreen: React.FC = () => {
               className="bin-detail-copilot"
               title={t("containers.askBinCopilot", { defaultValue: "Ask BoxBin AI Copilot about this bin" })}
             >
-              <Sparkles className="w-3.5 h-3.5 text-brand-200 animate-pulse" />
+              <BoxBinAiIcon size={18} withBadge showSparkle={false} />
               <span>{t("containers.aiCopilot", { defaultValue: "AI Copilot" })}</span>
             </Button>
 

@@ -5,7 +5,8 @@ import { copilotText as ct, copilotLanguage } from '@/lib/copilotI18n';
 import { useCallback, useEffect, useRef, useState, type PointerEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { Box, Coins, Lock, MapPin, Package, Search, PencilLine, FileText, ArrowLeft, ChevronDown, ChevronRight, MessageSquare, ShieldCheck, Bot, Check, Phone, PhoneOff, Square, History, Loader2, Mic, MicOff, Paperclip, Plus, Send, Sparkles, Trash2, X, AudioLines, Captions } from 'lucide-react';
+import { Box, Coins, Lock, MapPin, Package, Search, PencilLine, FileText, ArrowLeft, ChevronDown, ChevronRight, MessageSquare, ShieldCheck, Check, Phone, PhoneOff, Square, History, Loader2, Mic, MicOff, Paperclip, Plus, Send, Sparkles, Trash2, X, AudioLines, Captions } from 'lucide-react';
+import { BoxBinAiIcon } from './BoxBinAiIcon';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { CopilotProposalFields } from './CopilotProposalFields';
@@ -898,7 +899,7 @@ export function BoxBinCopilotDrawer() {
               <AudioLines className="size-6 text-primary-foreground animate-pulse" />
             )
           ) : (
-            <Bot className="size-6" />
+            <BoxBinAiIcon size={36} />
           )}
         </button>
       </div>
@@ -910,7 +911,7 @@ export function BoxBinCopilotDrawer() {
         <header className="copilot-header">
           <div className="copilot-header-row">
             <div className="copilot-header-identity">
-              <div className="copilot-brand-icon"><Sparkles className="size-5 text-brand-200" /></div>
+              <div className="copilot-brand-icon"><BoxBinAiIcon size={32} /></div>
               <div className="min-w-0"><DialogTitle className="truncate text-base font-semibold tracking-tight">{assistantName}</DialogTitle><DialogDescription className="mt-0.5 truncate text-xs text-slate-400">{ct('assistantSubtitle')}</DialogDescription></div>
             </div>
             <div className="copilot-header-actions">
@@ -1029,7 +1030,7 @@ export function BoxBinCopilotDrawer() {
             {savingError && <div role="alert" className="mb-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-900">{savingError}<button disabled={locked} className="ml-2 min-h-9 underline" onClick={() => void persist(messages)}>{ct('retrySave')}</button></div>}
             <div className="copilot-thread">{messages.map(msg => msg.id.startsWith('welcome-') ? <article key={msg.id} className="copilot-welcome min-w-0">
               {messages.length === 1 && <>
-                <div className="copilot-welcome-icon"><Sparkles /></div>
+                <div className="copilot-welcome-icon"><BoxBinAiIcon size={40} /></div>
                 <h3>{ct('welcomeTitle')}</h3>
                 <p className="copilot-welcome-subtitle">{ct('welcomeShort')}</p>
                 <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1 text-xs font-medium text-brand-800">
@@ -1053,7 +1054,7 @@ export function BoxBinCopilotDrawer() {
                 </ResponsiveDisclosure>
               </>}
             </article> : <article key={msg.id} className={`copilot-turn ${msg.sender === 'user' ? 'copilot-turn-user' : 'copilot-turn-assistant'} ${msg.actionProposal ? 'copilot-turn-proposal' : ''}`}>
-              <div className="copilot-message-meta">{msg.sender === 'copilot' && <span className="copilot-message-avatar"><Sparkles aria-hidden="true" /></span>}<span>{msg.sender === 'user' ? ct('you') : assistantName}</span>{msg.sender === 'copilot' && !msg.isStreaming && typeof msg.responseTimeMs === 'number' && Number.isFinite(msg.responseTimeMs) && msg.responseTimeMs >= 0 && <span className="copilot-response-time" title={ct(msg.responseTimeKind === 'voice' ? 'voiceResponseTiming' : 'responseTiming', { seconds: (msg.responseTimeMs / 1000).toFixed(1) })} aria-label={ct(msg.responseTimeKind === 'voice' ? 'voiceResponseTiming' : 'responseTiming', { seconds: (msg.responseTimeMs / 1000).toFixed(1) })}>{msg.responseTimeKind === 'voice' ? `${ct('voiceTimingLabel')} ≈ ` : ''}{(msg.responseTimeMs / 1000).toFixed(1)} s</span>}</div>
+              <div className="copilot-message-meta">{msg.sender === 'copilot' && <span className="copilot-message-avatar"><BoxBinAiIcon size={18} withBadge showSparkle={false} /></span>}<span>{msg.sender === 'user' ? ct('you') : assistantName}</span>{msg.sender === 'copilot' && !msg.isStreaming && typeof msg.responseTimeMs === 'number' && Number.isFinite(msg.responseTimeMs) && msg.responseTimeMs >= 0 && <span className="copilot-response-time" title={ct(msg.responseTimeKind === 'voice' ? 'voiceResponseTiming' : 'responseTiming', { seconds: (msg.responseTimeMs / 1000).toFixed(1) })} aria-label={ct(msg.responseTimeKind === 'voice' ? 'voiceResponseTiming' : 'responseTiming', { seconds: (msg.responseTimeMs / 1000).toFixed(1) })}>{msg.responseTimeKind === 'voice' ? `${ct('voiceTimingLabel')} ≈ ` : ''}{(msg.responseTimeMs / 1000).toFixed(1)} s</span>}</div>
               <div className={msg.sender === 'user' ? 'copilot-message-user' : 'copilot-message-assistant'}>
                 {msg.attachedFile && <div className="mb-2 break-words text-xs">{msg.attachedFile.previewUrl && <img src={msg.attachedFile.previewUrl} alt={ct('attachedPhoto')} className="mb-1 max-h-32 rounded-xl" />}{msg.attachedFile.name}{!msg.attachedFile.previewUrl && ct('photoNotStored')}</div>}
                 {msg.isStreaming && !msg.text ? <div className="flex items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-500"><Loader2 className="size-4 shrink-0 animate-spin" />{ct('thinking')}</div> : <SafeMarkdown text={msg.text} />}

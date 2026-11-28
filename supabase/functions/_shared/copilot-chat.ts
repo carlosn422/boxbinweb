@@ -112,6 +112,42 @@ export const responseSchema = {
   },
   required: ['reply', 'suggestedQuestions', 'suggestedActions', 'actionProposal']
 };
+export const readOnlyResponseSchema = {
+  propertyOrdering: ['reply', 'suggestedQuestions', 'suggestedActions'],
+  type: 'OBJECT',
+  properties: {
+    reply: {
+      type: 'STRING'
+    },
+    suggestedQuestions: {
+      type: 'ARRAY',
+      items: {
+        type: 'STRING'
+      }
+    },
+    suggestedActions: {
+      type: 'ARRAY',
+      items: {
+        type: 'OBJECT',
+        properties: {
+          label: {
+            type: 'STRING'
+          },
+          path: {
+            type: 'STRING'
+          }
+        },
+        required: ['label', 'path']
+      }
+    }
+  },
+  required: ['reply', 'suggestedQuestions', 'suggestedActions']
+};
+export function mayNeedActionProposal(query: string, history: { sender: string; text: string }[] = [], hasImage = false): boolean {
+  if (hasImage) return true;
+  const recent = [query, ...history.slice(-2).map(m => m.text)].join(' ');
+  return /\b(crea\w*|agrega\w*|a[nñ]ad\w*|guarda\w*|registra\w*|edita\w*|actualiza\w*|cambia\w*|modifica\w*|mueve|mover|moviendo|transfi\w*|renombra\w*|elimina\w*|borra\w*|quita\w*|genera\w*|exporta\w*|descarga\w*|dibuja\w*|dise[nñ]\w*|pdf|reporte|informe|documento|imagen|foto|create|add|save|register|edit|update|change|modify|move|transfer|rename|delete|remove|generate|export|download|report|document|image|picture|photo|draw|sell|vender|venta|sale)\b/i.test(recent);
+}
 export async function canonicalProposal(ctx: Context, proposal: any, scope: string | null) {
   if (!proposal) return null;
   const d = proposal.data;
@@ -587,6 +623,9 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
         parts: responses
       });
     }
+    const isSimpleReadOnly = !needsToolPhase && !allowWeb && !input.image && !mayNeedActionProposal(input.query, input.history, false);
+    const fastModel = isSimpleReadOnly ? (Deno.env.get('COPILOT_FAST_MODEL') || 'gemini-2.5-flash-lite') : undefined;
+    const activeSchema = isSimpleReadOnly ? readOnlyResponseSchema : responseSchema;
     const finalRequest = {
       systemInstruction: {
         parts: [{
@@ -597,23 +636,36 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
       contents: [{ role: 'user', parts: [...parts, { text: JSON.stringify({ toolResults: evidence, instruction: input.language === 'es' ? 'Responde con los datos obtenidos. Declara búsquedas incompletas. Genera el JSON del contrato.' : 'Answer using the gathered data. State any incomplete searches. Generate the contract JSON.' }) }] }],
       generationConfig: {
         temperature: 0.1,
-        maxOutputTokens: 4096,
+        maxOutputTokens: isSimpleReadOnly ? 1536 : 4096,
         thinkingConfig,
         responseMimeType: 'application/json',
-        responseSchema
+        responseSchema: activeSchema
       }
     };
     const phase1Ms = needsToolPhase ? Date.now() - phase1Start : 0;
     const phase2Start = Date.now();
     let ttftMs: number | null = null;
     let deltaChunks = 0;
-    const raw = stream
+    const runPhase2 = async (modelOverride?: string) => stream
       ? await streamReply(finalRequest, (delta) => {
           if (ttftMs === null) ttftMs = Date.now() - phase2Start;
           deltaChunks++;
           stream.onText(delta);
-        }, stream.signal, remaining())
-      : candidateText(await gemini(finalRequest, false, remaining()));
+        }, stream.signal, remaining(), modelOverride)
+      : candidateText(await gemini(finalRequest, false, remaining(), undefined, modelOverride));
+    let usedFastModel = !!fastModel;
+    let raw: string;
+    try {
+      raw = await runPhase2(fastModel);
+    } catch (e) {
+      // Automatic fallback to standard chat model if fast model is unavailable/unconfigured
+      if (fastModel && deltaChunks === 0 && e instanceof CopilotError && e.code === 'COPILOT_CONFIGURATION') {
+        usedFastModel = false;
+        raw = await runPhase2(undefined);
+      } else {
+        throw e;
+      }
+    }
     const phase2Ms = Date.now() - phase2Start;
     const answer = validateAnswer(JSON.parse(raw), sources);
     try {
@@ -628,6 +680,8 @@ export async function handler(req: Request, stream?: ChatStream): Promise<Respon
     }
     const debugTiming = {
       streaming: !!stream,
+      fastPath: usedFastModel,
+      schema: isSimpleReadOnly ? 'readonly' : 'full',
       authMs,
       bodyMs,
       planMs,
